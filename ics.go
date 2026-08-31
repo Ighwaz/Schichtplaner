@@ -56,12 +56,8 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		for _, shift := range allShifts {
-			f := slotField(&slot, shift)
-			if f == nil {
-				continue
-			}
-			for _, name := range *f {
+		forEachShift(&slot, func(shift string, names *[]string) {
+			for _, name := range *names {
 				if person != "" && name != person {
 					continue
 				}
@@ -79,7 +75,7 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 				sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", label))
 				sb.WriteString("END:VEVENT\r\n")
 			}
-		}
+		})
 	}
 
 	sb.WriteString("END:VCALENDAR\r\n")
@@ -90,10 +86,8 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
-	r.ParseMultipartForm(16 << 20)
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		writeJSON(w, map[string]string{"error": "Keine Datei"})
+	file, ok := uploadedFile(w, r, 16<<20)
+	if !ok {
 		return
 	}
 	defer file.Close()
@@ -160,13 +154,8 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			slot, ok := d.Schichten[date]
-			if !ok {
-				slot = emptySlot()
-			}
-			f := slotField(&slot, shift)
-			if f != nil && !contains(*f, name) {
-				*f = append(*f, name)
+			slot := slotFor(&d, date)
+			if addToSlot(&slot, shift, name) {
 				d.Schichten[date] = slot
 				imported++
 			} else {

@@ -12,6 +12,12 @@ type Holiday struct {
 	Custom  bool   `json:"custom,omitempty"`
 }
 
+// appliesTo reports whether the holiday affects an employee of that team.
+// An employee without a team is never blocked by a holiday.
+func (h Holiday) appliesTo(team string) bool {
+	return team != "" && (h.Country == team || h.Country == "DE+IN")
+}
+
 // easter calculates Easter Sunday for a given year (Gregorian)
 func easter(year int) time.Time {
 	a := year % 19

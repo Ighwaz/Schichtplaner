@@ -139,3 +139,58 @@ func TestICSRoundTrip(t *testing.T) {
 		t.Fatalf("event missing from export:\n%s", ics)
 	}
 }
+
+func TestToggleUsesTheSameConflictRules(t *testing.T) {
+	a := newTestApp(t)
+	call(t, a, http.MethodPost, "/api/mitarbeiter", `{"name":"Anna","team":"DE"}`)
+
+	// 1. Mai 2026 is a public holiday in DE, so a toggle must ask first -
+	// exactly like an add does.
+	res := call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-05-01"],"schicht":"frueh","name":"Anna","action":"toggle"}`)
+	day := res["results"].(map[string]interface{})["2026-05-01"].(map[string]interface{})
+	if day["error"] != "holiday_conflict" {
+		t.Fatalf("toggle skipped the holiday check: %#v", day)
+	}
+
+	// 2. Forced toggle enters the shift and reports the warning.
+	res = call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-05-01"],"schicht":"frueh","name":"Anna","action":"toggle","force":true}`)
+	if len(res["hol_warnings"].([]interface{})) != 1 {
+		t.Fatalf("expected a holiday warning, got %#v", res["hol_warnings"])
+	}
+
+	// 3. Toggling again removes it.
+	res = call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-05-01"],"schicht":"frueh","name":"Anna","action":"toggle","force":true}`)
+	day = res["results"].(map[string]interface{})["2026-05-01"].(map[string]interface{})
+	if len(day["frueh"].([]interface{})) != 0 {
+		t.Fatalf("second toggle did not remove the entry: %#v", day["frueh"])
+	}
+}
+
+func TestNeedsConfirmBeforeReplacingAWorkShift(t *testing.T) {
+	a := newTestApp(t)
+	call(t, a, http.MethodPost, "/api/mitarbeiter", `{"name":"Anna","team":"DE"}`)
+	call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-04-02"],"schicht":"frueh","name":"Anna","action":"add"}`)
+
+	res := call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-04-02"],"schicht":"spaet","name":"Anna","action":"add"}`)
+	day := res["results"].(map[string]interface{})["2026-04-02"].(map[string]interface{})
+	if day["error"] != "needs_confirm" {
+		t.Fatalf("expected needs_confirm, got %#v", day)
+	}
+
+	// Rufbereitschaft is never reported as the blocking shift: it may run
+	// alongside a work shift, so replacing one work shift by another leaves it be.
+	call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-04-02"],"schicht":"rufbereitschaft","name":"Anna","action":"add","force":true}`)
+	res = call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-04-02"],"schicht":"spaet","name":"Anna","action":"add"}`)
+	day = res["results"].(map[string]interface{})["2026-04-02"].(map[string]interface{})
+	blocking := day["blocking"].([]interface{})
+	if len(blocking) != 1 || blocking[0] != "frueh" {
+		t.Fatalf("expected only frueh to block, got %#v", blocking)
+	}
+}

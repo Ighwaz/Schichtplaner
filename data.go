@@ -221,6 +221,62 @@ func slotField(s *DaySlot, shift string) *[]string {
 	return nil
 }
 
+// slotFor returns the day's slot, or an empty one if the day has no entries yet.
+func slotFor(d *AppData, date string) DaySlot {
+	if slot, ok := d.Schichten[date]; ok {
+		return slot
+	}
+	return emptySlot()
+}
+
+// forEachShift calls fn for every shift list of a slot.
+func forEachShift(slot *DaySlot, fn func(shift string, names *[]string)) {
+	for _, shift := range allShifts {
+		if f := slotField(slot, shift); f != nil {
+			fn(shift, f)
+		}
+	}
+}
+
+// addToSlot adds name to one shift of a slot and reports whether that changed
+// anything - an unknown shift or a name that is already there changes nothing.
+func addToSlot(slot *DaySlot, shift, name string) bool {
+	f := slotField(slot, shift)
+	if f == nil || contains(*f, name) {
+		return false
+	}
+	*f = append(*f, name)
+	return true
+}
+
+// removeFromSlot removes name from one shift and reports whether it was there.
+func removeFromSlot(slot *DaySlot, shift, name string) bool {
+	f := slotField(slot, shift)
+	if f == nil || !contains(*f, name) {
+		return false
+	}
+	*f = remove(*f, name)
+	return true
+}
+
+// blockingShifts lists the work shifts name already holds that day and that
+// cannot be combined with shift. Rufbereitschaft runs alongside everything.
+func blockingShifts(slot *DaySlot, shift, name string) []string {
+	if !workShifts[shift] {
+		return nil
+	}
+	var blocking []string
+	for _, s := range allShifts {
+		if !workShifts[s] || s == shift || s == "rufbereitschaft" {
+			continue
+		}
+		if f := slotField(slot, s); f != nil && contains(*f, name) {
+			blocking = append(blocking, s)
+		}
+	}
+	return blocking
+}
+
 func contains(arr []string, s string) bool {
 	for _, v := range arr {
 		if v == s {

@@ -900,6 +900,8 @@ const EXCLUSIVE   = new Set(['frueh','spaet','urlaub','krank','elternzeit','sond
 const WORK_SHIFTS = new Set(['frueh','spaet','rufbereitschaft']);
 const ABSENCE     = new Set(['urlaub','krank','elternzeit','sonderurlaub']);
 const SHIFT_LABEL = {frueh:'Frühschicht',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft',urlaub:'Urlaub',krank:'Krank',elternzeit:'Elternzeit',sonderurlaub:'Sonderurlaub'};
+// Frischer, leerer Tag - jeder Aufruf liefert eigene Arrays.
+function emptyDay(){return Object.fromEntries(ALL_SHIFTS.map(s=>[s,[]]));}
 const SHIFT_TIME  = {frueh:'06:00–14:00',spaet:'14:00–22:00',rufbereitschaft:'22:00–06:00',urlaub:'ganztägig',krank:'ganztägig',elternzeit:'ganztägig',sonderurlaub:'ganztägig'};
 const SHIFT_CSS   = {frueh:'frueh',spaet:'spaet',rufbereitschaft:'ruf',urlaub:'urlaub',krank:'krank',elternzeit:'elternzeit',sonderurlaub:'sonderurlaub'};
 const SHIFT_VAR   = {frueh:'--frueh',spaet:'--spaet',rufbereitschaft:'--ruf',urlaub:'--urlaub',krank:'--krank',elternzeit:'--eltern',sonderurlaub:'--sonder'};
@@ -1180,7 +1182,7 @@ async function applyRufKW(){
     body:JSON.stringify({year,month:month?parseInt(month):null,overwrite})});
   if(d.error){resEl.style.cssText='display:block;background:rgba(239,68,68,.1);color:#f87171';resEl.textContent='Fehler: '+d.error;}
   else{resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';resEl.textContent=d.applied+' Rufbereitschafts-Einträge übertragen.';
-    const data=await api('/api/data');schichten=data.schichten||{};renderCalendar();toast('Rufbereitschaft eingetragen');}
+    await reloadSchichten();renderCalendar();toast('Rufbereitschaft eingetragen');}
 }
 
 function exportRufKWCSV(){
@@ -1197,6 +1199,13 @@ function exportRufKWCSV(){
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=url;a.download=`ruf_kw_${year}.csv`;a.click();URL.revokeObjectURL(url);
   toast('CSV exportiert');
+}
+
+// Schichten/Notizen frisch vom Server holen, nachdem der Server sie geändert hat.
+async function reloadSchichten(){
+  const d=await api('/api/data');
+  schichten=d.schichten||{}; notizen=d.notizen||{};
+  return d;
 }
 
 function applyData(d){
@@ -1716,7 +1725,7 @@ async function confirmRestore(doRestore){
   const{name,team,color}=pendingRestore;pendingRestore=null;await doAdd(name,team,color);
   if(doRestore&&deletedBackups[name]){
     await api('/api/mitarbeiter/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,entries:deletedBackups[name]})});
-    const d=await api('/api/data');schichten=d.schichten||{};notizen=d.notizen||{};renderCalendar();toast(name+': Einträge wiederhergestellt');
+    await reloadSchichten();renderCalendar();toast(name+': Einträge wiederhergestellt');
   }
   delete deletedBackups[name];
 }
@@ -1975,31 +1984,35 @@ async function handleCellClick(e,key){
   } else toast('Bitte erst einen Mitarbeiter auswählen');
 }
 
+// Zwei Klicks spannen einen Bereich auf; liefert true, wenn der Klick
+// dazu gehoerte und schon verarbeitet wurde.
+async function handleRangeClick(key,names){
+  if(!rangeStart){
+    rangeStart=key; previewEnd=key;
+    updateSelInfo(); renderCalendar();
+    return true;
+  }
+  const lo=rangeStart<key?rangeStart:key;
+  const hi=rangeStart<key?key:rangeStart;
+  const dates=datesInRange(lo,hi);
+  rangeStart=null; previewEnd=null;
+  renderCalendar(); updateSelInfo();
+  await applyToDateList(dates,names,'add');
+  return true;
+}
+
 async function handleSinglePersonClick(key,ctrl){
   if(ctrl){if(multiDays.has(key))multiDays.delete(key);else multiDays.add(key);renderCalendar();updateSelInfo();return;}
   if(multiDays.size>0){await applyToDateList([...multiDays],[selectedPerson.name],'add');multiDays.clear();renderCalendar();updateSelInfo();return;}
-  if(rangeMode){
-    if(!rangeStart){
-      rangeStart=key; previewEnd=key;
-      updateSelInfo(); renderCalendar();
-    } else {
-      // 2nd click: apply immediately
-      const lo=rangeStart<key?rangeStart:key;
-      const hi=rangeStart<key?key:rangeStart;
-      const dates=datesInRange(lo,hi);
-      rangeStart=null; previewEnd=null;
-      renderCalendar(); updateSelInfo();
-      await applyToDateList(dates,[selectedPerson.name],'add');
-    }
-    return;
-  }
+  if(rangeMode){ await handleRangeClick(key,[selectedPerson.name]); return; }
   pushUndo();
   const res=await postSchicht([key],'toggle',selectedShift,selectedPerson.name);
   const r=res?.results?.[key];
-  if(r?.error==='needs_confirm'){
+  if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
     undoStack.pop();updateUndoBtns();
-    const blockNames=r.blocking.map(s=>SHIFT_LABEL[s]).join(', ');
-    const ok=await confirmDialog('Schicht ersetzen?',`<strong>${esc(selectedPerson.name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`);
+    const ok=r.error==='needs_confirm'
+      ? await confirmReplaceShift(selectedPerson.name,r.blocking)
+      : await confirmHolidayEntry(selectedPerson.name,[[key,r]]);
     if(ok){pushUndo();const r2=await postSchicht([key],'add',selectedShift,selectedPerson.name,true);applyResults(r2.results);showHolWarnings(r2.hol_warnings);}
   } else if(r?.error){undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich');}
   else{applyResults(res.results);showHolWarnings(res.hol_warnings);}
@@ -2007,23 +2020,21 @@ async function handleSinglePersonClick(key,ctrl){
 
 async function handleMultiPersonClick(key,ctrl){
   if(ctrl){if(multiDays.has(key))multiDays.delete(key);else multiDays.add(key);renderCalendar();updateSelInfo();return;}
-  if(rangeMode){
-    if(!rangeStart){
-      rangeStart=key; previewEnd=key;
-      updateSelInfo(); renderCalendar();
-    } else {
-      const lo=rangeStart<key?rangeStart:key;
-      const hi=rangeStart<key?key:rangeStart;
-      const dates=datesInRange(lo,hi);
-      rangeStart=null; previewEnd=null;
-      renderCalendar(); updateSelInfo();
-      await applyToDateList(dates,[...selectedPersons],'add');
-    }
-    return;
-  }
+  if(rangeMode){ await handleRangeClick(key,[...selectedPersons]); return; }
   const dates=multiDays.size>0?[...multiDays]:[key];
   await applyToDateList(dates,[...selectedPersons],'add');
   if(multiDays.size>0){multiDays.clear();renderCalendar();}
+}
+
+// Beide Konfliktdialoge - vom Einzelklick und vom Bereich gemeinsam genutzt.
+function confirmReplaceShift(name,blocking){
+  const blockNames=[...new Set(blocking)].map(s=>SHIFT_LABEL[s]).join(', ');
+  return confirmDialog('Schicht ersetzen?',`<strong>${esc(name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`);
+}
+function confirmHolidayEntry(name,holDays){
+  const h=holDays[0][1],flag=h.country==='DE'?'🇩🇪':h.country==='IN'?'🇮🇳':'🌍';
+  return confirmDialog('Feiertag – trotzdem eintragen?',
+    `${flag} <strong>${esc(h.holiday)}</strong> ist ein Feiertag für das Team von <strong>${esc(name)}</strong> (${holDays.length} Tag(e)).<br>Trotzdem als <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> eintragen?`);
 }
 
 async function applyToDateList(dates,names,action){
@@ -2035,15 +2046,12 @@ async function applyToDateList(dates,names,action){
     const okR=Object.fromEntries(Object.entries(res.results).filter(([,r])=>!r.error));
     applyResults(okR);showHolWarnings(res.hol_warnings);entered+=Object.keys(okR).length;
     if(holDays.length>0){
-      const holName=holDays[0][1].holiday,flag=holDays[0][1].country==='DE'?'🇩🇪':holDays[0][1].country==='IN'?'🇮🇳':'🌍';
-      const ok=await confirmDialog('Feiertag – trotzdem eintragen?',
-        `${flag} <strong>${esc(holName)}</strong> ist ein Feiertag für das Team von <strong>${esc(name)}</strong> (${holDays.length} Tag(e)).<br>Trotzdem als <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> eintragen?`);
+      const ok=await confirmHolidayEntry(name,holDays);
       if(ok){const r2=await postSchicht(holDays.map(([d])=>d),'add',selectedShift,name,true);applyResults(r2.results);replaced+=holDays.length;}
       else skipped+=holDays.length;
     }
     if(confirmDays.length>0){
-      const blockNames=[...new Set(confirmDays.flatMap(([,r])=>r.blocking))].map(s=>SHIFT_LABEL[s]).join(', ');
-      const ok=await confirmDialog('Schicht ersetzen?',`<strong>${esc(name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`);
+      const ok=await confirmReplaceShift(name,confirmDays.flatMap(([,r])=>r.blocking));
       if(ok){const r2=await postSchicht(confirmDays.map(([d])=>d),'add',selectedShift,name,true);applyResults(r2.results);showHolWarnings(r2.hol_warnings);replaced+=confirmDays.length;}
       else skipped+=confirmDays.length;
     }
@@ -2059,8 +2067,8 @@ async function postSchicht(dates,action,schicht,name,force=false){
 }
 async function applySchicht(dates,action,schicht,name){const res=await postSchicht(dates,action,schicht,name);if(res)applyResults(res.results);}
 function applyResults(results){if(!results)return;Object.entries(results).forEach(([k,v])=>{if(!v.error)schichten[k]=v;});renderCalendar();renderStats();}
-async function clearDay(key){pushUndo();const empty={frueh:[],spaet:[],rufbereitschaft:[],urlaub:[],krank:[],elternzeit:[],sonderurlaub:[]};const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:empty,dates:[key],mode:'replace'})});if(r.ok){schichten[key]={...empty};renderCalendar();toast('Tag geleert');}}
-async function pasteDay(dates,mode){if(!copiedDay)return;const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:copiedDay.slot,dates,mode})});if(r.ok){const d=await api('/api/data');schichten=d.schichten||{};renderCalendar();toast(dates.length+' Tag(e) eingefügt');}}
+async function clearDay(key){pushUndo();const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:emptyDay(),dates:[key],mode:'replace'})});if(r.ok){schichten[key]=emptyDay();renderCalendar();toast('Tag geleert');}}
+async function pasteDay(dates,mode){if(!copiedDay)return;const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:copiedDay.slot,dates,mode})});if(r.ok){await reloadSchichten();renderCalendar();toast(dates.length+' Tag(e) eingefügt');}}
 async function handleDrop(toKey){if(!dragState)return;const{name,fromKey,fromShift}=dragState;dragState=null;if(fromKey===toKey)return;pushUndo();await applySchicht([fromKey],'remove',fromShift,name);await applySchicht([toKey],'add',fromShift,name);toast(name+' verschoben');}
 
 // ══════════════════════════════════════════════════════════════
@@ -2125,10 +2133,9 @@ async function clearRangeAll(){
     if(!ok) return;
   }
   pushUndo();
-  const empty={frueh:[],spaet:[],rufbereitschaft:[],urlaub:[],krank:[],elternzeit:[],sonderurlaub:[]};
   await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({slot:empty,dates,mode:'replace'})});
-  dates.forEach(k=>{schichten[k]={...empty};});
+    body:JSON.stringify({slot:emptyDay(),dates,mode:'replace'})});
+  dates.forEach(k=>{schichten[k]=emptyDay();});
   rangeStart=null;previewEnd=null;renderCalendar();updateSelInfo();
   toast(dates.length+' Tag(e) vollständig geleert');
 }
@@ -2199,15 +2206,20 @@ function isUnderstaffed(slot,key){
   if(key){const dow=new Date(key+'T00:00:00').getDay();if(dow===0||dow===6)return(slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1);}
   return(slot.frueh||[]).length<(soll.frueh||1)||(slot.spaet||[]).length<(soll.spaet||1)||(slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1);
 }
-function jumpToDate(key){
-  const d=new Date(key+'T00:00:00');
-  curYear=d.getFullYear(); curMonth=d.getMonth()+1;
-  updateLabel(); renderCalendar();
+// Kalenderansicht aktivieren - von jumpToDate und vom Autoplan genutzt.
+function showCalendarView(){
   document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
   document.querySelector('[data-view="cal"]').classList.add('active');
   document.querySelector('[data-panel="cal"]').classList.add('active');
-  activeView='cal'; closeAllModals();
+  activeView='cal';
+}
+
+function jumpToDate(key){
+  const d=new Date(key+'T00:00:00');
+  curYear=d.getFullYear(); curMonth=d.getMonth()+1;
+  updateLabel(); renderCalendar();
+  showCalendarView(); closeAllModals();
   setTimeout(()=>{
     const cell=document.querySelector(`.day-cell[data-key="${key}"]`);
     if(cell){cell.scrollIntoView({behavior:'smooth',block:'center'});
@@ -2298,15 +2310,11 @@ async function applyTemplateDirectly(){
     body:JSON.stringify({year:selYear,month:selMonth,template:tname,overwrite})});
   if(d.error) toast('Fehler: '+d.error);
   else{
-    const data=await api('/api/data'); schichten=data.schichten||{};
+    await reloadSchichten();
     // Navigate to the applied month
     curYear=selYear; curMonth=selMonth;
     updateLabel(); renderCalendar();
-    document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
-    document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
-    document.querySelector('[data-view="cal"]').classList.add('active');
-    document.querySelector('[data-panel="cal"]').classList.add('active');
-    activeView='cal';
+    showCalendarView();
     toast(`Template "${tname}" auf ${MONTHS[selMonth-1]} ${selYear} angewendet (${d.planned} Einträge)`);
   }
 }
@@ -2581,7 +2589,7 @@ async function doImport(){
   const fd=new FormData();fd.append('file',input.files[0]);
   const d=await fetch('/api/import_ics',{method:'POST',body:fd}).then(r=>r.json());
   if(d.error){resEl.textContent='Fehler: '+d.error;resEl.className='imp-result err';}
-  else{resEl.textContent=d.imported+' importiert'+(d.skipped?', '+d.skipped+' übersprungen':'');resEl.className='imp-result ok';const data=await api('/api/data');schichten=data.schichten||{};notizen=data.notizen||{};renderCalendar();if(d.imported>0)toast(d.imported+' Einträge importiert');}
+  else{resEl.textContent=d.imported+' importiert'+(d.skipped?', '+d.skipped+' übersprungen':'');resEl.className='imp-result ok';await reloadSchichten();renderCalendar();if(d.imported>0)toast(d.imported+' Einträge importiert');}
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2683,14 +2691,7 @@ async function doImportData(){
     resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';
     resEl.textContent=`✓ Import erfolgreich: ${d.mitarbeiter} Mitarbeiter, ${d.schichten} Tage, ${d.templates} Templates`;
     // Reload all data
-    const data=await api('/api/data');
-    mitarbeiter=data.mitarbeiter||[]; schichten=data.schichten||{};
-    notizen=data.notizen||{}; soll=data.soll||{frueh:1,spaet:1,rufbereitschaft:1};
-    customHolidays=data.custom_holidays||[]; templates=data.templates||{}; rufKW=data.ruf_kw||{};
-    mitarbeiter.forEach(m=>{if(!m.color)m.color=AVATAR_COLORS[0];if(!m.icon)m.icon='';if(!m.prefs)m.prefs={};});
-    document.getElementById('soll-f').value=soll.frueh??1;
-    document.getElementById('soll-s').value=soll.spaet??1;
-    document.getElementById('soll-r').value=soll.rufbereitschaft??1;
+    applyData(await api('/api/data'));
     await loadHolidays(curYear);
     renderMembers(); renderCalendar(); renderStats();
     setTimeout(()=>closeModal('data-import-modal'),1800);

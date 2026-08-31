@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +24,21 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 
 func readJSON(r *http.Request, v interface{}) error {
 	return json.NewDecoder(r.Body).Decode(v)
+}
+
+// uploadedFile returns the "file" part of a multipart upload, or reports the
+// error to the client and returns false.
+func uploadedFile(w http.ResponseWriter, r *http.Request, maxMemory int64) (multipart.File, bool) {
+	if err := r.ParseMultipartForm(maxMemory); err != nil {
+		writeJSON(w, map[string]string{"error": "Ungültiger Upload"})
+		return nil, false
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(w, map[string]string{"error": "Keine Datei"})
+		return nil, false
+	}
+	return file, true
 }
 
 func pathSegment(path, prefix string) string {
@@ -138,17 +154,13 @@ func (a *App) handleUpdateMitarbeiter(w http.ResponseWriter, r *http.Request) {
 // templates and the Rufbereitschafts-KW plan.
 func renameEmployee(d *AppData, oldName, newName string) {
 	for date, slot := range d.Schichten {
-		for _, shift := range allShifts {
-			f := slotField(&slot, shift)
-			if f == nil {
-				continue
-			}
-			for i, n := range *f {
+		forEachShift(&slot, func(_ string, names *[]string) {
+			for i, n := range *names {
 				if n == oldName {
-					(*f)[i] = newName
+					(*names)[i] = newName
 				}
 			}
-		}
+		})
 		d.Schichten[date] = slot
 	}
 	for tName, tmpl := range d.Templates {
@@ -189,60 +201,57 @@ func (a *App) handleDeleteMitarbeiter(w http.ResponseWriter, r *http.Request) {
 	// frontend can offer to restore the entries when the name is re-added.
 	backup := map[string]map[string]bool{}
 	for date, slot := range d.Schichten {
-		changed := false
 		for _, shift := range allShifts {
-			f := slotField(&slot, shift)
-			if f == nil || !contains(*f, name) {
+			if !removeFromSlot(&slot, shift, name) {
 				continue
 			}
 			if backup[date] == nil {
 				backup[date] = map[string]bool{}
 			}
 			backup[date][shift] = true
-			*f = remove(*f, name)
-			changed = true
-		}
-		if changed {
 			d.Schichten[date] = slot
 		}
 	}
 	a.saveData(d)
 	writeJSON(w, map[string]interface{}{"ok": true, "mitarbeiter": d.Mitarbeiter, "backup": backup})
 }
-func (a *App) handleSetColor(w http.ResponseWriter, r *http.Request) {
-	// /api/mitarbeiter/<name>/color
-	path := strings.TrimSuffix(r.URL.Path, "/color")
-	name, _ := url.PathUnescape(strings.TrimPrefix(path, "/api/mitarbeiter/"))
-	var body struct {
-		Color string `json:"color"`
-	}
-	readJSON(r, &body)
+
+// updateEmployee applies fn to the named employee and persists the change.
+func (a *App) updateEmployee(name string, fn func(*Employee)) {
 	d := a.loadData()
-	for i, m := range d.Mitarbeiter {
-		if m.Name == name {
-			d.Mitarbeiter[i].Color = body.Color
+	for i := range d.Mitarbeiter {
+		if d.Mitarbeiter[i].Name == name {
+			fn(&d.Mitarbeiter[i])
 			break
 		}
 	}
 	a.saveData(d)
+}
+
+func (a *App) handleSetColor(w http.ResponseWriter, r *http.Request) {
+	// /api/mitarbeiter/<name>/color
+	name := pathSegment(strings.TrimSuffix(r.URL.Path, "/color"), "/api/mitarbeiter")
+	var body struct {
+		Color string `json:"color"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	a.updateEmployee(name, func(m *Employee) { m.Color = body.Color })
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
 func (a *App) handleSetPrefs(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimSuffix(r.URL.Path, "/prefs")
-	name, _ := url.PathUnescape(strings.TrimPrefix(path, "/api/mitarbeiter/"))
+	name := pathSegment(strings.TrimSuffix(r.URL.Path, "/prefs"), "/api/mitarbeiter")
 	var body struct {
 		Prefs map[string]string `json:"prefs"`
 	}
-	readJSON(r, &body)
-	d := a.loadData()
-	for i, m := range d.Mitarbeiter {
-		if m.Name == name {
-			d.Mitarbeiter[i].Prefs = body.Prefs
-			break
-		}
+	if err := readJSON(r, &body); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
 	}
-	a.saveData(d)
+	a.updateEmployee(name, func(m *Employee) { m.Prefs = body.Prefs })
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
@@ -262,17 +271,9 @@ func (a *App) handleRestoreMitarbeiter(w http.ResponseWriter, r *http.Request) {
 	d := a.loadData()
 	restored := 0
 	for date, shifts := range body.Entries {
-		slot, ok := d.Schichten[date]
-		if !ok {
-			slot = emptySlot()
-		}
+		slot := slotFor(&d, date)
 		for shift, on := range shifts {
-			if !on {
-				continue
-			}
-			f := slotField(&slot, shift)
-			if f != nil && !contains(*f, body.Name) {
-				*f = append(*f, body.Name)
+			if on && addToSlot(&slot, shift, body.Name) {
 				restored++
 			}
 		}
@@ -329,103 +330,51 @@ func (a *App) handleSchicht(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, date := range body.Dates {
-		slot, ok := d.Schichten[date]
-		if !ok {
-			slot = emptySlot()
-		}
+		slot := slotFor(&d, date)
 
 		switch body.Action {
-		case "add":
-			// Holiday conflict check
-			if !body.Force {
-				if hol, exists := hols[date]; exists && !hol.Bridge && !hol.Custom {
-					if empTeam != "" && (hol.Country == empTeam || hol.Country == "DE+IN") {
-						results[date] = map[string]interface{}{
-							"error":   "holiday_conflict",
-							"holiday": hol.Name,
-							"country": hol.Country,
-						}
-						continue
-					}
-				}
-			} else {
-				// Track warning
-				if hol, exists := hols[date]; exists && !hol.Bridge {
-					if empTeam != "" && (hol.Country == empTeam || hol.Country == "DE+IN") {
-						holWarnings = append(holWarnings, map[string]string{
-							"date":    date,
-							"name":    body.Name,
-							"holiday": hol.Name,
-							"country": hol.Country,
-						})
-					}
-				}
+		case "add", "toggle":
+			if slotField(&slot, body.Schicht) == nil {
+				break
 			}
-
-			// Conflict with existing work shifts (needs_confirm)
-			if workShifts[body.Schicht] && !body.Force {
-				var blocking []string
-				for _, s := range allShifts {
-					if workShifts[s] && s != body.Schicht && s != "rufbereitschaft" {
-						f := slotField(&slot, s)
-						if f != nil && contains(*f, body.Name) {
-							blocking = append(blocking, s)
-						}
+			// A toggle on an existing entry just removes it again.
+			if body.Action == "toggle" && removeFromSlot(&slot, body.Schicht, body.Name) {
+				break
+			}
+			hol, isHoliday := hols[date]
+			if !body.Force {
+				// Holiday of the employee's own team: ask before entering.
+				if isHoliday && !hol.Bridge && !hol.Custom && hol.appliesTo(empTeam) {
+					results[date] = map[string]interface{}{
+						"error":   "holiday_conflict",
+						"holiday": hol.Name,
+						"country": hol.Country,
 					}
+					continue
 				}
-				if len(blocking) > 0 {
+				// Already on a different work shift that day: ask before replacing.
+				if blocking := blockingShifts(&slot, body.Schicht, body.Name); len(blocking) > 0 {
 					results[date] = map[string]interface{}{
 						"error":    "needs_confirm",
 						"blocking": blocking,
 					}
 					continue
 				}
+			} else if isHoliday && !hol.Bridge && hol.appliesTo(empTeam) {
+				holWarnings = append(holWarnings, map[string]string{
+					"date":    date,
+					"name":    body.Name,
+					"holiday": hol.Name,
+					"country": hol.Country,
+				})
 			}
-
-			f := slotField(&slot, body.Schicht)
-			if f != nil && !contains(*f, body.Name) {
-				*f = append(*f, body.Name)
-			}
+			addToSlot(&slot, body.Schicht, body.Name)
 
 		case "remove":
-			f := slotField(&slot, body.Schicht)
-			if f != nil {
-				*f = remove(*f, body.Name)
-			}
-
-		case "toggle":
-			f := slotField(&slot, body.Schicht)
-			if f == nil {
-				break
-			}
-			if contains(*f, body.Name) {
-				*f = remove(*f, body.Name)
-			} else {
-				// Check conflict
-				if workShifts[body.Schicht] && !body.Force {
-					var blocking []string
-					for _, s := range allShifts {
-						if workShifts[s] && s != body.Schicht && s != "rufbereitschaft" {
-							sf := slotField(&slot, s)
-							if sf != nil && contains(*sf, body.Name) {
-								blocking = append(blocking, s)
-							}
-						}
-					}
-					if len(blocking) > 0 {
-						results[date] = map[string]interface{}{
-							"error":    "needs_confirm",
-							"blocking": blocking,
-						}
-						continue
-					}
-				}
-				*f = append(*f, body.Name)
-			}
+			removeFromSlot(&slot, body.Schicht, body.Name)
 
 		case "clear_shift":
-			f := slotField(&slot, body.Schicht)
-			if f != nil {
+			if f := slotField(&slot, body.Schicht); f != nil {
 				*f = []string{}
 			}
 		}
@@ -484,22 +433,12 @@ func (a *App) handlePaste(w http.ResponseWriter, r *http.Request) {
 		if body.Mode == "replace" {
 			d.Schichten[date] = body.Slot
 		} else {
-			slot, ok := d.Schichten[date]
-			if !ok {
-				slot = emptySlot()
-			}
-			// Merge
-			for _, s := range allShifts {
-				src := slotField(&body.Slot, s)
-				dst := slotField(&slot, s)
-				if src != nil && dst != nil {
-					for _, name := range *src {
-						if !contains(*dst, name) {
-							*dst = append(*dst, name)
-						}
-					}
+			slot := slotFor(&d, date)
+			forEachShift(&body.Slot, func(shift string, names *[]string) {
+				for _, name := range *names {
+					addToSlot(&slot, shift, name)
 				}
-			}
+			})
 			d.Schichten[date] = slot
 		}
 	}
@@ -532,14 +471,8 @@ func (a *App) handleAddCustomHoliday(w http.ResponseWriter, r *http.Request) {
 	var body CustomHoliday
 	readJSON(r, &body)
 	d := a.loadData()
-	// Remove duplicates
-	filtered := []CustomHoliday{}
-	for _, ch := range d.CustomHolidays {
-		if !(ch.Date == body.Date && ch.Name == body.Name) {
-			filtered = append(filtered, ch)
-		}
-	}
-	filtered = append(filtered, body)
+	// Adding replaces an identical entry instead of duplicating it.
+	filtered := append(withoutHoliday(d.CustomHolidays, body.Date, body.Name), body)
 	sort.Slice(filtered, func(i, j int) bool {
 		return filtered[i].Date < filtered[j].Date
 	})
@@ -549,7 +482,7 @@ func (a *App) handleAddCustomHoliday(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDeleteCustomHoliday(w http.ResponseWriter, r *http.Request) {
-	key, _ := url.PathUnescape(strings.TrimPrefix(r.URL.Path, "/api/custom_holidays/"))
+	key := pathSegment(r.URL.Path, "/api/custom_holidays")
 	parts := strings.SplitN(key, "|", 2)
 	if len(parts) != 2 {
 		http.Error(w, "invalid key", 400)
@@ -557,15 +490,20 @@ func (a *App) handleDeleteCustomHoliday(w http.ResponseWriter, r *http.Request) 
 	}
 	date, name := parts[0], parts[1]
 	d := a.loadData()
-	filtered := []CustomHoliday{}
-	for _, ch := range d.CustomHolidays {
-		if !(ch.Date == date && ch.Name == name) {
-			filtered = append(filtered, ch)
-		}
-	}
-	d.CustomHolidays = filtered
+	d.CustomHolidays = withoutHoliday(d.CustomHolidays, date, name)
 	a.saveData(d)
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// withoutHoliday returns the list without the entry matching date and name.
+func withoutHoliday(list []CustomHoliday, date, name string) []CustomHoliday {
+	out := []CustomHoliday{}
+	for _, ch := range list {
+		if ch.Date != date || ch.Name != name {
+			out = append(out, ch)
+		}
+	}
+	return out
 }
 
 // ── /api/templates ───────────────────────────────────────────────────────────
@@ -588,7 +526,7 @@ func (a *App) handleSaveTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDeleteTemplate(w http.ResponseWriter, r *http.Request) {
-	name, _ := url.PathUnescape(strings.TrimPrefix(r.URL.Path, "/api/templates/"))
+	name := pathSegment(r.URL.Path, "/api/templates")
 	d := a.loadData()
 	delete(d.Templates, name)
 	a.saveData(d)
@@ -637,27 +575,12 @@ func (a *App) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 			date := d2.Format("2006-01-02")
 
 			// Skip holidays for the employee's team
-			if hol, holExists := hols[date]; holExists && !hol.Bridge {
-				team := empTeam[name]
-				if team != "" && (hol.Country == team || hol.Country == "DE+IN") {
-					continue
-				}
-			}
-
-			slot, exists := d.Schichten[date]
-			if !exists {
-				slot = emptySlot()
-			}
-
-			f := slotField(&slot, shift)
-			if f == nil {
+			if hol, holExists := hols[date]; holExists && !hol.Bridge && hol.appliesTo(empTeam[name]) {
 				continue
 			}
-			if !body.Overwrite && contains(*f, name) {
-				continue
-			}
-			if !contains(*f, name) {
-				*f = append(*f, name)
+
+			slot := slotFor(&d, date)
+			if addToSlot(&slot, shift, name) {
 				planned++
 			}
 			d.Schichten[date] = slot
@@ -726,16 +649,9 @@ func (a *App) handleApplyRufKW(w http.ResponseWriter, r *http.Request) {
 		}
 
 		date := cur.Format("2006-01-02")
-		slot, exists := d.Schichten[date]
-		if !exists {
-			slot = emptySlot()
-		}
+		slot := slotFor(&d, date)
 		for _, name := range names {
-			if !body.Overwrite && contains(slot.Rufbereitschaft, name) {
-				continue
-			}
-			if !contains(slot.Rufbereitschaft, name) {
-				slot.Rufbereitschaft = append(slot.Rufbereitschaft, name)
+			if addToSlot(&slot, "rufbereitschaft", name) {
 				applied++
 			}
 		}
@@ -825,10 +741,8 @@ func (a *App) handleExportData(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleImportData(w http.ResponseWriter, r *http.Request) {
-	r.ParseMultipartForm(32 << 20)
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		writeJSON(w, map[string]string{"error": "Keine Datei"})
+	file, ok := uploadedFile(w, r, 32<<20)
+	if !ok {
 		return
 	}
 	defer file.Close()
