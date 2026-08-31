@@ -34,7 +34,10 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 	yearStr := q.Get("year")
 	monthStr := q.Get("month")
 
-	d := a.loadData()
+	d, ok := a.data(w)
+	if !ok {
+		return
+	}
 
 	var sb strings.Builder
 	sb.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Schichtplaner DE/IN//DE\r\nCALSCALE:GREGORIAN\r\n")
@@ -92,8 +95,8 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	d := a.loadData()
-	imported := 0
+	var changes []ShiftChange
+	seen := map[ShiftChange]bool{}
 	skipped := 0
 
 	// Build reverse label map
@@ -154,13 +157,13 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			slot := slotFor(&d, date)
-			if addToSlot(&slot, shift, name) {
-				d.Schichten[date] = slot
-				imported++
-			} else {
+			change := ShiftChange{Date: date, Shift: shift, Name: name}
+			if seen[change] {
 				skipped++
+				continue
 			}
+			seen[change] = true
+			changes = append(changes, change)
 
 		default:
 			if !inEvent {
@@ -174,10 +177,18 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	a.saveData(d)
+	s, ok := a.requireStore(w)
+	if !ok {
+		return
+	}
+	imported, err := s.AddShifts("import:ics", changes)
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	writeJSON(w, map[string]interface{}{
 		"ok":       true,
 		"imported": imported,
-		"skipped":  skipped,
+		"skipped":  skipped + len(changes) - imported,
 	})
 }

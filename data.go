@@ -77,8 +77,10 @@ func saveConfig(cfg Config) {
 	os.WriteFile(configPath(), data, 0644)
 }
 
-// ── Data file I/O ─────────────────────────────────────────────────────────────
+// ── Data shapes ───────────────────────────────────────────────────────────────
 
+// dataFileName is the plan file of earlier versions. It is imported into the
+// database once and then no longer written to; see store.go.
 const dataFileName = "schichtplan_daten.json"
 
 func defaultData() AppData {
@@ -103,30 +105,6 @@ func emptySlot() DaySlot {
 		Elternzeit:      []string{},
 		Sonderurlaub:    []string{},
 	}
-}
-
-func (a *App) dataFilePath() string {
-	if a.dataFolder == "" {
-		return ""
-	}
-	return filepath.Join(a.dataFolder, dataFileName)
-}
-
-func (a *App) loadData() AppData {
-	path := a.dataFilePath()
-	if path == "" {
-		return defaultData()
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return defaultData()
-	}
-	var d AppData
-	if err := json.Unmarshal(raw, &d); err != nil {
-		return defaultData()
-	}
-	normalizeData(&d)
-	return d
 }
 
 // normalizeData fills in anything an older or hand-edited data file may be
@@ -175,28 +153,6 @@ func unwrapRufKW(m map[string]interface{}) map[string]interface{} {
 		return map[string]interface{}{}
 	}
 	return m
-}
-
-func (a *App) saveData(d AppData) error {
-	path := a.dataFilePath()
-	if path == "" {
-		return nil
-	}
-	raw, err := json.MarshalIndent(d, "", "  ")
-	if err != nil {
-		return err
-	}
-	// Write to a temp file and rename, so a crash mid-write cannot leave a
-	// truncated data file behind.
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0644); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
-		return err
-	}
-	return nil
 }
 
 // ── Slot helpers ──────────────────────────────────────────────────────────────

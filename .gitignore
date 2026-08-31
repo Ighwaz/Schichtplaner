@@ -7,8 +7,10 @@
 /frontend/wailsjs/
 
 # Laufzeitdaten (gehören nicht ins Repo)
+schichtplan.db
+schichtplan.db-wal
+schichtplan.db-shm
 schichtplan_daten.json
-schichtplan_daten.json.tmp
 schichtplan_backup.json
 .schichtplaner_config.json
 
