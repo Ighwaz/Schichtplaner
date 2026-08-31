@@ -519,3 +519,52 @@ func TestAutoplanSkipsShiftConflicts(t *testing.T) {
 		t.Errorf("autoplan double-booked the day: %#v", got)
 	}
 }
+
+func TestICSImportHandlesFoldedLines(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
+
+	// Calendars fold every line past 75 octets; the continuation starts with
+	// a space. An unfolded parser would drop this event.
+	ics := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n" +
+		"BEGIN:VEVENT\r\nUID:1@x\r\nDTSTART;TZID=Europe/Berlin:20260908T140000\r\n" +
+		"SUMMARY:Anna – Spät\r\n schicht\r\nEND:VEVENT\r\n" +
+		"END:VCALENDAR\r\n"
+
+	body, ctype := multipartBody(t, "cal.ics", ics)
+	r := httptest.NewRequest(http.MethodPost, "/api/import_ics", strings.NewReader(body))
+	r.Header.Set("Content-Type", ctype)
+	w := httptest.NewRecorder()
+	a.ServeHTTP(w, r)
+
+	if got := entered(t, a, "2026-09-08", "spaet"); len(got) != 1 || got[0] != "Anna" {
+		t.Fatalf("folded event was dropped: %#v (%s)", got, w.Body.String())
+	}
+}
+
+func TestICSExportFoldsLongLines(t *testing.T) {
+	a := newTestApp(t)
+	long := "Maximiliane Friederike von Habsburg-Lothringen zu Sonnenfels"
+	addShift(t, a, "2026-04-01", "rufbereitschaft", long)
+
+	r := httptest.NewRequest(http.MethodGet, "/api/export_ics?year=2026", nil)
+	w := httptest.NewRecorder()
+	a.ServeHTTP(w, r)
+	out := w.Body.String()
+
+	for _, line := range strings.Split(out, "\r\n") {
+		if len(line) > 75 {
+			t.Fatalf("line longer than 75 octets: %q", line)
+		}
+	}
+	// And it has to survive the round trip through our own importer.
+	b := newTestApp(t)
+	body, ctype := multipartBody(t, "cal.ics", out)
+	r = httptest.NewRequest(http.MethodPost, "/api/import_ics", strings.NewReader(body))
+	r.Header.Set("Content-Type", ctype)
+	w = httptest.NewRecorder()
+	b.ServeHTTP(w, r)
+	if got := entered(t, b, "2026-04-01", "rufbereitschaft"); len(got) != 1 || got[0] != long {
+		t.Fatalf("round trip lost the name: %#v (%s)", got, w.Body.String())
+	}
+}

@@ -1945,7 +1945,12 @@ function makeCell(key,dayNum,other){
     const acts=document.createElement('div');acts.className='day-actions';
     const mkBtn=(title,icon,action,extra='')=>{const b=document.createElement('button');b.className='dab'+extra;b.title=title;b.textContent=icon;b.dataset.action=action;b.dataset.key=key;return b;};
     acts.appendChild(mkBtn('Details/Notiz','📝','open'));
-    if(copiedDay) acts.appendChild(mkBtn('Einfügen','📋','paste'));
+    // Der Einfuegen-Knopf bleibt immer an derselben Stelle, nur unsichtbar,
+    // solange nichts kopiert ist - sonst rutschen Kopieren und Leeren beim
+    // Kopieren eine Position nach rechts und man trifft das falsche Symbol.
+    const paste=mkBtn('Einfügen','📋','paste');
+    if(!copiedDay){paste.style.visibility='hidden';paste.style.pointerEvents='none';paste.tabIndex=-1;}
+    acts.appendChild(paste);
     acts.appendChild(mkBtn('Kopieren','⧉','copy'));
     acts.appendChild(mkBtn('Leeren','✕','clear',' red'));
     numRow.appendChild(acts);
