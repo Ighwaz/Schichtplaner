@@ -459,7 +459,10 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 @media print{
   header,.folder-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,.day-actions,.ruf-export-row,.tmpl-footer{display:none!important}
   .main{display:block!important;height:auto!important;grid-template-columns:1fr!important}
-  .view-panel{display:block!important}
+  /* Nur die offene Ansicht drucken - sonst landen Rufbereitschaft,
+     KW-Plan, Template und Feiertage als Extraseiten mit im Ausdruck. */
+  .view-panel{display:none!important}
+  .view-panel.active{display:block!important}
   .cal-wrap,.ruf-wrap{overflow:visible!important;padding:0!important}
   .day-cell{break-inside:avoid;min-height:80px!important}
   body{overflow:visible!important}
@@ -570,7 +573,10 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
           <select id="new-team" style="flex:1"><option value="DE">🇩🇪 Deutschland</option><option value="IN">🇮🇳 Indien</option></select>
           <div class="color-preview" id="new-color"></div>
         </div>
-        <button class="add-btn" id="btn-add">+ Hinzufügen</button>
+        <div style="display:flex;gap:6px">
+          <button class="add-btn" id="btn-add" style="flex:1">+ Hinzufügen</button>
+          <button class="btn-s" onclick="openBulk('mitarbeiter')" title="Mehrere auf einmal anlegen" style="white-space:nowrap">⇊ Liste</button>
+        </div>
       </div>
     </div>
     <div class="sb-sec" style="padding:7px 10px">
@@ -709,6 +715,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
             </select>
           </div>
           <button class="btn-p" onclick="addCustomHoliday()" style="align-self:flex-end">+ Hinzufügen</button>
+          <button class="btn-s" onclick="openBulk('feiertage')" style="align-self:flex-end" title="Mehrere auf einmal anlegen">⇊ Liste</button>
         </div>
         <div id="hol-coverage-note" style="display:none;font-size:12px;line-height:1.6;color:var(--text2);background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.3);border-radius:8px;padding:9px 11px;margin-bottom:10px"></div>
         <div class="hol-list" id="hol-list"><div class="hol-empty">Keine eigenen Feiertage eingetragen</div></div>
@@ -716,6 +723,21 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
     </div>
   </div>
 
+
+  <!-- MASSENANLAGE -->
+  <div class="modal-bg hidden" id="bulk-modal">
+    <div class="modal-box" style="width:540px">
+      <div class="modal-hdr"><div class="modal-title" id="bulk-title">Liste anlegen</div><button class="modal-close" onclick="closeModal('bulk-modal')">✕</button></div>
+      <p id="bulk-hint" style="font-size:12.5px;color:var(--text2);line-height:1.65;margin-bottom:10px"></p>
+      <textarea id="bulk-input" rows="9" spellcheck="false"
+        style="width:100%;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:9px 11px;border-radius:9px;font-size:13px;font-family:'JetBrains Mono',monospace;resize:vertical"></textarea>
+      <div id="bulk-preview" style="font-size:12px;line-height:1.6;margin-top:9px;min-height:20px"></div>
+      <div class="modal-footer" style="margin-top:12px">
+        <button class="btn-p" id="bulk-go" onclick="runBulk()" style="flex:1">Anlegen</button>
+        <button class="btn-s" onclick="closeModal('bulk-modal')">Abbrechen</button>
+      </div>
+    </div>
+  </div>
 
   <!-- APPLY RUF-KW MODAL -->
   <div class="modal-bg hidden" id="rufkw-apply-modal">
@@ -1301,6 +1323,7 @@ function bindEvents(){
   document.getElementById('btn-next').onclick=nextMonth;
   document.getElementById('btn-today').onclick=goToday;
   document.getElementById('btn-add').onclick=addMitarbeiter;
+  document.getElementById('bulk-input').addEventListener('input',updateBulkPreview);
   document.getElementById('new-name').addEventListener('keydown',e=>{
     if(e.key==='Enter') addMitarbeiter();
     if(e.key==='Escape'){ document.getElementById('add-form').classList.remove('open'); document.getElementById('add-toggle').classList.remove('open'); }
@@ -2596,6 +2619,118 @@ function renderCoverageNote(){
     `Bitte mit dem Datum des jeweiligen Jahres oben als eigenen Feiertag mit Land <strong>IN</strong> eintragen – `+
     `er wirkt dann genau wie ein gesetzlicher Feiertag.`;
   el.style.display='block';
+}
+
+// ══════════════════════════════════════════════════════════════
+// MASSENANLAGE (Mitarbeiter / eigene Feiertage)
+// ══════════════════════════════════════════════════════════════
+let bulkMode='mitarbeiter';
+
+function openBulk(mode){
+  bulkMode=mode;
+  const titel=document.getElementById('bulk-title');
+  const hinweis=document.getElementById('bulk-hint');
+  const feld=document.getElementById('bulk-input');
+  if(mode==='mitarbeiter'){
+    titel.textContent='Mehrere Mitarbeiter anlegen';
+    hinweis.innerHTML='Eine Person je Zeile: <b>Name</b> oder <b>Name;DE</b> bzw. <b>Name;IN</b>. '+
+      'Ohne Land wird <b>DE</b> genommen. Spalten aus Excel (Tabulator) funktionieren genauso.';
+    feld.placeholder='Anna Meier;DE\nRavi Kumar;IN\nJonas Weiß';
+  }else{
+    titel.textContent='Mehrere Feiertage anlegen';
+    hinweis.innerHTML='Ein Tag je Zeile: <b>Datum;Name</b>, optional noch <b>;DE</b>, <b>;IN</b> oder <b>;DE+IN</b>. '+
+      'Datum als <b>2026-12-24</b> oder <b>24.12.2026</b>. Ohne Land wird <b>DE</b> genommen.';
+    feld.placeholder='2026-12-24;Heiligabend\n31.12.2026;Silvester;DE+IN\n2027-01-02;Brückentag;DE';
+  }
+  feld.value='';
+  updateBulkPreview();
+  openModal('bulk-modal');
+  setTimeout(()=>feld.focus(),60);
+}
+
+// Datum in ISO-Form bringen; akzeptiert 2026-12-24 und 24.12.2026.
+function bulkDatum(s){
+  const echt=(y,m,d)=>{const dt=new Date(Date.UTC(y,m-1,d));
+    return dt.getUTCFullYear()===y&&dt.getUTCMonth()===m-1&&dt.getUTCDate()===d;};
+  const zwei=n=>String(n).padStart(2,'0');
+  let m=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  if(m&&echt(+m[1],+m[2],+m[3])) return `${m[1]}-${zwei(+m[2])}-${zwei(+m[3])}`;
+  m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s);
+  if(m&&echt(+m[3],+m[2],+m[1])) return `${m[3]}-${zwei(+m[2])}-${zwei(+m[1])}`;
+  return null;
+}
+
+// Zeilen einlesen und prüfen, bevor irgendetwas gespeichert wird.
+function parseBulk(text){
+  const gut=[], fehler=[], gesehen=new Set();
+  text.split('\n').forEach((roh,i)=>{
+    const zeile=roh.trim();
+    if(!zeile) return;
+    const nr=i+1;
+    const f=zeile.split(/[\t;]/).map(x=>x.trim());
+    if(bulkMode==='mitarbeiter'){
+      const name=f[0], land=(f[1]||'DE').toUpperCase();
+      if(!name){fehler.push(`Zeile ${nr}: kein Name`);return;}
+      if(land!=='DE'&&land!=='IN'){fehler.push(`Zeile ${nr}: Land „${f[1]}" – erlaubt sind DE oder IN`);return;}
+      const k=name.toLowerCase();
+      if(gesehen.has(k)){fehler.push(`Zeile ${nr}: „${name}" steht doppelt in der Liste`);return;}
+      if(mitarbeiter.some(m=>m.name.toLowerCase()===k)){fehler.push(`Zeile ${nr}: „${name}" gibt es schon`);return;}
+      gesehen.add(k); gut.push({name,team:land,color:randColor()});
+    }else{
+      const datum=bulkDatum(f[0]), name=f[1], land=(f[2]||'DE').toUpperCase();
+      if(!datum){fehler.push(`Zeile ${nr}: „${f[0]}" ist kein Datum`);return;}
+      if(!name){fehler.push(`Zeile ${nr}: kein Name`);return;}
+      if(!['DE','IN','DE+IN'].includes(land)){fehler.push(`Zeile ${nr}: Land „${f[2]}" – erlaubt sind DE, IN oder DE+IN`);return;}
+      const k=datum+'|'+name.toLowerCase();
+      if(gesehen.has(k)){fehler.push(`Zeile ${nr}: ${datum} „${name}" steht doppelt in der Liste`);return;}
+      if(customHolidays.some(h=>h.date===datum&&h.name.toLowerCase()===name.toLowerCase())){
+        fehler.push(`Zeile ${nr}: ${datum} „${name}" gibt es schon`);return;}
+      gesehen.add(k); gut.push({date:datum,name,country:land});
+    }
+  });
+  return {gut,fehler};
+}
+
+function updateBulkPreview(){
+  const el=document.getElementById('bulk-preview');
+  const {gut,fehler}=parseBulk(document.getElementById('bulk-input').value);
+  document.getElementById('bulk-go').disabled=gut.length===0;
+  if(!gut.length&&!fehler.length){el.innerHTML='<span style="color:var(--text3)">Noch nichts eingetragen.</span>';return;}
+  const was=bulkMode==='mitarbeiter'?'Mitarbeiter':'Feiertage';
+  let html=`<span style="color:var(--frueh);font-weight:600">${gut.length} ${was}</span> werden angelegt.`;
+  if(fehler.length){
+    html+=`<div style="margin-top:6px;color:#f87171"><b>${fehler.length} Zeile(n) übersprungen:</b><br>`+
+      fehler.slice(0,6).map(esc).join('<br>')+
+      (fehler.length>6?`<br>… und ${fehler.length-6} weitere`:'')+'</div>';
+  }
+  el.innerHTML=html;
+}
+
+async function runBulk(){
+  const {gut}=parseBulk(document.getElementById('bulk-input').value);
+  if(!gut.length) return;
+  const btn=document.getElementById('bulk-go');
+  btn.disabled=true; btn.textContent='Lege an…';
+  try{
+    if(bulkMode==='mitarbeiter'){
+      const d=await api('/api/mitarbeiter/bulk',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({mitarbeiter:gut})});
+      if(d.error){toast('Fehler: '+d.error);return;}
+      mitarbeiter=d.mitarbeiter||mitarbeiter;
+      renderMembers();renderCalendar();renderTemplateTable();
+      toast(`${d.angelegt} Mitarbeiter angelegt`+(d.uebersprungen?`, ${d.uebersprungen} übersprungen`:''));
+    }else{
+      const d=await api('/api/custom_holidays/bulk',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({feiertage:gut})});
+      if(d.error){toast('Fehler: '+d.error);return;}
+      customHolidays=await api('/api/custom_holidays');
+      const jahre=[...new Set(gut.map(h=>parseInt(h.date.slice(0,4))))];
+      for(const j of jahre) Object.assign(holidays,await api('/api/holidays/'+j));
+      renderCustomHolidays();renderCalendar();
+      toast(`${d.angelegt} Feiertage angelegt`+(d.uebersprungen?`, ${d.uebersprungen} übersprungen`:''));
+    }
+    closeModal('bulk-modal');
+  }finally{ btn.disabled=false; btn.textContent='Anlegen'; }
 }
 
 function renderCustomHolidays(){

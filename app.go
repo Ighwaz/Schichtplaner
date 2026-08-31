@@ -116,6 +116,8 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleGetMitarbeiter(w, r)
 	case path == "/api/mitarbeiter" && r.Method == http.MethodPost:
 		a.handleAddMitarbeiter(w, r)
+	case path == "/api/mitarbeiter/bulk" && r.Method == http.MethodPost:
+		a.handleBulkMitarbeiter(w, r)
 	case strings.HasPrefix(path, "/api/mitarbeiter/") && strings.HasSuffix(path, "/color"):
 		a.handleSetColor(w, r)
 	case strings.HasPrefix(path, "/api/mitarbeiter/") && strings.HasSuffix(path, "/prefs"):
@@ -140,6 +142,8 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleHolidays(w, r)
 	case path == "/api/custom_holidays" && r.Method == http.MethodGet:
 		a.handleGetCustomHolidays(w, r)
+	case path == "/api/custom_holidays/bulk" && r.Method == http.MethodPost:
+		a.handleBulkCustomHolidays(w, r)
 	case path == "/api/custom_holidays" && r.Method == http.MethodPost:
 		a.handleAddCustomHoliday(w, r)
 	case strings.HasPrefix(path, "/api/custom_holidays/") && r.Method == http.MethodDelete:

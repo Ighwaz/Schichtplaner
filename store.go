@@ -13,6 +13,11 @@ import (
 
 const dbFileName = "schichtplan.db"
 
+// journalMode: kein WAL. Alle Zugriffe sind ohnehin serialisiert (App.mu), und
+// ein Rollback-Journal haelt die Daten in EINER Datei - wer den Ordner sichert,
+// erwischt sonst leicht nur schichtplan.db ohne das -wal daneben.
+var journalMode = "DELETE"
+
 // Store keeps the shift plan in a SQLite database inside the data folder.
 // Every write runs in a transaction and touches only the affected rows, and
 // every change is appended to the changelog table.
@@ -71,7 +76,7 @@ CREATE TABLE IF NOT EXISTS changelog (
 
 func openStore(folder string) (*Store, error) {
 	path := filepath.Join(folder, dbFileName)
-	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=journal_mode(" + journalMode + ")&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -686,6 +691,30 @@ func (s *Store) DeleteEmployee(name string) (Employee, map[string]map[string]boo
 	return gone, backup, err
 }
 
+// AddEmployees creates several employees in one transaction and reports how
+// many were new; names that already exist are left untouched.
+func (s *Store) AddEmployees(list []Employee) (added, skipped int, err error) {
+	err = s.tx("mitarbeiter:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
+		added, skipped = 0, 0
+		for _, m := range list {
+			var exists int
+			if err := t.QueryRow(`SELECT COUNT(*) FROM employees WHERE name = ?`, m.Name).Scan(&exists); err != nil {
+				return err
+			}
+			if exists > 0 {
+				skipped++
+				continue
+			}
+			if err := insertEmployee(t, m); err != nil {
+				return err
+			}
+			added++
+		}
+		return nil
+	})
+	return added, skipped, err
+}
+
 func (s *Store) SetColor(name, color string) error {
 	return s.tx("mitarbeiter:farbe", name, func(t *sql.Tx) error {
 		_, err := t.Exec(`UPDATE employees SET color = ? WHERE name = ?`, color, name)
@@ -729,6 +758,28 @@ func (s *Store) AddCustomHoliday(ch CustomHoliday) error {
 			ch.Date, ch.Name, ch.Country)
 		return err
 	})
+}
+
+// AddCustomHolidays inserts several holidays in one transaction. An entry that
+// is already there with the same date and name counts as skipped.
+func (s *Store) AddCustomHolidays(list []CustomHoliday) (added, skipped int, err error) {
+	err = s.tx("feiertag:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
+		added, skipped = 0, 0
+		for _, ch := range list {
+			res, err := t.Exec(`INSERT OR IGNORE INTO custom_holidays (date, name, country) VALUES (?, ?, ?)`,
+				ch.Date, ch.Name, ch.Country)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n > 0 {
+				added++
+			} else {
+				skipped++
+			}
+		}
+		return nil
+	})
+	return added, skipped, err
 }
 
 func (s *Store) DeleteCustomHoliday(date, name string) error {

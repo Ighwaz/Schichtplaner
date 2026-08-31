@@ -568,3 +568,86 @@ func TestICSExportFoldsLongLines(t *testing.T) {
 		t.Fatalf("round trip lost the name: %#v (%s)", got, w.Body.String())
 	}
 }
+
+// ── Massenanlage ──────────────────────────────────────────────────────────────
+
+func TestBulkEmployees(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
+
+	res := call(t, a, http.MethodPost, "/api/mitarbeiter/bulk", `{"mitarbeiter":[
+		{"name":"Ravi","team":"IN"},
+		{"name":" Jonas ","team":"DE"},
+		{"name":"Anna","team":"DE"},
+		{"name":"Ravi","team":"IN"},
+		{"name":"   "}
+	]}`)
+	if res["angelegt"].(float64) != 2 {
+		t.Fatalf("expected two new employees, got %v", res["angelegt"])
+	}
+	// Anna exists already; the second Ravi and the blank name are dropped before
+	// the store sees them, so only Anna counts as skipped.
+	if res["uebersprungen"].(float64) != 1 {
+		t.Errorf("expected one skipped, got %v", res["uebersprungen"])
+	}
+	names := map[string]bool{}
+	for _, m := range res["mitarbeiter"].([]interface{}) {
+		names[m.(map[string]interface{})["name"].(string)] = true
+	}
+	if len(names) != 3 || !names["Jonas"] {
+		t.Fatalf("unexpected list, names trimmed? %#v", names)
+	}
+}
+
+func TestBulkCustomHolidays(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
+
+	res := call(t, a, http.MethodPost, "/api/custom_holidays/bulk", `{"feiertage":[
+		{"date":"2026-12-24","name":"Heiligabend"},
+		{"date":"2026-12-31","name":"Silvester","country":"DE+IN"},
+		{"date":"2026-02-31","name":"Gibt es nicht"},
+		{"date":"2026-12-24","name":"Heiligabend"}
+	]}`)
+	if res["angelegt"].(float64) != 2 {
+		t.Fatalf("expected two holidays, got %v", res["angelegt"])
+	}
+
+	// Without a country the entry defaults to DE, and it has to block like a
+	// statutory holiday does.
+	list := call(t, a, http.MethodGet, "/api/data", "")["custom_holidays"].([]interface{})
+	if len(list) != 2 {
+		t.Fatalf("expected two stored holidays, got %d", len(list))
+	}
+	if c := list[0].(map[string]interface{})["country"]; c != "DE" {
+		t.Errorf("missing country should default to DE, got %v", c)
+	}
+	sch := call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-12-24"],"schicht":"frueh","name":"Anna","action":"add"}`)
+	if got := result(t, sch, "2026-12-24")["error"]; got != "holiday_conflict" {
+		t.Errorf("bulk holiday does not block: %v", got)
+	}
+
+	// Re-running the same list changes nothing.
+	res = call(t, a, http.MethodPost, "/api/custom_holidays/bulk",
+		`{"feiertage":[{"date":"2026-12-24","name":"Heiligabend","country":"DE"}]}`)
+	if res["angelegt"].(float64) != 0 || res["uebersprungen"].(float64) != 1 {
+		t.Errorf("duplicate run should skip: %#v", res)
+	}
+}
+
+func TestBulkRejectsEmptyInput(t *testing.T) {
+	a := newTestApp(t)
+	for _, c := range []struct{ path, body string }{
+		{"/api/mitarbeiter/bulk", `{"mitarbeiter":[{"name":"  "}]}`},
+		{"/api/custom_holidays/bulk", `{"feiertage":[{"date":"kaputt","name":"X"}]}`},
+	} {
+		r := httptest.NewRequest(http.MethodPost, c.path, strings.NewReader(c.body))
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		a.ServeHTTP(w, r)
+		if !strings.Contains(w.Body.String(), "error") {
+			t.Errorf("%s should refuse empty input, got %s", c.path, w.Body.String())
+		}
+	}
+}

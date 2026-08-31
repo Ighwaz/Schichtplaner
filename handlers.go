@@ -159,6 +159,49 @@ func (a *App) handleAddMitarbeiter(w http.ResponseWriter, r *http.Request) {
 	a.respondEmployees(w, nil)
 }
 
+// handleBulkMitarbeiter creates a whole list of employees at once.
+func (a *App) handleBulkMitarbeiter(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Mitarbeiter []struct {
+			Name  string `json:"name"`
+			Team  string `json:"team"`
+			Color string `json:"color"`
+		} `json:"mitarbeiter"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	var list []Employee
+	seen := map[string]bool{}
+	for _, m := range body.Mitarbeiter {
+		name := strings.TrimSpace(m.Name)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		color := m.Color
+		if color == "" {
+			color = "#4a9eff"
+		}
+		list = append(list, Employee{Name: name, Team: m.Team, Color: color, Prefs: map[string]string{}})
+	}
+	if len(list) == 0 {
+		writeJSON(w, map[string]string{"error": "Keine gültigen Namen"})
+		return
+	}
+	s, ok := a.requireStore(w)
+	if !ok {
+		return
+	}
+	added, skipped, err := s.AddEmployees(list)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	a.respondEmployees(w, map[string]interface{}{"angelegt": added, "uebersprungen": skipped})
+}
+
 func (a *App) handleUpdateMitarbeiter(w http.ResponseWriter, r *http.Request) {
 	oldName := pathSegment(r.URL.Path, "/api/mitarbeiter")
 	var body struct {
@@ -535,6 +578,52 @@ func (a *App) handleAddCustomHoliday(w http.ResponseWriter, r *http.Request) {
 	if a.write(w, func(s *Store) error { return s.AddCustomHoliday(body) }) {
 		writeJSON(w, map[string]bool{"ok": true})
 	}
+}
+
+// handleBulkCustomHolidays creates a whole list of holidays at once.
+func (a *App) handleBulkCustomHolidays(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Feiertage []CustomHoliday `json:"feiertage"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	var list []CustomHoliday
+	seen := map[string]bool{}
+	for _, ch := range body.Feiertage {
+		ch.Date = strings.TrimSpace(ch.Date)
+		ch.Name = strings.TrimSpace(ch.Name)
+		if ch.Name == "" {
+			continue
+		}
+		if _, err := time.Parse("2006-01-02", ch.Date); err != nil {
+			continue
+		}
+		if ch.Country == "" {
+			ch.Country = "DE"
+		}
+		key := ch.Date + "|" + ch.Name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		list = append(list, ch)
+	}
+	if len(list) == 0 {
+		writeJSON(w, map[string]string{"error": "Keine gültigen Feiertage"})
+		return
+	}
+	s, ok := a.requireStore(w)
+	if !ok {
+		return
+	}
+	added, skipped, err := s.AddCustomHolidays(list)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "angelegt": added, "uebersprungen": skipped})
 }
 
 func (a *App) handleDeleteCustomHoliday(w http.ResponseWriter, r *http.Request) {

@@ -15,14 +15,19 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 - **Templates** pro Wochentag und Person, per Autoplan auf einen Monat anwendbar
 - **Rufbereitschaft nach KW** – Wochenplan, der auf einen Monat oder ein ganzes
   Jahr übertragen werden kann
+- **Massenanlage** für Mitarbeiter und eigene Feiertage: Liste einfügen
+  (auch aus Excel), Vorschau prüfen, anlegen
 - **Import/Export** als ICS (Kalender) und JSON (vollständiges Backup)
 - **Datenordner frei wählbar**
 
 ## Datenhaltung
 
 Der Plan liegt als **SQLite-Datenbank** `schichtplan.db` im gewählten
-Datenordner. Jede Änderung läuft in einer Transaktion und schreibt nur die
-betroffenen Zeilen – ein Klick im Kalender rührt nicht den ganzen Bestand an.
+Datenordner – eine einzige Datei, die nach jedem Schreibvorgang vollständig
+ist. Jede Änderung läuft in einer Transaktion und schreibt nur die betroffenen
+Zeilen; ein Klick im Kalender rührt nicht den ganzen Bestand an. Gemessen mit
+fünf Jahresplänen (13.000 Einträge): kompletter Ladevorgang 14 ms, ein Klick
+3 ms.
 
 | Tabelle | Inhalt |
 |---|---|
@@ -95,6 +100,9 @@ Land `IN` nachtragen – ein eigener Feiertag verhält sich genau wie ein
 gesetzlicher und fragt vor einem Eintrag nach.
 
 `GET /api/holiday_coverage` nennt den abgedeckten Zeitraum.
+
+Mehrere Feiertage auf einmal legt der Knopf **⇊ Liste** an – eine Zeile je Tag,
+`Datum;Name;Land`. Für Mitarbeiter gibt es denselben Knopf in der Seitenleiste.
 
 ## Bekannte Grenzen
 
