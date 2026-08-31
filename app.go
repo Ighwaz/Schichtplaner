@@ -130,6 +130,8 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleNotiz(w, r)
 	case path == "/api/paste" && r.Method == http.MethodPost:
 		a.handlePaste(w, r)
+	case path == "/api/holiday_coverage":
+		a.handleHolidayCoverage(w, r)
 	case strings.HasPrefix(path, "/api/holidays/"):
 		a.handleHolidays(w, r)
 	case path == "/api/custom_holidays" && r.Method == http.MethodGet:

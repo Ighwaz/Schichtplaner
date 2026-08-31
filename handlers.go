@@ -342,8 +342,9 @@ func (a *App) handleSchicht(w http.ResponseWriter, r *http.Request) {
 			}
 			hol, isHoliday := hols[date]
 			if !body.Force {
-				// Holiday of the employee's own team: ask before entering.
-				if isHoliday && !hol.Bridge && !hol.Custom && hol.appliesTo(empTeam) {
+				// Holiday of the employee's own team - gesetzlich oder selbst
+				// eingetragen: nachfragen, statt still einzutragen.
+				if isHoliday && !hol.Bridge && hol.appliesTo(empTeam) {
 					results[date] = map[string]interface{}{
 						"error":   "holiday_conflict",
 						"holiday": hol.Name,
@@ -774,6 +775,17 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, entries)
+}
+
+// ── /api/holiday_coverage ─────────────────────────────────────────────────────
+
+// handleHolidayCoverage reports for which years Holi and Diwali are tabulated,
+// so the UI can point out that they have to be added by hand beyond that.
+func (a *App) handleHolidayCoverage(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]int{
+		"in_movable_from": inMovableFirstYear,
+		"in_movable_to":   inMovableLastYear,
+	})
 }
 
 // ── /api/datadir ──────────────────────────────────────────────────────────────

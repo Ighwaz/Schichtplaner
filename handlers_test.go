@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newTestApp returns an App backed by a throwaway database.
@@ -364,4 +366,93 @@ func multipartBody(t *testing.T, filename, content string) (string, string) {
 		`Content-Disposition: form-data; name="file"; filename="` + filename + `"` + "\r\n" +
 		"Content-Type: application/json\r\n\r\n" + content + "\r\n--" + boundary + "--\r\n"
 	return body, "multipart/form-data; boundary=" + boundary
+}
+
+// ── Feiertage ─────────────────────────────────────────────────────────────────
+
+func TestCustomHolidayAsksLikeAStatutoryOne(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Ravi", "IN")
+	call(t, a, http.MethodPost, "/api/custom_holidays",
+		`{"date":"2026-07-15","name":"Betriebsausflug","country":"IN"}`)
+
+	res := call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-07-15"],"schicht":"frueh","name":"Ravi","action":"add"}`)
+	day := result(t, res, "2026-07-15")
+	if day["error"] != "holiday_conflict" || day["holiday"] != "Betriebsausflug" {
+		t.Fatalf("own holiday did not ask: %#v", day)
+	}
+
+	// A holiday of the other team leaves the entry alone.
+	addEmployee(t, a, "Anna", "DE")
+	res = call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-07-15"],"schicht":"frueh","name":"Anna","action":"add"}`)
+	if got := result(t, res, "2026-07-15")["error"]; got != nil {
+		t.Fatalf("holiday of the other team should not block: %v", got)
+	}
+
+	// Confirming enters it anyway.
+	call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-07-15"],"schicht":"frueh","name":"Ravi","action":"add","force":true}`)
+	if got := entered(t, a, "2026-07-15", "frueh"); len(got) != 2 {
+		t.Fatalf("forced entry missing: %#v", got)
+	}
+}
+
+func TestMovableIndianHolidaysAreTabulated(t *testing.T) {
+	a := newTestApp(t)
+
+	// Inside the tabulated range Holi and Diwali are known...
+	hols := call(t, a, http.MethodGet, "/api/holidays/2029", "")
+	if h, ok := hols["2029-03-01"].(map[string]interface{}); !ok || h["name"] != "Holi" {
+		t.Errorf("Holi 2029 missing: %#v", hols["2029-03-01"])
+	}
+	if h, ok := hols["2029-11-05"].(map[string]interface{}); !ok || h["name"] != "Diwali" {
+		t.Errorf("Diwali 2029 missing: %#v", hols["2029-11-05"])
+	}
+
+	// ...beyond it they are absent, and the API says where the table ends so
+	// the UI can ask for them to be entered by hand.
+	cover := call(t, a, http.MethodGet, "/api/holiday_coverage", "")
+	last := int(cover["in_movable_to"].(float64))
+	if last != inMovableLastYear {
+		t.Fatalf("coverage %d does not match the table (%d)", last, inMovableLastYear)
+	}
+	beyond := call(t, a, http.MethodGet, "/api/holidays/"+strconv.Itoa(last+1), "")
+	for date, h := range beyond {
+		name := h.(map[string]interface{})["name"]
+		if name == "Holi" || name == "Diwali" {
+			t.Errorf("unexpected %v on %s beyond the table", name, date)
+		}
+	}
+	// The fixed-date Indian holidays are still there.
+	if _, ok := beyond[strconv.Itoa(last+1)+"-01-26"]; !ok {
+		t.Error("Republic Day missing beyond the table")
+	}
+}
+
+func TestHoliAndDiwaliTablesCoverTheSameYears(t *testing.T) {
+	for year := inMovableFirstYear; year <= inMovableLastYear; year++ {
+		if _, ok := holiDates[year]; !ok {
+			t.Errorf("Holi %d fehlt", year)
+		}
+		if _, ok := diwaliDates[year]; !ok {
+			t.Errorf("Diwali %d fehlt", year)
+		}
+	}
+	if len(holiDates) != inMovableLastYear-inMovableFirstYear+1 {
+		t.Errorf("Holi-Tabelle hat %d Einträge, erwartet %d",
+			len(holiDates), inMovableLastYear-inMovableFirstYear+1)
+	}
+	// Every tabulated date has to fall in its own year and parse cleanly.
+	for _, table := range []map[int]string{holiDates, diwaliDates} {
+		for year, date := range table {
+			d, err := time.Parse("2006-01-02", date)
+			if err != nil {
+				t.Errorf("%s ist kein gültiges Datum: %v", date, err)
+			} else if d.Year() != year {
+				t.Errorf("%s steht unter Jahr %d", date, year)
+			}
+		}
+	}
 }

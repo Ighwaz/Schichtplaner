@@ -80,10 +80,25 @@ Das Frontend spricht das Backend ausschließlich über `/api/…` an; die Routen
 sind in [app.go](app.go) gebündelt. `GET /api/history?limit=200` liefert das
 Änderungsprotokoll.
 
+## Feiertage
+
+Gesetzliche Feiertage DE (Baden-Württemberg) werden gerechnet, die indischen
+Fixtermine ebenso. **Holi und Diwali** folgen dem lunisolaren Kalender und
+haben keine Formel – sie stehen als Tabelle in [holidays.go](holidays.go) und
+reichen derzeit bis **2036** (Quelle: qppstudio.net, jeweils der Tag, den
+Indien als Feiertag begeht – bei Holi also Rangwali Holi, nicht der Holika
+Dahan am Abend davor).
+
+Für Jahre jenseits der Tabelle weist die Ansicht „Eigene Feiertage" darauf hin.
+Bis die Tabelle verlängert wird, lassen sich beide als eigener Feiertag mit
+Land `IN` nachtragen – ein eigener Feiertag verhält sich genau wie ein
+gesetzlicher und fragt vor einem Eintrag nach.
+
+`GET /api/holiday_coverage` nennt den abgedeckten Zeitraum.
+
 ## Bekannte Grenzen
 
-- Indische Feiertage mit beweglichem Datum (Holi, Diwali) sind bis
-  einschließlich 2028 hinterlegt und müssen danach in
-  [holidays.go](holidays.go) ergänzt werden.
 - Das Änderungsprotokoll hält fest, *was* wann geändert wurde, nicht *wer* –
   die App kennt keine Benutzer.
+- Brückentage werden nur um gesetzliche Feiertage herum erkannt, nicht um
+  eigene.

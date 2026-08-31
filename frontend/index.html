@@ -710,6 +710,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
           </div>
           <button class="btn-p" onclick="addCustomHoliday()" style="align-self:flex-end">+ Hinzufügen</button>
         </div>
+        <div id="hol-coverage-note" style="display:none;font-size:12px;line-height:1.6;color:var(--text2);background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.3);border-radius:8px;padding:9px 11px;margin-bottom:10px"></div>
         <div class="hol-list" id="hol-list"><div class="hol-empty">Keine eigenen Feiertage eingetragen</div></div>
       </div>
     </div>
@@ -1259,6 +1260,7 @@ async function init(){
   loadHolidays(curYear).then(()=>{
     renderCalendar();
   }).catch(()=>{});
+  loadHolidayCoverage();
 
   // Warn if no folder is set
   const dir = await api('/api/datadir').catch(()=>({}));
@@ -1457,6 +1459,7 @@ async function nextMonth(){
 }
 function goToday(){const n=new Date();curYear=n.getFullYear();curMonth=n.getMonth()+1;clearSelection();renderCalendar();updateLabel();}
 function updateLabel(){
+  renderCoverageNote();
   // Sync month dropdown
   const mSel=document.getElementById('nav-month');
   if(mSel){
@@ -2528,7 +2531,28 @@ function exportRufCSV(){
 // ══════════════════════════════════════════════════════════════
 // CUSTOM HOLIDAYS
 // ══════════════════════════════════════════════════════════════
+// Holi und Diwali wechseln jaehrlich das Datum und sind nur fuer einen
+// begrenzten Zeitraum hinterlegt - danach muessen sie von Hand ergaenzt werden.
+let holidayCoverage=null;
+async function loadHolidayCoverage(){
+  try{ holidayCoverage=await api('/api/holiday_coverage'); }catch(e){ holidayCoverage=null; }
+  renderCoverageNote();
+}
+function renderCoverageNote(){
+  const el=document.getElementById('hol-coverage-note');
+  if(!el) return;
+  if(!holidayCoverage||!holidayCoverage.in_movable_to||curYear<=holidayCoverage.in_movable_to){
+    el.style.display='none'; return;
+  }
+  el.innerHTML=`⚠ Für <strong>${curYear}</strong> sind <strong>Holi</strong> und <strong>Diwali</strong> nicht hinterlegt `+
+    `(bewegliche Feiertage, zuletzt ${holidayCoverage.in_movable_to}).<br>`+
+    `Bitte mit dem Datum des jeweiligen Jahres oben als eigenen Feiertag mit Land <strong>IN</strong> eintragen – `+
+    `er wirkt dann genau wie ein gesetzlicher Feiertag.`;
+  el.style.display='block';
+}
+
 function renderCustomHolidays(){
+  renderCoverageNote();
   const list=document.getElementById('hol-list');
   if(!customHolidays.length){list.innerHTML='<div class="hol-empty">Noch keine eigenen Feiertage</div>';return;}
   const countryBadge={DE:'<span class="hol-item-country hol-de-badge">🇩🇪 DE</span>',IN:'<span class="hol-item-country hol-in-badge">🇮🇳 IN</span>','DE+IN':'<span class="hol-item-country hol-both-badge">🌍 Beide</span>'};

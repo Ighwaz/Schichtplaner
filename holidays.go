@@ -67,24 +67,39 @@ func getGermanHolidays(year int) map[string]Holiday {
 	return hols
 }
 
-// getIndianHolidays returns major Indian public holidays (fixed-date ones + key variable)
+// Holi and Diwali follow the Hindu lunisolar calendar and have no closed
+// formula, so their dates are tabulated. Source: qppstudio.net, which lists
+// the day India observes as the public holiday - for Holi that is Rangwali
+// Holi (the colour festival), not the Holika Dahan evening before it.
+// Beyond inMovableLastYear the two are simply missing; the UI points that out
+// so they can be added as custom holidays.
+const (
+	inMovableFirstYear = 2026
+	inMovableLastYear  = 2036
+)
+
+var holiDates = map[int]string{
+	2026: "2026-03-03", 2027: "2027-03-22", 2028: "2028-03-11",
+	2029: "2029-03-01", 2030: "2030-03-20", 2031: "2031-03-09",
+	2032: "2032-03-27", 2033: "2033-03-16", 2034: "2034-03-05",
+	2035: "2035-03-24", 2036: "2036-03-12",
+}
+
+var diwaliDates = map[int]string{
+	2026: "2026-11-08", 2027: "2027-10-29", 2028: "2028-10-17",
+	2029: "2029-11-05", 2030: "2030-10-26", 2031: "2031-11-14",
+	2032: "2032-11-02", 2033: "2033-10-22", 2034: "2034-11-10",
+	2035: "2035-10-30", 2036: "2036-10-18",
+}
+
+// getIndianHolidays returns the fixed-date Indian public holidays plus Holi and
+// Diwali for the years these are tabulated for.
 func getIndianHolidays(year int) map[string]Holiday {
 	hols := map[string]Holiday{
 		fmt.Sprintf("%d-01-26", year): {Name: "Republic Day", Country: "IN"},
 		fmt.Sprintf("%d-08-15", year): {Name: "Independence Day", Country: "IN"},
 		fmt.Sprintf("%d-10-02", year): {Name: "Gandhi Jayanti", Country: "IN"},
 		fmt.Sprintf("%d-12-25", year): {Name: "Christmas Day", Country: "IN"},
-	}
-	// Holi (variable - day after Holika Dahan, roughly March)
-	// Diwali (variable - October/November)
-	// These are approximations for common years
-	holiDates := map[int]string{
-		2024: "2024-03-25", 2025: "2025-03-14", 2026: "2026-03-03",
-		2027: "2027-03-22", 2028: "2028-03-10",
-	}
-	diwaliDates := map[int]string{
-		2024: "2024-11-01", 2025: "2025-10-20", 2026: "2026-11-08",
-		2027: "2027-10-29", 2028: "2028-10-17",
 	}
 	if d, ok := holiDates[year]; ok {
 		hols[d] = Holiday{Name: "Holi", Country: "IN"}
