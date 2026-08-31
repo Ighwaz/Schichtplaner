@@ -209,13 +209,14 @@ func (a *App) handleDeleteMitarbeiter(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// The backup lets the frontend offer a restore when the name is re-added.
-	backup, err := s.DeleteEmployee(name)
+	// The backup lets the frontend offer a restore when the name is re-added -
+	// including team, colour and icon, not just the shift entries.
+	gone, backup, err := s.DeleteEmployee(name)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	a.respondEmployees(w, map[string]interface{}{"backup": backup})
+	a.respondEmployees(w, map[string]interface{}{"backup": backup, "employee": gone})
 }
 
 func (a *App) handleSetColor(w http.ResponseWriter, r *http.Request) {
@@ -617,6 +618,7 @@ func (a *App) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 	lastDay := firstDay.AddDate(0, 1, -1)
 
 	var changes []ShiftChange
+	skippedHoliday, skippedConflict := 0, 0
 	for name, days := range tmpl {
 		for day := firstDay; !day.After(lastDay); day = day.AddDate(0, 0, 1) {
 			// Template weekdays are Mon=0 .. Sun=6.
@@ -626,8 +628,21 @@ func (a *App) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 			}
 			date := day.Format("2006-01-02")
 			if hol, isHoliday := hols[date]; isHoliday && !hol.Bridge && hol.appliesTo(empTeam[name]) {
+				skippedHoliday++
 				continue
 			}
+			// Never plan someone into two work shifts of the same day - the
+			// manual path asks before doing that, so the batch must not do it
+			// silently. d is our working copy and grows as we go.
+			slot := slotFor(&d, date)
+			if len(blockingShifts(&slot, shift, name)) > 0 {
+				skippedConflict++
+				continue
+			}
+			if !addToSlot(&slot, shift, name) {
+				continue
+			}
+			d.Schichten[date] = slot
 			changes = append(changes, ShiftChange{Date: date, Shift: shift, Name: name})
 		}
 	}
@@ -641,7 +656,12 @@ func (a *App) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, map[string]interface{}{"ok": true, "planned": planned})
+	writeJSON(w, map[string]interface{}{
+		"ok":               true,
+		"planned":          planned,
+		"skipped_holiday":  skippedHoliday,
+		"skipped_conflict": skippedConflict,
+	})
 }
 
 // ── /api/ruf_kw ──────────────────────────────────────────────────────────────

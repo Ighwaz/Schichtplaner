@@ -59,19 +59,23 @@ func (a *App) shutdown(ctx context.Context) {
 	a.store.Close()
 }
 
-// setDataFolder opens the database in folder and replaces any open one.
+// setDataFolder opens the database in folder and replaces any open one. The
+// new database is opened first: if that fails, the previously opened folder
+// stays in use instead of leaving the app without any data at all.
 func (a *App) setDataFolder(folder string) error {
-	a.store.Close()
-	a.store = nil
-	a.dataFolder = folder
 	if folder == "" {
+		a.store.Close()
+		a.store = nil
+		a.dataFolder = ""
 		return nil
 	}
 	store, err := openStore(folder)
 	if err != nil {
 		return err
 	}
+	a.store.Close()
 	a.store = store
+	a.dataFolder = folder
 	return nil
 }
 

@@ -296,7 +296,7 @@ func TestLegacyJSONIsImportedOnce(t *testing.T) {
 	}
 
 	// A second start must not import the JSON again over newer edits.
-	if _, err := s.DeleteEmployee("Alt"); err != nil {
+	if _, _, err := s.DeleteEmployee("Alt"); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -454,5 +454,68 @@ func TestHoliAndDiwaliTablesCoverTheSameYears(t *testing.T) {
 				t.Errorf("%s steht unter Jahr %d", date, year)
 			}
 		}
+	}
+}
+
+func TestFailedFolderSwitchKeepsTheOldOne(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
+	good := a.dataFolder
+
+	// A folder whose database path is occupied by a directory cannot be opened.
+	broken := t.TempDir()
+	if err := os.Mkdir(filepath.Join(broken, dbFileName), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.setDataFolder(broken); err == nil {
+		t.Fatal("expected the broken folder to be refused")
+	}
+
+	// The app has to keep working on the folder it had.
+	if a.dataFolder != good || a.store == nil {
+		t.Fatalf("folder switch tore down the working store: %q, store=%v", a.dataFolder, a.store != nil)
+	}
+	data := call(t, a, http.MethodGet, "/api/data", "")
+	if n := len(data["mitarbeiter"].([]interface{})); n != 1 {
+		t.Fatalf("data no longer reachable, %d Mitarbeiter", n)
+	}
+}
+
+func TestDeleteReturnsTheEmployeeForRestore(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
+	call(t, a, http.MethodPut, "/api/mitarbeiter/Anna",
+		`{"name":"Anna","team":"DE","color":"#123456","icon":"🌙"}`)
+
+	del := call(t, a, http.MethodDelete, "/api/mitarbeiter/Anna", "")
+	emp, ok := del["employee"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("delete did not return the employee: %#v", del["employee"])
+	}
+	if emp["team"] != "DE" || emp["color"] != "#123456" || emp["icon"] != "🌙" {
+		t.Fatalf("employee record incomplete: %#v", emp)
+	}
+}
+
+func TestAutoplanSkipsShiftConflicts(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
+	// 2026-06-01 is a Monday; Anna already works the early shift there.
+	addShift(t, a, "2026-06-01", "frueh", "Anna")
+	call(t, a, http.MethodPost, "/api/templates", `{"name":"Spaet","template":{"Anna":{"0":"spaet"}}}`)
+
+	res := call(t, a, http.MethodPost, "/api/autoplan", `{"year":2026,"month":6,"template":"Spaet"}`)
+	if res["skipped_conflict"].(float64) != 1 {
+		t.Fatalf("expected one skipped Monday, got %v", res["skipped_conflict"])
+	}
+	if res["planned"].(float64) != 4 {
+		t.Fatalf("expected the other four Mondays to be planned, got %v", res["planned"])
+	}
+	// The existing early shift must be untouched, and no double booking.
+	if got := entered(t, a, "2026-06-01", "frueh"); len(got) != 1 {
+		t.Errorf("existing shift changed: %#v", got)
+	}
+	if got := entered(t, a, "2026-06-01", "spaet"); len(got) != 0 {
+		t.Errorf("autoplan double-booked the day: %#v", got)
 	}
 }

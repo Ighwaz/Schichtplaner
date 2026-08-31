@@ -502,16 +502,16 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
   <div class="sep"></div>
   <!-- Shift pills: compact, letter only with tooltip -->
   <div class="hdr-pills" id="modebar">
-    <div class="pill active" data-shift="frueh"    title="Frühschicht"><span class="dot dot-f"></span>F</div>
-    <div class="pill"        data-shift="spaet"    title="Spätschicht"><span class="dot dot-s"></span>S</div>
-    <div class="pill"        data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
+    <div class="pill active" role="button" tabindex="0" data-shift="frueh"    title="Frühschicht"><span class="dot dot-f"></span>F</div>
+    <div class="pill"        role="button" tabindex="0" data-shift="spaet"    title="Spätschicht"><span class="dot dot-s"></span>S</div>
+    <div class="pill"        role="button" tabindex="0" data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
   </div>
   <div class="sep"></div>
   <div class="hdr-pills" id="modebar2">
-    <div class="pill" data-shift="urlaub"      title="Urlaub"><span class="dot dot-u"></span>U</div>
-    <div class="pill" data-shift="krank"       title="Krank"><span class="dot dot-k"></span>K</div>
-    <div class="pill" data-shift="elternzeit"  title="Elternzeit"><span class="dot dot-e"></span>E</div>
-    <div class="pill" data-shift="sonderurlaub" title="Sonderurlaub"><span class="dot dot-so"></span>So</div>
+    <div class="pill" role="button" tabindex="0" data-shift="urlaub"      title="Urlaub"><span class="dot dot-u"></span>U</div>
+    <div class="pill" role="button" tabindex="0" data-shift="krank"       title="Krank"><span class="dot dot-k"></span>K</div>
+    <div class="pill" role="button" tabindex="0" data-shift="elternzeit"  title="Elternzeit"><span class="dot dot-e"></span>E</div>
+    <div class="pill" role="button" tabindex="0" data-shift="sonderurlaub" title="Sonderurlaub"><span class="dot dot-so"></span>So</div>
   </div>
   <div class="sep"></div>
   <div style="display:flex;gap:3px;align-items:center">
@@ -925,6 +925,9 @@ let rufKW={};
 let profOldName=null, profColor=null, profEmoji=null, profPrefs={};
 // Template editor state: {personName: {dow: shift}}
 let tmplData={};
+// Beim Loeschen gemerkte Mitarbeiterdaten (Team/Farbe/Icon/Wuensche),
+// damit ein Wiederherstellen nicht nur die Eintraege zurueckbringt.
+let deletedProfiles={};
 let activeView='cal';
 const currentSubTab={};
 
@@ -1347,13 +1350,21 @@ function switchSubTab(view, subId){
     });
   });
 
-  // Shift pills
+  // Shift pills - per Maus und per Tastatur bedienbar
+  const pickShift=p=>{
+    selectedShift=p.dataset.shift;
+    document.querySelectorAll('.pill').forEach(x=>x.classList.toggle('active',x===p));
+    updateSelInfo();
+  };
   ['modebar','modebar2'].forEach(id=>{
-    document.getElementById(id).addEventListener('click',e=>{
+    const bar=document.getElementById(id);
+    bar.addEventListener('click',e=>{
+      const p=e.target.closest('[data-shift]'); if(p) pickShift(p);
+    });
+    bar.addEventListener('keydown',e=>{
+      if(e.key!=='Enter'&&e.key!==' ')return;
       const p=e.target.closest('[data-shift]'); if(!p) return;
-      selectedShift=p.dataset.shift;
-      document.querySelectorAll('.pill').forEach(x=>x.classList.toggle('active',x===p));
-      updateSelInfo();
+      e.preventDefault(); pickShift(p);
     });
   });
 
@@ -1706,6 +1717,7 @@ async function deleteMitarbeiter(name){
     const d=await api('/api/mitarbeiter/'+encodeURIComponent(name),{method:'DELETE'});
     if(d.error){toast('Fehler: '+d.error);return;}
     if(d.backup&&Object.keys(d.backup).length>0)deletedBackups[name]=d.backup;
+    if(d.employee&&d.employee.name)deletedProfiles[name]=d.employee;
     mitarbeiter=mitarbeiter.filter(m=>m.name!==name);
     if(selectedPerson?.name===name){selectedPerson=null;updateSelInfo();}
     selectedPersons.delete(name);
@@ -1722,12 +1734,29 @@ function showRestoreModal(name,backup){
 }
 async function confirmRestore(doRestore){
   closeModal('restore-modal');if(!pendingRestore)return;
-  const{name,team,color}=pendingRestore;pendingRestore=null;await doAdd(name,team,color);
-  if(doRestore&&deletedBackups[name]){
-    await api('/api/mitarbeiter/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,entries:deletedBackups[name]})});
-    await reloadSchichten();renderCalendar();toast(name+': Einträge wiederhergestellt');
+  const{name,team,color}=pendingRestore;pendingRestore=null;
+  const prof=doRestore?deletedProfiles[name]:null;
+  // Beim Wiederherstellen zaehlt das gemerkte Profil, nicht das Formular:
+  // sonst kaeme die Person mit falschem Team zurueck und die Feiertagslogik
+  // wuerde ab dann andere Tage sperren.
+  await doAdd(name,prof?.team??team,prof?.color??color);
+  if(doRestore){
+    if(prof){
+      await api('/api/mitarbeiter/'+encodeURIComponent(name),{method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,team:prof.team||'',color:prof.color||'',icon:prof.icon||''})});
+      if(prof.prefs&&Object.keys(prof.prefs).length)
+        await api('/api/mitarbeiter/'+encodeURIComponent(name)+'/prefs',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({prefs:prof.prefs})});
+      const m=mitarbeiter.find(x=>x.name===name);
+      if(m){m.team=prof.team||'';m.color=prof.color||m.color;m.icon=prof.icon||'';m.prefs=prof.prefs||{};}
+      renderMembers();
+    }
+    if(deletedBackups[name]){
+      await api('/api/mitarbeiter/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,entries:deletedBackups[name]})});
+      await reloadSchichten();renderCalendar();toast(name+': Einträge wiederhergestellt');
+    }
   }
-  delete deletedBackups[name];
+  delete deletedBackups[name];delete deletedProfiles[name];
 }
 function cancelRestore(){closeModal('restore-modal');pendingRestore=null;}
 
@@ -2191,8 +2220,19 @@ function rangeClass(key){
   if(key===lo&&lo===hi)return 'range-start';if(key===lo)return 'in-range range-start';
   if(key===hi)return 'in-range range-end';if(key>lo&&key<hi)return 'in-range';return '';
 }
+// Vorschau des Zeitraums: nur die Klassen der Tageszellen anpassen. Ein
+// kompletter renderCalendar() bei jeder Mausbewegung tauscht das DOM aus und
+// kann den naechsten Klick verschlucken.
+function updateRangePreview(){
+  document.querySelectorAll('.day-cell').forEach(cell=>{
+    if(cell.classList.contains('other'))return;
+    cell.classList.remove('in-range','range-start','range-end');
+    const rc=rangeClass(cell.dataset.key);
+    if(rc)cell.classList.add(...rc.split(' '));
+  });
+}
 function datesInRange(a,b){const lo=a<b?a:b,hi=a<b?b:a,out=[];let cur=new Date(lo+'T00:00:00'),end=new Date(hi+'T00:00:00');while(cur<=end){out.push(dk(cur.getFullYear(),cur.getMonth()+1,cur.getDate()));cur.setDate(cur.getDate()+1);}return out;}
-document.addEventListener('mouseover',e=>{if(!rangeMode||!rangeStart||frozenRangeEnd)return;const cell=e.target.closest('.day-cell:not(.other)');if(cell&&cell.dataset.key!==previewEnd){previewEnd=cell.dataset.key;renderCalendar();}});
+document.addEventListener('mouseover',e=>{if(!rangeMode||!rangeStart||frozenRangeEnd)return;const cell=e.target.closest('.day-cell:not(.other)');if(cell&&cell.dataset.key!==previewEnd){previewEnd=cell.dataset.key;updateRangePreview();}});
 
 // ══════════════════════════════════════════════════════════════
 // CONFLICTS & UNDERSTAFFED
@@ -2312,7 +2352,9 @@ async function applyTemplateDirectly(){
     curYear=selYear; curMonth=selMonth;
     updateLabel(); renderCalendar();
     showCalendarView();
-    toast(`Template "${tname}" auf ${MONTHS[selMonth-1]} ${selYear} angewendet (${d.planned} Einträge)`);
+    const uebersprungen=(d.skipped_conflict||0)+(d.skipped_holiday||0);
+    const zusatz=uebersprungen?` – ${uebersprungen} übersprungen (${d.skipped_conflict||0}× Konflikt, ${d.skipped_holiday||0}× Feiertag)`:'';
+    toast(`Template "${tname}" auf ${MONTHS[selMonth-1]} ${selYear} angewendet: ${d.planned} Einträge${zusatz}`);
   }
 }
 

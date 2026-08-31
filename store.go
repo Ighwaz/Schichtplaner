@@ -642,11 +642,23 @@ func replaceName(v interface{}, oldName, newName string) (interface{}, bool) {
 	return v, false
 }
 
-// DeleteEmployee removes the employee and every shift entry of that name, and
-// returns those entries so they can be restored later.
-func (s *Store) DeleteEmployee(name string) (map[string]map[string]bool, error) {
+// DeleteEmployee removes the employee and every shift entry of that name. It
+// returns the entries and the employee record itself, so a later restore can
+// bring back team, colour and icon along with the shifts.
+func (s *Store) DeleteEmployee(name string) (Employee, map[string]map[string]bool, error) {
+	var gone Employee
 	backup := map[string]map[string]bool{}
 	err := s.tx("mitarbeiter:löschen", name, func(t *sql.Tx) error {
+		var prefs string
+		switch err := t.QueryRow(`SELECT name, team, color, icon, prefs FROM employees WHERE name = ?`, name).
+			Scan(&gone.Name, &gone.Team, &gone.Color, &gone.Icon, &prefs); err {
+		case nil:
+			gone.Prefs = map[string]string{}
+			json.Unmarshal([]byte(prefs), &gone.Prefs)
+		case sql.ErrNoRows:
+		default:
+			return err
+		}
 		rows, err := t.Query(`SELECT date, shift FROM shifts WHERE name = ?`, name)
 		if err != nil {
 			return err
@@ -671,7 +683,7 @@ func (s *Store) DeleteEmployee(name string) (map[string]map[string]bool, error) 
 		_, err = t.Exec(`DELETE FROM employees WHERE name = ?`, name)
 		return err
 	})
-	return backup, err
+	return gone, backup, err
 }
 
 func (s *Store) SetColor(name, color string) error {
