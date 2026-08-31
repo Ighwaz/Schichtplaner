@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Schichtplaner",
+  "outputfilename": "Schichtplaner",
+  "frontend": {
+    "dir": "frontend",
+    "install": "echo skip",
+    "build": "echo skip",
+    "devUrl": ""
+  },
+  "author": {
+    "name": "IT",
+    "email": ""
+  }
+}

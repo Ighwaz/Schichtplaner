@@ -1,0 +1,20 @@
+# Build-Artefakte
+/build/bin/
+*.exe
+*.syso
+
+# Von `wails build` generiert
+/frontend/wailsjs/
+
+# Laufzeitdaten (gehören nicht ins Repo)
+schichtplan_daten.json
+schichtplan_daten.json.tmp
+schichtplan_backup.json
+.schichtplaner_config.json
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store

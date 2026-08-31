@@ -1,0 +1,250 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+)
+
+// ── Data structures ───────────────────────────────────────────────────────────
+
+type Employee struct {
+	Name  string            `json:"name"`
+	Team  string            `json:"team"`
+	Color string            `json:"color"`
+	Icon  string            `json:"icon"`
+	Prefs map[string]string `json:"prefs"`
+}
+
+type DaySlot struct {
+	Frueh           []string `json:"frueh"`
+	Spaet           []string `json:"spaet"`
+	Rufbereitschaft []string `json:"rufbereitschaft"`
+	Urlaub          []string `json:"urlaub"`
+	Krank           []string `json:"krank"`
+	Elternzeit      []string `json:"elternzeit"`
+	Sonderurlaub    []string `json:"sonderurlaub"`
+}
+
+type SollBesetzung struct {
+	Frueh           int `json:"frueh"`
+	Spaet           int `json:"spaet"`
+	Rufbereitschaft int `json:"rufbereitschaft"`
+}
+
+type CustomHoliday struct {
+	Date    string `json:"date"`
+	Name    string `json:"name"`
+	Country string `json:"country"`
+}
+
+// Template: map[personName]map[weekday(string)]shiftType
+type Template map[string]map[string]string
+
+type AppData struct {
+	Mitarbeiter    []Employee             `json:"mitarbeiter"`
+	Schichten      map[string]DaySlot     `json:"schichten"`
+	Notizen        map[string]string      `json:"notizen"`
+	Soll           SollBesetzung          `json:"soll"`
+	CustomHolidays []CustomHoliday        `json:"custom_holidays"`
+	Templates      map[string]Template    `json:"templates"`
+	RufKW          map[string]interface{} `json:"ruf_kw"`
+}
+
+// ── Config ───────────────────────────────────────────────────────────────────
+
+type Config struct {
+	DataFolder string `json:"data_folder"`
+}
+
+func configPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".schichtplaner_config.json")
+}
+
+func loadConfig() Config {
+	data, err := os.ReadFile(configPath())
+	if err != nil {
+		return Config{}
+	}
+	var cfg Config
+	json.Unmarshal(data, &cfg)
+	return cfg
+}
+
+func saveConfig(cfg Config) {
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	os.WriteFile(configPath(), data, 0644)
+}
+
+// ── Data file I/O ─────────────────────────────────────────────────────────────
+
+const dataFileName = "schichtplan_daten.json"
+
+func defaultData() AppData {
+	return AppData{
+		Mitarbeiter:    []Employee{},
+		Schichten:      map[string]DaySlot{},
+		Notizen:        map[string]string{},
+		Soll:           SollBesetzung{Frueh: 1, Spaet: 1, Rufbereitschaft: 1},
+		CustomHolidays: []CustomHoliday{},
+		Templates:      map[string]Template{},
+		RufKW:          map[string]interface{}{},
+	}
+}
+
+func emptySlot() DaySlot {
+	return DaySlot{
+		Frueh:           []string{},
+		Spaet:           []string{},
+		Rufbereitschaft: []string{},
+		Urlaub:          []string{},
+		Krank:           []string{},
+		Elternzeit:      []string{},
+		Sonderurlaub:    []string{},
+	}
+}
+
+func (a *App) dataFilePath() string {
+	if a.dataFolder == "" {
+		return ""
+	}
+	return filepath.Join(a.dataFolder, dataFileName)
+}
+
+func (a *App) loadData() AppData {
+	path := a.dataFilePath()
+	if path == "" {
+		return defaultData()
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return defaultData()
+	}
+	var d AppData
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return defaultData()
+	}
+	normalizeData(&d)
+	return d
+}
+
+// normalizeData fills in anything an older or hand-edited data file may be
+// missing, so handlers never have to deal with nil maps.
+func normalizeData(d *AppData) {
+	if d.Schichten == nil {
+		d.Schichten = map[string]DaySlot{}
+	}
+	if d.Notizen == nil {
+		d.Notizen = map[string]string{}
+	}
+	if d.CustomHolidays == nil {
+		d.CustomHolidays = []CustomHoliday{}
+	}
+	if d.Templates == nil {
+		d.Templates = map[string]Template{}
+	}
+	if d.Mitarbeiter == nil {
+		d.Mitarbeiter = []Employee{}
+	}
+	if d.Soll == (SollBesetzung{}) {
+		d.Soll = SollBesetzung{Frueh: 1, Spaet: 1, Rufbereitschaft: 1}
+	}
+	d.RufKW = unwrapRufKW(d.RufKW)
+	for i := range d.Mitarbeiter {
+		if d.Mitarbeiter[i].Color == "" {
+			d.Mitarbeiter[i].Color = "#4a9eff"
+		}
+		if d.Mitarbeiter[i].Prefs == nil {
+			d.Mitarbeiter[i].Prefs = map[string]string{}
+		}
+	}
+}
+
+// unwrapRufKW repairs KW plans that were stored one level too deep as
+// {"ruf_kw": {...}} by an earlier version, and never returns nil.
+func unwrapRufKW(m map[string]interface{}) map[string]interface{} {
+	for len(m) == 1 {
+		inner, ok := m["ruf_kw"].(map[string]interface{})
+		if !ok {
+			break
+		}
+		m = inner
+	}
+	if m == nil {
+		return map[string]interface{}{}
+	}
+	return m
+}
+
+func (a *App) saveData(d AppData) error {
+	path := a.dataFilePath()
+	if path == "" {
+		return nil
+	}
+	raw, err := json.MarshalIndent(d, "", "  ")
+	if err != nil {
+		return err
+	}
+	// Write to a temp file and rename, so a crash mid-write cannot leave a
+	// truncated data file behind.
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// ── Slot helpers ──────────────────────────────────────────────────────────────
+
+func slotField(s *DaySlot, shift string) *[]string {
+	switch shift {
+	case "frueh":
+		return &s.Frueh
+	case "spaet":
+		return &s.Spaet
+	case "rufbereitschaft":
+		return &s.Rufbereitschaft
+	case "urlaub":
+		return &s.Urlaub
+	case "krank":
+		return &s.Krank
+	case "elternzeit":
+		return &s.Elternzeit
+	case "sonderurlaub":
+		return &s.Sonderurlaub
+	}
+	return nil
+}
+
+func contains(arr []string, s string) bool {
+	for _, v := range arr {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func remove(arr []string, s string) []string {
+	out := make([]string, 0, len(arr))
+	for _, v := range arr {
+		if v != s {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// workShifts are shifts that conflict with absences
+var workShifts = map[string]bool{
+	"frueh": true, "spaet": true, "rufbereitschaft": true,
+}
+
+var allShifts = []string{
+	"frueh", "spaet", "rufbereitschaft", "urlaub", "krank", "elternzeit", "sonderurlaub",
+}

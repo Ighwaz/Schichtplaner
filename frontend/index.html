@@ -1,0 +1,2719 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Schichtplaner DE/IN</title>
+<style>
+/* ── Animations ─────────────────────────────────────────── */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes chipPop{0%{transform:scale(0.7);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes pulseUnder{0%,100%{border-color:var(--krank)}50%{border-color:transparent}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+[data-theme="dark"]{
+  --bg:#0c0e14;--surface:#13161f;--surface2:#181c28;--surface3:#1e2233;
+  --border:#232840;--border2:#2e3555;
+  --text:#e4e8f4;--text2:#8892b0;--text3:#5a6480;
+  --shadow:rgba(0,0,0,.6);--chip-alpha:.2;--day-other:.35;
+  --frueh-text:#4ade80;--spaet-text:#fcd34d;--ruf-text:#c4b5fd;
+  --urlaub-text:#f9a8d4;--krank-text:#fca5a5;--eltern-text:#67e8f9;--sonder-text:#fde68a;
+}
+[data-theme="light"]{
+  --bg:#f1f3f9;--surface:#fff;--surface2:#f6f8fd;--surface3:#eef0f8;
+  --border:#dde1f0;--border2:#c5cae0;
+  --text:#1a1d2e;--text2:#4a526b;--text3:#868fa8;
+  --shadow:rgba(50,60,110,.1);--chip-alpha:.1;--day-other:.3;
+  --frueh-text:#15803d;--spaet-text:#b45309;--ruf-text:#6d28d9;
+  --urlaub-text:#9d174d;--krank-text:#b91c1c;--eltern-text:#0e7490;--sonder-text:#92400e;
+}
+:root{
+  /* Shift colors — more saturated, better dark-mode contrast */
+  --frueh:#16a34a;--frueh-bg:rgba(22,163,74,.13);--frueh-text:#4ade80;
+  --spaet:#d97706;--spaet-bg:rgba(217,119,6,.13);--spaet-text:#fbbf24;
+  --ruf:#7c3aed;--ruf-bg:rgba(124,58,237,.13);--ruf-text:#a78bfa;
+  --urlaub:#be185d;--urlaub-bg:rgba(190,24,93,.13);--urlaub-text:#f472b6;
+  --krank:#dc2626;--krank-bg:rgba(220,38,38,.13);--krank-text:#f87171;
+  --eltern:#0891b2;--eltern-bg:rgba(8,145,178,.13);--eltern-text:#22d3ee;
+  --sonder:#b45309;--sonder-bg:rgba(180,83,9,.13);--sonder-text:#fbbf24;
+  /* UI colors */
+  --blue:#3b82f6;--blue-soft:rgba(59,130,246,.12);
+  --orange:#f97316;
+  --today:rgba(59,130,246,.15);--today-border:#3b82f6;
+  --radius-cell:11px;--radius-chip:5px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Inter',sans-serif;font-size:15px;background:var(--bg);color:var(--text);overflow:hidden}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* HEADER */
+header{background:var(--surface);border-bottom:2px solid var(--border);padding:5px 10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px var(--shadow)}
+h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
+.h1-de{color:var(--blue)}.h1-in{color:var(--orange)}
+.hdr-group{display:flex;align-items:center;gap:3px}
+.hdr-lbl{display:none}
+.hdr-pills{display:flex;gap:3px;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:3px;padding:4px 8px;border-radius:20px;border:2px solid transparent;
+  background:var(--surface2);cursor:pointer;font-size:12px;font-weight:700;color:var(--text2);transition:background .12s,border-color .12s,color .12s,transform .1s;white-space:nowrap}
+.pill:hover{background:var(--surface3);color:var(--text)}
+.pill:active{transform:scale(.94)}
+.pill .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-f{width:5px;height:5px;border-radius:50%;background:var(--frueh);flex-shrink:0}.dot-s{width:5px;height:5px;border-radius:50%;background:var(--spaet);flex-shrink:0}.dot-r{width:5px;height:5px;border-radius:50%;background:var(--ruf);flex-shrink:0}
+.dot-u{width:5px;height:5px;border-radius:50%;background:var(--urlaub);flex-shrink:0}.dot-k{width:5px;height:5px;border-radius:50%;background:var(--krank);flex-shrink:0}.dot-e{width:5px;height:5px;border-radius:50%;background:var(--eltern);flex-shrink:0}.dot-so{width:5px;height:5px;border-radius:50%;background:var(--sonder);flex-shrink:0}
+.pill.active{border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
+.pill.active[data-shift=frueh]{color:var(--frueh)}.pill.active[data-shift=spaet]{color:var(--spaet)}
+.pill.active[data-shift=rufbereitschaft]{color:var(--ruf)}.pill.active[data-shift=urlaub]{color:var(--urlaub)}
+.pill.active[data-shift=krank]{color:var(--krank)}.pill.active[data-shift=elternzeit]{color:var(--eltern)}
+.pill.active[data-shift=sonderurlaub]{color:var(--sonder)}
+.sep{width:1px;height:32px;background:var(--border);flex-shrink:0;align-self:center}
+.hbtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:2px solid var(--border);
+  background:var(--surface2);cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;white-space:nowrap;flex-shrink:0}
+.hbtn:hover{border-color:var(--border2);color:var(--text);background:var(--surface3)}
+.hbtn.on{border-color:var(--blue);color:var(--blue);background:rgba(59,130,246,.1)}
+.nav{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0}
+.nbtn{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:4px 9px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s,transform .1s}
+.nbtn:active{transform:scale(.95)}
+.nbtn:hover{background:var(--surface3);border-color:var(--border2)}
+#month-label{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;min-width:145px;text-align:center}
+.ur-btn{background:var(--surface2);border:2px solid var(--border);color:var(--text2);padding:5px 9px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s}
+.ur-btn:hover:not(:disabled){background:var(--surface3);color:var(--text)}
+.ur-btn:disabled{opacity:.3;cursor:default}
+.theme-btn{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:5px 9px;border-radius:8px;cursor:pointer;font-size:14px;transition:all .15s}
+
+/* FOLDER BAR */
+.folder-bar{display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);position:sticky;top:55px;z-index:90}
+.folder-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40vw;min-width:40px}
+.fbtn{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap}
+.fbtn:hover{border-color:var(--blue);color:var(--blue)}
+
+/* VIEW TABS */
+.view-tabs{display:flex;gap:3px;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:82px;z-index:89}
+.vtab{padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);border:2px solid transparent;transition:background .12s,border-color .12s,color .12s,transform .1s}
+.vtab:hover{background:var(--surface2);color:var(--text)}
+.vtab:active{transform:scale(.97)}
+.vtab.active{background:var(--surface2);border-color:var(--blue);color:var(--blue)}
+.sub-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.sub-tab{padding:4px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);border:2px solid transparent;transition:all .15s}
+.sub-tab:hover{background:var(--surface2);color:var(--text)}
+.sub-tab.active{background:var(--surface2);border-color:var(--ruf);color:var(--ruf)}
+.sub-panel{display:none}.sub-panel.active{display:block}
+
+/* LAYOUT */
+.main{display:grid;grid-template-columns:274px 1fr;height:calc(100vh - 120px);overflow:hidden;transition:grid-template-columns .2s}
+.main.collapsed{grid-template-columns:0px 1fr}
+.sidebar-toggle{position:fixed;left:274px;top:50%;transform:translateY(-50%);z-index:95;
+  background:var(--surface);border:2px solid var(--border);border-radius:0 8px 8px 0;
+  color:var(--text2);cursor:pointer;padding:10px 5px;font-size:13px;transition:left .2s}
+.sidebar-toggle:hover{background:var(--surface3)}
+.sidebar-toggle.closed{left:3px}
+.view-panel{display:none;flex:1;overflow:hidden;flex-direction:column}
+.view-panel.active{display:flex;animation:fadeIn .18s ease}
+
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;width:274px}
+.sb-sec{padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-sec h3{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:6px}
+
+/* Collapsible add form */
+.add-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 10px;border-radius:8px;background:var(--surface2);border:2px solid var(--border);transition:all .15s}
+.add-toggle:hover{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 8%,var(--surface2))}
+.add-toggle-label{font-size:13px;font-weight:700;color:var(--blue)}
+.add-toggle-icon{font-size:11px;color:var(--text3);transition:transform .2s}
+.add-toggle.open .add-toggle-icon{transform:rotate(180deg)}
+.add-form{display:flex;flex-direction:column;gap:5px;overflow:hidden;max-height:0;transition:max-height .25s ease,padding .2s}
+.add-form.open{max-height:160px;padding-top:8px}
+.add-form input,.add-form select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:6px 9px;border-radius:8px;font-size:13px;font-family:inherit;width:100%}
+.add-form input:focus,.add-form select:focus{outline:none;border-color:var(--blue)}
+.add-form input::placeholder{color:var(--text3)}
+.add-row{display:flex;gap:5px}
+.color-preview{width:32px;height:32px;border-radius:7px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;transition:transform .15s}
+.color-preview:hover{transform:scale(1.1)}
+.add-btn{background:var(--blue);color:#fff;border:none;padding:7px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px}
+.add-btn:hover{opacity:.85}
+
+/* Compact soll row */
+.soll-compact{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.soll-pill{display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:20px;background:var(--surface2);border:1.5px solid var(--border);font-size:11px;font-weight:600}
+.soll-pill input{width:28px;background:transparent;border:none;color:var(--text);font-size:11px;font-weight:700;text-align:center;padding:0;font-family:'JetBrains Mono',monospace}
+.soll-pill input:focus{outline:none}
+.soll-pill input::-webkit-inner-spin-button,.soll-pill input::-webkit-outer-spin-button{-webkit-appearance:none}
+
+.soll-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px}
+.soll-row label{color:var(--text2);width:85px;flex-shrink:0;font-weight:500}
+.soll-row input{width:42px;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:3px 5px;border-radius:6px;font-size:12px;text-align:center}
+.soll-row input:focus{outline:none;border-color:var(--blue)}
+.sel-info{padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);text-align:center;line-height:1.6;flex-shrink:0;background:var(--surface2)}
+.sb-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-tab{flex:1;padding:7px;text-align:center;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;color:var(--text3);border-bottom:3px solid transparent;transition:all .15s}
+.sb-tab.active{color:var(--text);border-bottom-color:var(--blue)}
+.sb-panel{display:none;flex:1;overflow:hidden;flex-direction:column}
+.sb-panel.active{display:flex}
+.member-list{overflow-y:auto;flex:1;padding:5px}
+.sb-filter{display:flex;gap:4px;padding:5px 7px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-filter input{flex:1;background:var(--surface2);border:2px solid var(--border);color:var(--text);
+  padding:4px 8px;border-radius:6px;font-size:12px;font-family:inherit}
+.sb-filter input:focus{outline:none;border-color:var(--blue)}
+.sb-filter select{background:var(--surface2);border:2px solid var(--border);color:var(--text2);
+  padding:4px 6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer}
+.member-item{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:7px;margin-bottom:3px;cursor:pointer;transition:background .12s,transform .1s;border:1px solid transparent;animation:fadeIn .15s ease both}
+.member-item:hover{border-color:var(--border2);background:var(--surface3);transform:translateX(2px)}
+.member-item.selected{background:var(--blue-soft);border-color:var(--blue)}
+.member-item.multi-picked{border-color:var(--blue)!important;background:rgba(59,130,246,.07)!important}
+.member-cb{width:15px;height:15px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;margin:0}
+.avatar{width:26px;height:26px;border-radius:50%;box-shadow:0 0 0 2px var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 2px 5px var(--shadow)}
+.member-name{font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.badge{font-family:'JetBrains Mono',monospace;font-size:8px;padding:1px 4px;border-radius:3px;font-weight:700;flex-shrink:0}
+.badge-de{background:rgba(59,130,246,.15);color:var(--blue)}.badge-in{background:rgba(249,115,22,.15);color:var(--orange)}
+.member-btns{display:flex;gap:2px;flex-shrink:0;opacity:0;transition:opacity .15s}
+.member-item:hover .member-btns{opacity:1}
+.member-item.selected .member-btns{opacity:1}
+.mbtn{border:1px solid transparent;cursor:pointer;font-size:10px;padding:2px 5px;border-radius:4px;line-height:1;font-weight:600;transition:all .15s}
+.mbtn-edit{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2);color:var(--blue)}
+.mbtn-edit:hover{background:rgba(59,130,246,.2)}
+.mbtn-del{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.2);color:#f87171}
+.mbtn-del:hover{background:rgba(248,113,113,.2)}
+.member-confirm{display:none;align-items:center;gap:4px;flex-shrink:0}
+.member-confirm.show{display:flex!important}
+.cfbtn{border:none;cursor:pointer;font-size:10px;padding:3px 7px;border-radius:5px;font-weight:700}
+.cfbtn-yes{background:rgba(248,113,113,.15);color:#f87171}.cfbtn-yes:hover{background:rgba(248,113,113,.3)}
+.cfbtn-no{background:var(--surface3);border:1px solid var(--border);color:var(--text2)}
+.stats-wrap{overflow-y:auto;flex:1;padding:7px}
+.stat-row{background:var(--surface2);border-radius:8px;padding:9px 11px;margin-bottom:5px;border:1px solid var(--border)}
+.stat-name{font-weight:700;font-size:13px;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.stat-bar-row{display:flex;align-items:center;gap:5px;font-size:11px;margin-bottom:2px}
+.stat-bar-label{color:var(--text2);width:50px;flex-shrink:0;text-align:right}
+.stat-bar-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.stat-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.stat-bar-count{color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:10px;min-width:16px}
+
+/* CALENDAR */
+.cal-wrap{overflow-y:auto;padding:12px;background:var(--bg)}
+.cal-grid{display:grid;grid-template-columns:32px repeat(7,1fr);gap:5px}
+.day-hdr{text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--text3);padding:4px 0 6px;text-transform:uppercase}
+.day-hdr.we{opacity:.55}
+.day-cell{background:var(--surface);border:2px solid var(--border);border-radius:9px;padding:7px;min-height:118px;transition:border-color .12s,background .12s,transform .1s;display:flex;flex-direction:column;gap:2px;cursor:pointer;position:relative;overflow:hidden}
+.day-cell:hover{border-color:var(--border2);background:var(--surface2);box-shadow:0 2px 10px var(--shadow)}
+.day-cell.other{opacity:var(--day-other);pointer-events:none;background:var(--bg)!important;border-color:var(--border)!important}
+.day-cell.weekend{background:color-mix(in srgb,var(--surface) 88%,var(--bg))}
+.day-cell.today{background:var(--today);border-color:var(--today-border);border-width:2px}
+.day-cell.hol-de{background:color-mix(in srgb,var(--blue) 6%,var(--surface))}
+.day-cell.hol-in{background:color-mix(in srgb,var(--orange) 6%,var(--surface))}
+.day-cell.hol-both{background:rgba(167,139,250,.09)}
+.day-cell.bridge{background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.3)}
+.range-panel{background:var(--surface);border:2px solid var(--border2);border-radius:12px;
+  padding:12px 14px;margin-top:8px;box-shadow:0 4px 16px var(--shadow)}
+.range-panel h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+  color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
+.range-panel-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+.rp-label{font-size:10px;color:var(--text3);width:100%;margin-bottom:2px;font-weight:600}
+.rpbtn{padding:5px 10px;border-radius:7px;border:2px solid var(--border);background:var(--surface2);
+  color:var(--text2);cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;white-space:nowrap}
+.rpbtn:hover{border-color:var(--border2);color:var(--text);background:var(--surface3)}
+.rpbtn.red{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.07);color:#f87171}
+.rpbtn.red:hover{background:rgba(248,113,113,.18);border-color:#f87171}
+.rpbtn.orange{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.07);color:var(--spaet)}
+.rpbtn.orange:hover{background:rgba(245,158,11,.18);border-color:var(--spaet)}
+.rpbtn.blue{border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.07);color:var(--blue)}
+.rpbtn.blue:hover{background:rgba(59,130,246,.18);border-color:var(--blue)}
+.bridge-tag{font-size:10px;color:var(--sonder);font-weight:600;flex-shrink:0;line-height:1.3}
+.day-cell.conflict{outline:2px solid rgba(239,68,68,.45);outline-offset:-2px}
+.day-cell.understaffed{outline:2px solid rgba(245,158,11,.5);outline-offset:-2px;animation:pulseUnder 2.8s ease-in-out infinite}
+.day-cell.has-note{border-bottom:3px solid var(--spaet)}
+.day-cell.in-range{background:rgba(59,130,246,.07)!important;border-color:rgba(59,130,246,.35)!important}
+.day-cell.range-end,.day-cell.in-range{animation:fadeIn .12s ease}.day-cell.range-start{border-color:var(--blue)!important;background:rgba(59,130,246,.14)!important}
+.day-cell.multi-day{border-color:var(--ruf)!important;background:rgba(167,139,250,.09)!important}
+.day-cell.copied{border-color:var(--spaet)!important}
+.day-cell.drag-over{border-color:var(--blue)!important;background:rgba(59,130,246,.07)!important}
+.day-num{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:20px}
+.day-number{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}
+.day-number.is-today{color:var(--blue)}
+.day-actions{display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.day-cell:hover .day-actions{opacity:1}
+.dab{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 3px;border-radius:4px;transition:color .1s,background .1s;line-height:1}
+.dab:hover{color:var(--text);background:var(--surface3)}
+.dab.red:hover{color:#f87171;background:rgba(248,113,113,.1)}
+.hol-tag{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;line-height:1.3;font-weight:500}
+.hol-de-tag{color:var(--blue)}.hol-in-tag{color:var(--orange)}.hol-custom-tag{color:var(--sonder)}
+.conflict-badge{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--krank);border:2px solid var(--surface)}
+.understaffed-badge{font-size:9px;background:rgba(245,158,11,.12);color:var(--spaet);border-radius:4px;padding:1px 4px;font-weight:700;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.soll-ist{display:flex;gap:2px;flex-shrink:0;margin-top:1px}
+.si-bar{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
+.si-fill{height:100%;border-radius:2px;transition:width .2s}
+.chips-area{display:flex;flex-direction:column;gap:2px;flex:1}
+.chips-row{display:flex;align-items:flex-start;gap:3px}
+.chips-label{font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;min-width:10px;padding-top:3px;flex-shrink:0;opacity:.75}
+.chips{display:flex;flex-wrap:wrap;gap:2px;flex:1}
+.chip{font-size:10px;padding:2px 7px 2px 5px;border-radius:var(--radius-chip);font-weight:600;cursor:grab;white-space:nowrap;max-width:82px;transition:opacity .15s,transform .12s;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;line-height:1.4}
+.chip:hover{opacity:.65}
+.chip.frueh{background:var(--frueh-bg);color:var(--frueh-text);border:1px solid color-mix(in srgb,var(--frueh) 35%,transparent)}
+.chip.spaet{background:var(--spaet-bg);color:var(--spaet-text);border:1px solid color-mix(in srgb,var(--spaet) 35%,transparent)}
+.chip.ruf{background:var(--ruf-bg);color:var(--ruf-text);border:1px solid color-mix(in srgb,var(--ruf) 35%,transparent)}
+.chip.urlaub{background:var(--urlaub-bg);color:var(--urlaub-text);border:1px solid color-mix(in srgb,var(--urlaub) 35%,transparent)}
+.chip.krank{background:var(--krank-bg);color:var(--krank-text);border:1px solid color-mix(in srgb,var(--krank) 35%,transparent)}
+.chip.elternzeit{background:var(--eltern-bg);color:var(--eltern-text);border:1px solid color-mix(in srgb,var(--eltern) 35%,transparent)}
+.chip.sonderurlaub{background:var(--sonder-bg);color:var(--sonder-text);border:1px solid color-mix(in srgb,var(--sonder) 35%,transparent)}
+
+/* ── RUFBEREITSCHAFT OVERVIEW ── */
+.ruf-wrap{overflow-y:auto;flex:1;padding:14px;background:var(--bg);height:100%}
+.ruf-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.ruf-toolbar select{background:var(--surface);border:2px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:13px;font-family:inherit}
+.ruf-toolbar select:focus{outline:none;border-color:var(--blue)}
+.ruf-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.ruf-sum-card{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:150px}
+.ruf-sum-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.ruf-sum-name{font-weight:600;font-size:13px}
+.ruf-sum-count{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--ruf);margin-left:auto}
+.ruf-sum-label{font-size:10px;color:var(--text3)}
+.ruf-table-wrap{background:var(--surface);border:2px solid var(--border);border-radius:12px;overflow:hidden}
+.ruf-table{width:100%;border-collapse:collapse;font-size:13px}
+.ruf-table th{background:var(--surface2);padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);font-family:'JetBrains Mono',monospace;border-bottom:2px solid var(--border)}
+.ruf-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ruf-table tr:last-child td{border-bottom:none}
+.ruf-table tr:hover td{background:var(--surface2)}
+.ruf-date-col{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);white-space:nowrap}
+.ruf-day-col{font-size:11px;color:var(--text3)}
+.ruf-person-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:rgba(167,139,250,.15);color:var(--ruf);font-weight:600;font-size:12px;margin:2px}
+.ruf-empty{text-align:center;padding:40px;color:var(--text3);font-size:14px}
+.ruf-export-row{display:flex;gap:8px;margin-top:12px}
+
+/* ── TEMPLATE EDITOR ── */
+.tmpl-wrap{overflow-y:auto;flex:1;padding:14px;background:var(--bg)}
+.tmpl-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.tmpl-title{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700}
+.tmpl-name-row{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.tmpl-name-row input{background:var(--surface);border:2px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:13px;font-family:inherit;min-width:180px}
+.tmpl-name-row input:focus{outline:none;border-color:var(--blue)}
+.tmpl-saved{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tmpl-saved-btn{padding:4px 10px;border-radius:7px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:12px;font-weight:600;transition:all .15s}
+.tmpl-saved-btn:hover{border-color:var(--blue);color:var(--blue)}
+.tmpl-saved-btn.active{border-color:var(--blue);color:var(--blue);background:rgba(59,130,246,.1)}
+.tmpl-table-wrap{background:var(--surface);border:2px solid var(--border);border-radius:12px;overflow:auto}
+.tmpl-table{border-collapse:collapse;font-size:13px;min-width:600px;width:100%}
+.tmpl-table th{background:var(--surface2);padding:9px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);font-family:'JetBrains Mono',monospace;border-bottom:2px solid var(--border);white-space:nowrap}
+.tmpl-table th.person-col{text-align:left;min-width:130px}
+.tmpl-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center}
+.tmpl-table td.person-cell{text-align:left;padding:6px 12px}
+.tmpl-table tr:last-child td{border-bottom:none}
+.tmpl-cell-btn{display:inline-block;padding:5px 10px;border-radius:7px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;min-width:54px;text-align:center}
+.tmpl-cell-btn:hover{border-color:var(--border2);color:var(--text)}
+.tmpl-cell-btn.t-f{border-color:var(--frueh);background:rgba(34,197,94,.12);color:var(--frueh)}
+.tmpl-cell-btn.t-s{border-color:var(--spaet);background:rgba(245,158,11,.12);color:var(--spaet)}
+.tmpl-cell-btn.t-r{border-color:var(--ruf);background:rgba(167,139,250,.12);color:var(--ruf)}
+.tmpl-cell-btn.t-frei{border-color:var(--krank);background:rgba(248,113,113,.08);color:var(--krank)}
+.tmpl-person-chip{display:flex;align-items:center;gap:6px}
+.tmpl-hint{font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.tmpl-footer{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+
+/* CUSTOM HOLIDAYS */
+.hol-manage-wrap{padding:14px}
+.hol-manage-wrap h3{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:10px}
+.hol-add-form{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end}
+.hol-add-form input,.hol-add-form select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px;font-family:inherit}
+.hol-add-form input:focus,.hol-add-form select:focus{outline:none;border-color:var(--blue)}
+.hol-list{display:flex;flex-direction:column;gap:5px}
+.hol-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.hol-item-date{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);min-width:90px}
+.hol-item-name{flex:1;font-size:13px;font-weight:500}
+.hol-item-country{font-size:11px;padding:2px 6px;border-radius:4px;font-weight:700}
+.hol-de-badge{background:rgba(59,130,246,.15);color:var(--blue)}
+.hol-in-badge{background:rgba(249,115,22,.15);color:var(--orange)}
+.hol-both-badge{background:rgba(167,139,250,.15);color:var(--ruf)}
+.hol-del-btn{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:#f87171;cursor:pointer;font-size:11px;padding:3px 8px;border-radius:5px;font-weight:600;flex-shrink:0}
+.hol-del-btn:hover{background:rgba(248,113,113,.2)}
+.hol-empty{color:var(--text3);font-size:13px;padding:14px 0;text-align:center}
+
+/* MODALS */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);
+  animation:fadeIn .18s ease}
+.modal-bg.hidden{display:none}
+.modal-box{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:22px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px var(--shadow)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.modal-title{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700}
+.modal-close{background:var(--surface2);border:2px solid var(--border);color:var(--text2);font-size:15px;cursor:pointer;border-radius:7px;padding:3px 8px;transition:all .15s}
+.modal-close:hover{color:var(--text);border-color:var(--border2)}
+.modal-footer{display:flex;gap:7px;margin-top:12px}
+.btn-p{background:var(--blue);color:#fff;border:none;padding:6px 13px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;transition:opacity .12s,transform .1s;font-family:inherit}
+.btn-p:hover{opacity:.85}
+.btn-s{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:8px 13px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
+.btn-s:hover{background:var(--surface3)}
+.dm-shift{background:var(--surface2);border-radius:9px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border)}
+.dm-shift-hdr{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.dm-dot{width:7px;height:7px;border-radius:50%}
+.dm-shift-name{font-weight:700;font-size:13px}
+.dm-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+.dm-people{display:flex;flex-wrap:wrap;gap:4px}
+.dm-chip{display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600}
+.dm-av{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+.dm-empty{color:var(--text3);font-size:11px;font-style:italic}
+.note-label{font-size:10px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:4px}
+.note-input{width:100%;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:8px 10px;border-radius:8px;font-size:13px;font-family:inherit;resize:none;min-height:60px}
+.note-input:focus{outline:none;border-color:var(--blue)}
+.prof-av-big{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 4px 14px var(--shadow);cursor:pointer;transition:transform .15s;position:relative}
+.prof-av-big:hover{transform:scale(1.05)}
+.prof-field{margin-bottom:12px}
+.prof-field label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.prof-field input,.prof-field select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:8px 11px;border-radius:9px;font-size:14px;font-family:inherit;width:100%}
+.prof-field input:focus,.prof-field select:focus{outline:none;border-color:var(--blue)}
+.emoji-grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;background:var(--surface2);border:2px solid var(--border);border-radius:9px;padding:9px}
+.emoji-opt{font-size:21px;cursor:pointer;padding:3px;border-radius:6px;transition:background .1s,transform .1s}
+.emoji-opt:hover{background:var(--surface3);transform:scale(1.15)}
+.emoji-opt.sel{background:var(--surface3);outline:2px solid var(--blue)}
+.emoji-none{font-size:12px;color:var(--text3);padding:3px 7px;border-radius:6px;cursor:pointer;border:2px solid var(--border);font-weight:600;transition:all .1s}
+.emoji-none:hover,.emoji-none.sel{border-color:var(--blue);color:var(--text)}
+.color-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px}
+.cswatch-big{width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform .1s}
+.cswatch-big:hover{transform:scale(1.15)}
+.cswatch-big.sel{border-color:var(--text)}
+.prefs-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:5px}
+.prefs-table th{text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);padding:3px 5px;font-family:'JetBrains Mono',monospace}
+.prefs-table td{padding:2px 3px}
+.pref-btn{padding:4px 8px;border-radius:6px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;white-space:nowrap}
+.pref-btn:hover{border-color:var(--border2);color:var(--text)}
+.pref-btn.sel-f{border-color:var(--frueh);background:rgba(34,197,94,.12);color:var(--frueh)}
+.pref-btn.sel-s{border-color:var(--spaet);background:rgba(245,158,11,.12);color:var(--spaet)}
+.pref-btn.sel-r{border-color:var(--ruf);background:rgba(167,139,250,.12);color:var(--ruf)}
+.pref-btn.sel-frei{border-color:var(--krank);background:rgba(248,113,113,.08);color:var(--krank)}
+.ap-check{display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;font-weight:500;margin-bottom:5px}
+.ap-check input{cursor:pointer;accent-color:var(--blue)}
+.ap-toggle{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500}
+.ap-result{font-size:12px;padding:8px 10px;border-radius:8px;margin-top:9px;display:none}
+.ap-result.ok{background:rgba(34,197,94,.1);color:var(--frueh);display:block}
+.ap-result.err{background:rgba(239,68,68,.1);color:#f87171;display:block}
+.ics-sec{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.ics-sec:last-child{border-bottom:none;margin-bottom:0}
+.ics-sec h3{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);margin-bottom:7px;font-family:'JetBrains Mono',monospace}
+.ics-sec select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:6px 8px;border-radius:8px;font-size:13px;font-family:inherit;width:100%;margin-bottom:5px}
+.ics-row{display:flex;gap:5px}.ics-row select{flex:1;margin-bottom:0}
+.drop-zone{border:2px dashed var(--border2);border-radius:9px;padding:14px;text-align:center;color:var(--text3);font-size:13px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--blue);color:var(--text);background:rgba(59,130,246,.04)}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.imp-result{font-size:11px;padding:7px 9px;border-radius:7px;margin-top:6px;display:none}
+.imp-result.ok{background:rgba(34,197,94,.1);color:var(--frueh);display:block}
+.imp-result.err{background:rgba(239,68,68,.1);color:#f87171;display:block}
+.under-panel{background:rgba(245,158,11,.08);border:2px solid rgba(245,158,11,.25);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.under-panel h4{font-size:12px;font-weight:700;color:var(--spaet);margin-bottom:7px;display:flex;align-items:center;gap:5px}
+.under-list{display:flex;flex-direction:column;gap:3px;max-height:200px;overflow-y:auto}
+.under-item{font-size:11px;display:flex;align-items:center;gap:6px;padding:2px 0}
+.under-date{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);min-width:70px}
+.under-shifts{display:flex;gap:4px;flex-wrap:wrap}
+.under-tag{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px}
+.rbtn{padding:9px 13px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:700;text-align:left;margin-bottom:5px;width:100%}
+.rbtn-yes{background:var(--blue);color:#fff}
+.rbtn-no{background:var(--surface2);border:2px solid var(--border)!important;color:var(--text)}
+.rbtn-cancel{background:transparent;color:var(--text3);font-size:12px;text-align:center}
+.cpop{position:fixed;background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:9px;z-index:700;box-shadow:0 8px 24px var(--shadow);display:flex;flex-wrap:wrap;gap:5px;width:182px}
+.cpop.hidden{display:none}
+.cswatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s}
+.cswatch:hover{transform:scale(1.2);border-color:var(--text)}
+.tooltip{position:fixed;background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;pointer-events:none;z-index:500;min-width:165px;max-width:245px;box-shadow:0 8px 28px var(--shadow);opacity:0;transition:opacity .1s}
+.tooltip.show{opacity:1}
+.tt-date{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:600}
+.tt-row{display:flex;gap:5px;margin-bottom:2px;align-items:baseline}
+.tt-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.4px;min-width:46px;flex-shrink:0;color:var(--text3);font-weight:600}
+.tt-names{color:var(--text);font-size:12px;font-weight:500}
+.tt-warn{color:#f87171;font-size:11px;margin-top:4px;padding-top:4px;border-top:1px solid var(--border)}
+.tt-hol-warn{color:var(--spaet);font-size:11px;margin-top:2px}
+.tt-under{color:var(--spaet);font-size:11px;margin-top:2px}
+.tt-note{color:var(--spaet);font-size:11px;margin-top:3px;font-style:italic}
+.tt-soll{font-size:10px;color:var(--text3);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)}
+.tt-si-ok{color:var(--frueh)}.tt-si-low{color:var(--krank)}.tt-si-over{color:#f87171}
+.rufkw-table{width:100%;border-collapse:collapse;font-size:13px}
+.rufkw-table th{background:var(--surface2);padding:8px 12px;text-align:left;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--text3);font-family:'JetBrains Mono',monospace;border-bottom:2px solid var(--border);white-space:nowrap}
+.rufkw-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.rufkw-table tr:hover td{background:var(--surface2)}
+.rufkw-kw-col{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);white-space:nowrap;width:60px}
+.rufkw-date-col{font-size:11px;color:var(--text2);white-space:nowrap;width:140px}
+.rufkw-person-cell{display:flex;flex-wrap:wrap;gap:4px;align-items:center;cursor:pointer;min-height:28px;padding:2px}
+.rufkw-person-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;
+  border-radius:6px;background:rgba(167,139,250,.15);color:var(--ruf);font-weight:600;font-size:12px}
+.rufkw-empty{color:var(--text3);font-size:12px;font-style:italic;padding:2px 4px}
+.rufkw-add{color:var(--text3);font-size:18px;padding:0 4px;cursor:pointer;line-height:1}
+.rufkw-add:hover{color:var(--text)}
+.rufkw-picker{position:fixed;background:var(--surface);border:2px solid var(--border2);
+  border-radius:10px;padding:8px;z-index:600;box-shadow:0 8px 24px var(--shadow);
+  min-width:200px;max-width:280px}
+.rufkw-picker.hidden{display:none}
+.rufkw-picker-item{display:flex;align-items:center;gap:8px;padding:6px 10px;
+  border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;transition:background .1s}
+.rufkw-picker-item:hover{background:var(--surface2)}
+.rufkw-picker-item.selected{background:rgba(167,139,250,.15);color:var(--ruf);font-weight:700}
+.rufkw-cur-row{background:rgba(59,130,246,.06)!important}
+.backup-drop{border:2px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;
+  color:var(--text3);font-size:13px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.backup-drop:hover,.backup-drop.drag-over{border-color:var(--blue);color:var(--text);background:rgba(59,130,246,.04)}
+.backup-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.backup-result{padding:10px 12px;border-radius:8px;margin-top:10px;font-size:13px;display:none}
+.backup-result.ok{background:rgba(34,197,94,.1);color:var(--frueh);display:block}
+.backup-result.err{background:rgba(239,68,68,.1);color:#f87171;display:block}
+
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:2px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;z-index:999;max-width:340px;transition:opacity .2s}
+#toast.show{opacity:1;animation:toastIn .22s cubic-bezier(.34,1.56,.64,1) both}
+@media print{
+  header,.folder-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,.day-actions,.ruf-export-row,.tmpl-footer{display:none!important}
+  .main{display:block!important;height:auto!important;grid-template-columns:1fr!important}
+  .view-panel{display:block!important}
+  .cal-wrap,.ruf-wrap{overflow:visible!important;padding:0!important}
+  .day-cell{break-inside:avoid;min-height:80px!important}
+  body{overflow:visible!important}
+}
+
+.chips-row{animation:slideDown .15s ease both}
+.member-item{animation:fadeIn .15s ease both}
+
+.day-cell:not(.other):hover{transform:translateY(-1px)}
+/* staggered member list */
+.member-item:nth-child(1){animation-delay:.02s}
+.member-item:nth-child(2){animation-delay:.04s}
+.member-item:nth-child(3){animation-delay:.06s}
+.member-item:nth-child(4){animation-delay:.08s}
+.member-item:nth-child(5){animation-delay:.1s}
+.member-item:nth-child(n+6){animation-delay:.12s}
+
+/* ── Design System Additions ── */
+#tooltip{position:fixed;z-index:500;background:var(--surface3);border:1.5px solid var(--border2);border-radius:9px;padding:9px 12px;font-size:12px;color:var(--text);pointer-events:none;max-width:260px;box-shadow:0 4px 16px var(--shadow);line-height:1.5;display:none}
+.hol-label{font-size:9px;font-weight:600;color:var(--krank-text);display:flex;align-items:center;gap:2px;letter-spacing:.1px;opacity:.85;margin-top:1px}
+.under-badge{position:absolute;top:5px;right:5px;font-size:9px;font-weight:700;color:var(--spaet-text);background:var(--spaet-bg);border:1px solid var(--spaet);border-radius:4px;padding:1px 5px}
+.day-cell.selected{border-color:var(--blue) !important;background:color-mix(in srgb,var(--blue) 7%,var(--surface));box-shadow:0 0 0 3px var(--blue-soft)}
+.range-start,.range-end{border-color:var(--blue) !important;background:color-mix(in srgb,var(--blue) 10%,var(--surface))}
+.in-range{background:color-mix(in srgb,var(--blue) 5%,var(--surface));border-color:color-mix(in srgb,var(--blue) 30%,var(--border))}
+/* pill active state */
+.pill:active{transform:scale(.94)}
+.pill.active{border-color:currentColor;font-weight:700}
+/* action buttons in day cells */
+.day-act-btn{background:var(--surface2);border:1.5px solid var(--border);color:var(--text2);border-radius:5px;cursor:pointer;font-size:11px;padding:1px 5px;transition:background .1s,transform .1s}
+.day-act-btn:hover{background:var(--surface3);color:var(--text)}
+.day-act-btn:active{transform:scale(.92)}
+/* Member name */
+.member-name{font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚙ <span class="h1-de">DE</span>/<span class="h1-in">IN</span></h1>
+  <div class="sep"></div>
+  <!-- Shift pills: compact, letter only with tooltip -->
+  <div class="hdr-pills" id="modebar">
+    <div class="pill active" data-shift="frueh"    title="Frühschicht"><span class="dot dot-f"></span>F</div>
+    <div class="pill"        data-shift="spaet"    title="Spätschicht"><span class="dot dot-s"></span>S</div>
+    <div class="pill"        data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
+  </div>
+  <div class="sep"></div>
+  <div class="hdr-pills" id="modebar2">
+    <div class="pill" data-shift="urlaub"      title="Urlaub"><span class="dot dot-u"></span>U</div>
+    <div class="pill" data-shift="krank"       title="Krank"><span class="dot dot-k"></span>K</div>
+    <div class="pill" data-shift="elternzeit"  title="Elternzeit"><span class="dot dot-e"></span>E</div>
+    <div class="pill" data-shift="sonderurlaub" title="Sonderurlaub"><span class="dot dot-so"></span>So</div>
+  </div>
+  <div class="sep"></div>
+  <div style="display:flex;gap:3px;align-items:center">
+    <div class="hbtn" id="btn-range" title="Zeitraum auswählen">⇿ Zeitraum</div>
+    <div class="hbtn" id="btn-ics"   title="ICS Export / Import">ICS</div>
+    <div class="hbtn" id="btn-print" title="Drucken">🖨</div>
+    <div class="hbtn" id="btn-check" title="Unterbesetzung prüfen">⚠</div>
+    <div class="sep"></div>
+    <button class="ur-btn" id="btn-undo" disabled title="Rückgängig (Strg+Z)">↩</button>
+    <button class="ur-btn" id="btn-redo" disabled title="Wiederholen (Strg+Y)">↪</button>
+    <button class="theme-btn" id="btn-theme" title="Hell/Dunkel">🌙</button>
+  </div>
+  <div style="flex:1"></div>
+  <div class="nav">
+    <button class="nbtn" id="btn-prev">←</button>
+    <select id="nav-month" style="background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:4px 6px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;min-width:100px"></select>
+    <select id="nav-year"  style="background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:4px 6px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;min-width:68px"></select>
+    <button class="nbtn" id="btn-next">→</button>
+    <button class="nbtn" id="btn-today">Heute</button>
+  </div>
+</header>
+
+<div class="folder-bar">
+  <span style="font-size:11px">📁</span>
+  <span class="folder-label" id="folder-label" style="font-size:11px">Lade…</span>
+  <button class="fbtn" id="btn-folder" style="font-size:10px;padding:2px 7px">Wechseln</button>
+  <div style="flex:1"></div>
+  <button class="fbtn" id="btn-export-data" onclick="exportAllData()" title="Alle Daten als JSON exportieren" style="color:var(--blue);font-size:10px;padding:2px 7px">↓ Export</button>
+  <label  class="fbtn" title="Backup importieren" style="color:var(--sonder);font-size:10px;padding:2px 7px;cursor:pointer">
+    ↑ Import<input type="file" id="backup-import-file" accept=".json" style="display:none" onchange="handleBackupImport(this)">
+  </label>
+  <button class="fbtn" id="btn-refresh" onclick="refreshData()" style="color:var(--frueh);font-size:10px;padding:2px 7px">↻</button>
+</div>
+
+<div class="view-tabs">
+  <div class="vtab active" data-view="cal">📅 Kalender</div>
+  <div class="vtab" data-view="ruf">🔔 Rufbereitschaft</div>
+  <div class="vtab" data-view="tmpl">⚙ Autoplan-Template</div>
+  <div class="vtab" data-view="hol">🎉 Eigene Feiertage</div>
+  <div class="vtab" data-view="rufkw">📋 Ruf-KW Plan</div>
+</div>
+
+<button class="sidebar-toggle" id="sidebar-toggle">◀</button>
+
+<div class="main" id="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-sec">
+      <div class="add-toggle" id="add-toggle" onclick="toggleAddForm()">
+        <span class="add-toggle-label">+ Mitarbeiter hinzufügen</span>
+        <span class="add-toggle-icon">▾</span>
+      </div>
+      <div class="add-form" id="add-form">
+        <input id="new-name" placeholder="Name…" maxlength="40">
+        <div class="add-row">
+          <select id="new-team" style="flex:1"><option value="DE">🇩🇪 Deutschland</option><option value="IN">🇮🇳 Indien</option></select>
+          <div class="color-preview" id="new-color"></div>
+        </div>
+        <button class="add-btn" id="btn-add">+ Hinzufügen</button>
+      </div>
+    </div>
+    <div class="sb-sec" style="padding:7px 10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:6px">Soll / Tag</div>
+      <div class="soll-compact">
+        <div class="soll-pill" style="border-color:rgba(34,197,94,.3)">
+          <span style="color:var(--frueh);font-size:10px">F</span>
+          <input type="number" id="soll-f" min="0" max="20" value="1" onchange="saveSoll()">
+          <span style="color:var(--text3);font-size:9px">P</span>
+        </div>
+        <div class="soll-pill" style="border-color:rgba(245,158,11,.3)">
+          <span style="color:var(--spaet);font-size:10px">S</span>
+          <input type="number" id="soll-s" min="0" max="20" value="1" onchange="saveSoll()">
+          <span style="color:var(--text3);font-size:9px">P</span>
+        </div>
+        <div class="soll-pill" style="border-color:rgba(167,139,250,.3)">
+          <span style="color:var(--ruf);font-size:10px">R</span>
+          <input type="number" id="soll-r" min="0" max="20" value="1" onchange="saveSoll()">
+          <span style="color:var(--text3);font-size:9px">P</span>
+        </div>
+      </div>
+    </div>
+    <div class="sel-info" id="sel-info"><div>Kein Mitarbeiter gewählt</div><div style="font-size:11px;color:var(--text3)">← Klicken</div></div>
+    <div class="sb-tabs">
+      <div class="sb-tab active" data-tab="team">Team</div>
+      <div class="sb-tab" data-tab="stats">Statistik</div>
+    </div>
+    <div class="sb-panel active" data-panel="team">
+      <div class="sb-filter">
+        <input id="sb-search" placeholder="Suchen…" oninput="renderMembers()">
+        <select id="sb-team-filter" onchange="renderMembers()">
+          <option value="">Alle</option>
+          <option value="DE">🇩🇪 DE</option>
+          <option value="IN">🇮🇳 IN</option>
+        </select>
+      </div>
+      <div class="member-list" id="member-list"></div>
+    </div>
+    <div class="sb-panel" data-panel="stats"><div class="stats-wrap" id="stats-wrap"></div></div>
+  </div>
+
+  <!-- VIEW PANELS -->
+  <div class="view-panel active" data-panel="cal">
+    <div class="cal-wrap" id="cal-wrap">
+      <div class="cal-grid" id="cal-grid">
+        <div class="day-hdr" style="color:var(--text3);font-size:9px;padding-left:0;text-align:center">KW</div><div class="day-hdr">Mo</div><div class="day-hdr">Di</div><div class="day-hdr">Mi</div>
+        <div class="day-hdr">Do</div><div class="day-hdr">Fr</div>
+        <div class="day-hdr we">Sa</div><div class="day-hdr we">So</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RUFBEREITSCHAFT VIEW (merged with KW) -->
+  <!-- RUFBEREITSCHAFT VIEW -->
+  <div class="view-panel" data-panel="ruf">
+    <div class="ruf-wrap" id="ruf-wrap">
+      <div class="ruf-toolbar">
+        <select id="ruf-year"></select>
+        <select id="ruf-month"><option value="">Alle Monate</option></select>
+        <button class="btn-p" onclick="renderRufView()">Anzeigen</button>
+        <button class="btn-s" onclick="exportRufCSV()">↓ CSV</button>
+        <button class="btn-s" onclick="window.print()">🖨 Drucken</button>
+      </div>
+      <div id="ruf-summary" class="ruf-summary"></div>
+      <div id="ruf-table-wrap" class="ruf-table-wrap"><div class="ruf-empty">Monat wählen und „Anzeigen" klicken</div></div>
+    </div>
+  </div>
+
+  <!-- RUF-KW VIEW -->
+  <div class="view-panel" data-panel="rufkw">
+    <div class="ruf-wrap" id="rufkw-wrap">
+      <div class="ruf-toolbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">📋 Rufbereitschaft KW-Plan</div>
+        <select id="rufkw-year" style="background:var(--surface);border:2px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:13px"></select>
+        <button class="btn-p" onclick="saveRufKW()">💾 Speichern</button>
+        <button class="btn-s" onclick="syncRufKWFromCalendar()" title="Bestehende Rufbereitschafts-Einträge aus dem Kalender in diesen Plan einlesen">↙ Aus Kalender einlesen</button>
+        <button class="btn-p" onclick="openApplyRufKW()" style="background:var(--frueh);color:#000">▶ Auf Kalender anwenden</button>
+        <button class="btn-s" onclick="exportRufKWCSV()">↓ CSV</button>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;line-height:1.6">
+        Weise jeder Kalenderwoche eine oder mehrere Personen für Rufbereitschaft zu. Klick auf eine Zelle öffnet die Personenauswahl.
+        Danach mit <strong>▶ Auf Kalender anwenden</strong> die Einträge in den Kalender übernehmen.
+      </p>
+      <div id="rufkw-table-wrap"></div>
+    </div>
+  </div>
+
+  <!-- TEMPLATE VIEW -->
+  <div class="view-panel" data-panel="tmpl">
+    <div class="tmpl-wrap">
+      <div class="tmpl-header">
+        <div class="tmpl-title">⚙ Autoplan-Template</div>
+        <button class="btn-p" id="btn-run-tmpl" onclick="applyTemplateDirectly()" style="background:var(--frueh);color:#000">▶ Template anwenden</button>
+      </div>
+      <div class="tmpl-hint" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div>Lege pro Mitarbeiter fest, welche Schicht er an welchem Wochentag hat. Der Autoplan übernimmt exakt dieses Muster.<br>
+        <strong>Klick auf eine Zelle</strong> wechselt zwischen Früh → Spät → Ruf → Frei → leer. Wochenenden (Sa/So) nur Rufbereitschaft möglich.</div>
+        <button class="btn-s" onclick="fillTemplateFromPrefs()" style="flex-shrink:0;font-size:11px" title="Präferenzen aus den Mitarbeiter-Profilen in dieses Template übernehmen">↙ Aus Profil-Präferenzen</button>
+      </div>
+      <div class="tmpl-name-row">
+        <label style="font-size:12px;font-weight:600;color:var(--text2)">Template-Name:</label>
+        <input id="tmpl-name-input" value="default" placeholder="Name…">
+        <button class="btn-p" onclick="saveTemplate()">💾 Speichern</button>
+        <button class="btn-s" onclick="loadTemplates()">↻</button>
+      </div>
+      <div class="tmpl-saved" id="tmpl-saved"></div>
+      <div class="tmpl-table-wrap">
+        <table class="tmpl-table" id="tmpl-table"></table>
+      </div>
+      <div class="tmpl-footer">
+        <div style="font-size:11px;color:var(--text3);align-self:center">Monat: <strong id="tmpl-month-label">–</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM HOLIDAYS VIEW -->
+  <div class="view-panel" data-panel="hol">
+    <div class="ruf-wrap">
+      <div class="hol-manage-wrap">
+        <h3>Eigene Feiertage</h3>
+        <div class="hol-add-form">
+          <div>
+            <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">Datum</label>
+            <input type="date" id="hol-date" style="width:155px">
+          </div>
+          <div style="flex:1;min-width:140px">
+            <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">Name</label>
+            <input type="text" id="hol-name" placeholder="z.B. Betriebsausflug" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">Land</label>
+            <select id="hol-country" style="width:110px">
+              <option value="DE">🇩🇪 DE</option>
+              <option value="IN">🇮🇳 IN</option>
+              <option value="DE+IN">🌍 Beide</option>
+            </select>
+          </div>
+          <button class="btn-p" onclick="addCustomHoliday()" style="align-self:flex-end">+ Hinzufügen</button>
+        </div>
+        <div class="hol-list" id="hol-list"><div class="hol-empty">Keine eigenen Feiertage eingetragen</div></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- APPLY RUF-KW MODAL -->
+  <div class="modal-bg hidden" id="rufkw-apply-modal">
+    <div class="modal-box" style="width:380px">
+      <div class="modal-hdr"><div class="modal-title">▶ Auf Kalender anwenden</div><button class="modal-close" onclick="closeModal('rufkw-apply-modal')">✕</button></div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">
+        Trägt die KW-Zuweisungen als Rufbereitschaft in den Kalender ein. Bereits vorhandene Einträge bleiben erhalten (außer du aktivierst „Überschreiben").
+      </p>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:block;margin-bottom:4px">Jahr</label>
+        <select id="rufkw-apply-year" style="width:100%;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px;font-family:inherit"></select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:block;margin-bottom:4px">Monat (optional)</label>
+        <select id="rufkw-apply-month" style="width:100%;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px;font-family:inherit">
+          <option value="">Alle Monate</option>
+          <option value="1">Januar</option><option value="2">Februar</option><option value="3">März</option>
+          <option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option>
+          <option value="7">Juli</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option>
+        </select>
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500;margin-bottom:12px;cursor:pointer">
+        <input type="checkbox" id="rufkw-overwrite" style="accent-color:var(--blue)"> Bestehende Einträge überschreiben
+      </label>
+      <div id="rufkw-apply-result" style="display:none;padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:8px"></div>
+      <div class="modal-footer">
+        <button class="btn-p" onclick="applyRufKW()" style="flex:1">▶ Anwenden</button>
+        <button class="btn-s" onclick="closeModal('rufkw-apply-modal')">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+
+
+<!-- BACKUP MODAL -->
+<div class="modal-bg hidden" id="backup-modal">
+  <div class="modal-box" style="width:440px">
+    <div class="modal-hdr">
+      <div class="modal-title">💾 Daten sichern / wiederherstellen</div>
+      <button class="modal-close" onclick="closeModal('backup-modal')">✕</button>
+    </div>
+
+    <div class="ics-sec">
+      <h3>Export – Komplettes Backup</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+        Exportiert alle Daten als <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace">schichtplan_backup.json</code> — enthält Mitarbeiter, alle Schichten, Templates, Feiertage und KW-Plan.
+      </p>
+      <button class="btn-p" onclick="doExportData()" style="width:100%">⬇ Backup herunterladen</button>
+    </div>
+
+    <div class="ics-sec">
+      <h3>Import – Backup wiederherstellen</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+        Lädt eine zuvor exportierte <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace">.json</code>-Datei und ersetzt die aktuellen Daten vollständig.
+      </p>
+      <div class="backup-drop" id="backup-drop-zone">
+        <input type="file" id="backup-file" accept=".json">
+        <span id="backup-drop-label">📂 .json Backup hier ablegen oder klicken</span>
+      </div>
+      <div class="backup-result" id="backup-result"></div>
+      <button class="btn-p" onclick="doImportData()" style="background:var(--spaet);color:#000;width:100%;margin-top:8px">⬆ Backup einspielen</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-bg hidden" id="day-modal">
+  <div class="modal-box">
+    <div class="modal-hdr"><div class="modal-title" id="dm-title">–</div><button class="modal-close" onclick="closeModal('day-modal')">✕</button></div>
+    <div id="dm-slots"></div>
+    <div class="note-label">Tagesnotiz</div>
+    <textarea class="note-input" id="dm-note" rows="3" placeholder="Notiz…"></textarea>
+    <div class="modal-footer">
+      <button class="btn-p" onclick="saveDayNote()">Notiz speichern</button>
+      <button class="btn-s" onclick="closeModal('day-modal')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="prof-modal">
+  <div class="modal-box" style="width:430px">
+    <div class="modal-hdr"><div class="modal-title">👤 Mitarbeiter bearbeiten</div><button class="modal-close" onclick="closeModal('prof-modal')">✕</button></div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <div class="prof-av-big" id="prof-av"><span id="prof-emoji-disp"></span><span id="prof-init-disp"></span></div>
+      <div><div style="font-size:16px;font-weight:700" id="prof-cur-name">–</div><div style="font-size:12px;color:var(--text3);margin-top:2px" id="prof-cur-team">–</div></div>
+    </div>
+    <div class="prof-field"><label>Name</label><input id="prof-name" type="text" maxlength="40"></div>
+    <div class="prof-field"><label>Team</label><select id="prof-team"><option value="DE">🇩🇪 Deutschland</option><option value="IN">🇮🇳 Indien</option></select></div>
+    <div class="prof-field"><label>Farbe</label><div class="color-row" id="prof-colors"></div></div>
+    <div class="prof-field"><label>Icon / Emoji</label><div class="emoji-grid" id="prof-emojis"></div></div>
+    <div class="prof-field">
+      <label>Tägliche Präferenzen <span style="font-weight:400;color:var(--text3);font-size:10px">(Autoplan-Hinweis)</span></label>
+      <table class="prefs-table">
+        <tr><th>Tag</th><th colspan="4">Bevorzugte Schicht</th></tr>
+        <tr><td style="font-size:11px;color:var(--text2)">Mo</td><td><button class="pref-btn" data-dow="0" data-val="">–</button></td><td><button class="pref-btn" data-dow="0" data-val="frueh">Früh</button></td><td><button class="pref-btn" data-dow="0" data-val="spaet">Spät</button></td><td><button class="pref-btn" data-dow="0" data-val="frei">Frei</button></td></tr>
+        <tr><td style="font-size:11px;color:var(--text2)">Di</td><td><button class="pref-btn" data-dow="1" data-val="">–</button></td><td><button class="pref-btn" data-dow="1" data-val="frueh">Früh</button></td><td><button class="pref-btn" data-dow="1" data-val="spaet">Spät</button></td><td><button class="pref-btn" data-dow="1" data-val="frei">Frei</button></td></tr>
+        <tr><td style="font-size:11px;color:var(--text2)">Mi</td><td><button class="pref-btn" data-dow="2" data-val="">–</button></td><td><button class="pref-btn" data-dow="2" data-val="frueh">Früh</button></td><td><button class="pref-btn" data-dow="2" data-val="spaet">Spät</button></td><td><button class="pref-btn" data-dow="2" data-val="frei">Frei</button></td></tr>
+        <tr><td style="font-size:11px;color:var(--text2)">Do</td><td><button class="pref-btn" data-dow="3" data-val="">–</button></td><td><button class="pref-btn" data-dow="3" data-val="frueh">Früh</button></td><td><button class="pref-btn" data-dow="3" data-val="spaet">Spät</button></td><td><button class="pref-btn" data-dow="3" data-val="frei">Frei</button></td></tr>
+        <tr><td style="font-size:11px;color:var(--text2)">Fr</td><td><button class="pref-btn" data-dow="4" data-val="">–</button></td><td><button class="pref-btn" data-dow="4" data-val="frueh">Früh</button></td><td><button class="pref-btn" data-dow="4" data-val="spaet">Spät</button></td><td><button class="pref-btn" data-dow="4" data-val="frei">Frei</button></td></tr>
+      </table>
+    </div>
+    <div id="prof-err" style="color:#f87171;font-size:12px;margin-bottom:6px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn-p" onclick="saveProfile()" style="flex:1">Speichern</button>
+      <button class="btn-s" onclick="closeModal('prof-modal')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="ics-modal">
+  <div class="modal-box" style="width:410px">
+    <div class="modal-hdr"><div class="modal-title">📅 ICS Export / Import</div><button class="modal-close" onclick="closeModal('ics-modal')">✕</button></div>
+    <div class="ics-sec"><h3>Export</h3>
+      <div class="ics-row">
+        <select id="exp-person"><option value="">Alle</option></select>
+        <select id="exp-year"><option value="">Alle Jahre</option></select>
+        <select id="exp-month"><option value="">Alle Monate</option></select>
+      </div>
+      <button class="btn-p" onclick="doExport()" style="margin-top:7px">↓ Exportieren</button>
+    </div>
+    <div class="ics-sec"><h3>Import</h3>
+      <p style="font-size:11px;color:var(--text3);margin-bottom:7px">Format: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px;font-family:'JetBrains Mono',monospace">Fruehschicht - Name</code></p>
+      <div class="drop-zone" id="drop-zone"><input type="file" id="ics-file" accept=".ics"><span id="drop-label">📄 .ics ablegen oder klicken</span></div>
+      <div class="imp-result" id="imp-result"></div>
+      <button class="btn-p" onclick="doImport()" style="background:var(--frueh);color:#000;margin-top:7px">↑ Importieren</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="under-modal">
+  <div class="modal-box" style="width:500px">
+    <div class="modal-hdr"><div class="modal-title">⚠ Unterbesetzung – <span id="under-label"></span></div><button class="modal-close" onclick="closeModal('under-modal')">✕</button></div>
+    <div id="under-content"></div>
+    <div class="modal-footer"><button class="btn-s" onclick="closeModal('under-modal')" style="flex:1">Schließen</button></div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="data-import-modal">
+  <div class="modal-box" style="width:420px">
+    <div class="modal-hdr">
+      <div class="modal-title">📂 Daten importieren</div>
+      <button class="modal-close" onclick="closeModal('data-import-modal')">✕</button>
+    </div>
+    <div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-radius:9px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:#f87171;line-height:1.6">
+      ⚠ <strong>Achtung:</strong> Der Import überschreibt alle aktuellen Daten vollständig. Vorher mit <strong>💾 Export</strong> ein Backup erstellen!
+    </div>
+    <div class="drop-zone" id="import-drop-zone" style="margin-bottom:10px">
+      <input type="file" id="import-file" accept=".json">
+      <span id="import-drop-label">📄 .json Datei hier ablegen oder klicken</span>
+    </div>
+    <div id="import-result" style="display:none;padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:10px"></div>
+    <div class="modal-footer">
+      <button class="btn-p" onclick="doImportData()" style="flex:1;background:var(--orange)">↑ Importieren &amp; Wiederherstellen</button>
+      <button class="btn-s" onclick="closeModal('data-import-modal')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="restore-modal">
+  <div class="modal-box" style="width:370px">
+    <div class="modal-hdr"><div class="modal-title">↩ Wiederherstellen</div><button class="modal-close" onclick="cancelRestore()">✕</button></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6"><strong id="restore-name"></strong> wurde entfernt – gespeicherte Einträge vorhanden.</p>
+    <div style="background:var(--surface2);border-radius:8px;padding:9px 11px;margin-bottom:12px;font-size:12px;line-height:1.9;border:1px solid var(--border)" id="restore-stats"></div>
+    <button class="rbtn rbtn-yes" onclick="confirmRestore(true)">✓ Einträge wiederherstellen</button>
+    <button class="rbtn rbtn-no" onclick="confirmRestore(false)">+ Neu beginnen</button>
+    <button class="rbtn rbtn-cancel" onclick="cancelRestore()">Abbrechen</button>
+  </div>
+</div>
+
+<div class="cpop hidden" id="cpop"></div>
+<div class="tooltip" id="tooltip"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════════
+const ALL_SHIFTS  = ['frueh','spaet','rufbereitschaft','urlaub','krank','elternzeit','sonderurlaub'];
+const EXCLUSIVE   = new Set(['frueh','spaet','urlaub','krank','elternzeit','sonderurlaub']);
+const WORK_SHIFTS = new Set(['frueh','spaet','rufbereitschaft']);
+const ABSENCE     = new Set(['urlaub','krank','elternzeit','sonderurlaub']);
+const SHIFT_LABEL = {frueh:'Frühschicht',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft',urlaub:'Urlaub',krank:'Krank',elternzeit:'Elternzeit',sonderurlaub:'Sonderurlaub'};
+const SHIFT_TIME  = {frueh:'06:00–14:00',spaet:'14:00–22:00',rufbereitschaft:'22:00–06:00',urlaub:'ganztägig',krank:'ganztägig',elternzeit:'ganztägig',sonderurlaub:'ganztägig'};
+const SHIFT_CSS   = {frueh:'frueh',spaet:'spaet',rufbereitschaft:'ruf',urlaub:'urlaub',krank:'krank',elternzeit:'elternzeit',sonderurlaub:'sonderurlaub'};
+const SHIFT_VAR   = {frueh:'--frueh',spaet:'--spaet',rufbereitschaft:'--ruf',urlaub:'--urlaub',krank:'--krank',elternzeit:'--eltern',sonderurlaub:'--sonder'};
+const SHIFT_SHORT = {frueh:['F','var(--frueh)'],spaet:['S','var(--spaet)'],rufbereitschaft:['R','var(--ruf)'],urlaub:['U','var(--urlaub)'],krank:['K','var(--krank)'],elternzeit:['E','var(--eltern)'],sonderurlaub:['So','var(--sonder)']};
+const DOW_NAMES   = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+const MONTHS      = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const MONTH_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const AVATAR_COLORS = ['#4a9eff','#ff7043','#22c55e','#f59e0b','#a78bfa','#f472b6','#34d399','#fb923c','#60a5fa','#e879f9','#4ade80','#facc15','#f87171','#38bdf8','#a3e635'];
+const EMOJIS = ['👩','👨','👩‍💻','👨‍💻','👩‍🔧','👨‍🔧','👩‍⚕️','👨‍⚕️','👩‍🏫','👨‍🏫','🧑','⭐','🔷','🔴','🟢','🟡','🟣','🔶','🌟','💼'];
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
+let mitarbeiter=[], schichten={}, holidays={}, notizen={}, customHolidays=[], templates={};
+let soll={frueh:1,spaet:1,rufbereitschaft:1};
+let selectedPerson=null, selectedShift='frueh', selectedPersons=new Set();
+let rangeMode=false, rangeStart=null, previewEnd=null, frozenRangeEnd=null, multiDays=new Set();
+let copiedDay=null, activeDayKey=null;
+let deletedBackups={}, pendingRestore=null, dragState=null, newColor=null;
+let undoStack=[], redoStack=[];
+let rufKW={};
+let profOldName=null, profColor=null, profEmoji=null, profPrefs={};
+// Template editor state: {personName: {dow: shift}}
+let tmplData={};
+let activeView='cal';
+const currentSubTab={};
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════
+// RUF-KW PLAN
+// ══════════════════════════════════════════════════════════════
+function getISOWeeks(year){
+  // Returns all ISO weeks whose Thursday falls in the given year
+  const weeks=[];
+  // Start from the Monday of the week containing Jan 4 (always in W01)
+  const jan4=new Date(year,0,4);
+  const startMon=new Date(jan4);
+  startMon.setDate(jan4.getDate()-((jan4.getDay()+6)%7));
+  let mon=new Date(startMon);
+  for(let safety=0; safety<60; safety++){
+    // Thursday of this week determines the ISO year
+    const thu=new Date(mon); thu.setDate(mon.getDate()+3);
+    const isoYear=thu.getFullYear();
+    if(isoYear>year) break;  // past our year
+    if(isoYear===year){
+      const kwNum=isoWeek(mon);
+      const kwKey=`${isoYear}-W${String(kwNum).padStart(2,'0')}`;
+      const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+      weeks.push({kw:kwNum,kwKey,isoYear,start:new Date(mon),end:new Date(sun)});
+    }
+    mon.setDate(mon.getDate()+7);
+  }
+  return weeks;
+}
+function fmtDate(d){return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDateShort(d){return d.toLocaleDateString('de-DE',{day:'numeric',month:'short'});}
+function getTodayKwKey(){
+  const d=new Date();
+  // ISO week: shift to Thursday of the week, then compute
+  const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=tmp.getUTCDay()||7;
+  tmp.setUTCDate(tmp.getUTCDate()+4-day);
+  const yearStart=new Date(Date.UTC(tmp.getUTCFullYear(),0,1));
+  const week=Math.ceil((((tmp-yearStart)/86400000)+1)/7);
+  return `${tmp.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
+}
+
+function initRufKWYear(){
+  ['rufkw-year','rufkw-apply-year'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    const years=new Set(Object.keys(rufKW).map(k=>k.slice(0,4)));
+    // Always include today's real year + next 2, regardless of calendar navigation
+    const todayYear=new Date().getFullYear();
+    for(let y=todayYear; y<=todayYear+2; y++) years.add(String(y));
+    const sorted=[...years].sort();
+    // Default to today's year if nothing selected yet
+    const current=sel.value&&sorted.includes(sel.value)?sel.value:String(todayYear);
+    sel.innerHTML=sorted.map(y=>`<option value="${y}"${y===current?' selected':''}>${y}</option>`).join('');
+  });
+  const apMon=document.getElementById('rufkw-apply-month');
+  if(apMon) apMon.innerHTML='<option value="">Ganzes Jahr</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
+}
+
+function syncRufKWFromCalendar(){
+  // Scan schichten for rufbereitschaft entries, group by ISO KW, populate rufKW
+  const counts = {};  // {kwKey: {personName: dayCount}}
+  Object.entries(schichten).forEach(([dateKey, slot]) => {
+    const people = slot.rufbereitschaft || [];
+    if(!people.length) return;
+    const d = new Date(dateKey + 'T00:00:00');
+    const kw = isoWeek(d);
+    // ISO year from Thursday
+    const thu = new Date(d); thu.setDate(d.getDate() + (4 - ((d.getDay()+6)%7 + 1)));
+    // simpler: use same formula as isoWeek
+    const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = tmp.getUTCDay() || 7;
+    tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+    const isoYear = tmp.getUTCFullYear();
+    const kwKey = `${isoYear}-W${String(kw).padStart(2,'0')}`;
+    if(!counts[kwKey]) counts[kwKey] = {};
+    people.forEach(name => { counts[kwKey][name] = (counts[kwKey][name]||0) + 1; });
+  });
+
+  // For each KW, pick the person(s) with most days — typically all 7 days = one person
+  let imported = 0;
+  Object.entries(counts).forEach(([kwKey, personDays]) => {
+    const maxDays = Math.max(...Object.values(personDays));
+    // All persons who have entries (could be multiple if split week)
+    const persons = Object.entries(personDays)
+      .filter(([,d]) => d >= maxDays * 0.5)  // at least half the max days
+      .map(([n]) => n);
+    if(persons.length && !rufKW[kwKey]) {
+      rufKW[kwKey] = persons.length === 1 ? persons[0] : persons;
+      imported++;
+    }
+  });
+
+  if(imported === 0){
+    toast('Keine neuen Einträge gefunden (bereits synchronisiert oder keine Rufbereitschaft im Kalender)');
+  } else {
+    renderRufKWTable();
+    toast(imported + ' KW(s) aus Kalender eingelesen – bitte mit 💾 Speichern sichern');
+  }
+}
+
+function showKwRufDialog(kw, weekDates){
+  // Build person picker popover
+  const existing = new Set();
+  weekDates.forEach(d=>{ const s=schichten[d]; if(s)(s.rufbereitschaft||[]).forEach(n=>existing.add(n)); });
+  const items = mitarbeiter.map(m=>{
+    const sel = [...existing].some(n=>n===m.name);
+    const av = m.icon?`<span style="font-size:14px">${m.icon}</span>`
+      :`<span style="font-size:10px;font-weight:700;color:#fff">${initials(m.name)}</span>`;
+    return `<div onclick="toggleKwPerson('${m.name.replace(/'/g,"\\'")}',${JSON.stringify(weekDates)})"
+      style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;
+      background:${sel?'rgba(167,139,250,.15)':'var(--surface2)'};margin-bottom:3px;
+      border:1px solid ${sel?'var(--ruf)':'var(--border)'}">
+      <div style="width:24px;height:24px;border-radius:50%;background:${m.color};display:flex;align-items:center;justify-content:center;flex-shrink:0">${av}</div>
+      <span style="font-size:13px;font-weight:600">${esc(m.name)}</span>
+      ${sel?'<span style="margin-left:auto;color:var(--ruf);font-size:12px">✓</span>':''}
+    </div>`;
+  }).join('');
+  confirmDialog(`KW ${kw} – Rufbereitschaft`,
+    `<div style="max-height:300px;overflow-y:auto">${items||'<p style="color:var(--text3)">Keine Mitarbeiter</p>'}</div>
+     <p style="font-size:11px;color:var(--text3);margin-top:8px">Klick wechselt Zuweisung</p>`
+  ).then(()=>{ renderRufKWTable(); });
+}
+async function toggleKwPerson(name, weekDates){
+  const kwDate = new Date(weekDates[0]+'T00:00:00');
+  const kw = isoWeek(kwDate);
+  const isoYear = (() => {
+    const tmp=new Date(Date.UTC(kwDate.getFullYear(),kwDate.getMonth(),kwDate.getDate()));
+    const day=tmp.getUTCDay()||7; tmp.setUTCDate(tmp.getUTCDate()+4-day);
+    return tmp.getUTCFullYear();
+  })();
+  const kwKey=`${isoYear}-W${String(kw).padStart(2,'0')}`;
+  const raw=rufKW[kwKey]; const arr=raw?(Array.isArray(raw)?raw:[raw]):[];
+  if(arr.includes(name)) rufKW[kwKey]=arr.filter(n=>n!==name);
+  else rufKW[kwKey]=[...arr,name];
+  if(Array.isArray(rufKW[kwKey])&&rufKW[kwKey].length===0) delete rufKW[kwKey];
+  renderRufKWTable();
+}
+
+function renderRufKWTable(){
+  initRufKWYear();
+  const sel=document.getElementById('rufkw-year'); if(!sel) return;
+  // Wire onchange if not already done
+  if(!sel._wired){ sel.addEventListener('change', renderRufKWTable); sel._wired=true; }
+  const year=parseInt(sel.value);
+  const weeks=getISOWeeks(year);
+  const todayKW=getTodayKwKey();
+  const wrap=document.getElementById('rufkw-table-wrap'); if(!wrap) return;
+  wrap.innerHTML=`<div style="background:var(--surface);border:2px solid var(--border);border-radius:12px;overflow:auto">
+    <table class="rufkw-table"><thead><tr>
+      <th class="rufkw-kw-col">KW</th>
+      <th class="rufkw-date-col">Mo – So</th>
+      <th>Rufbereitschaft</th>
+    </tr></thead><tbody id="rufkw-tbody"></tbody></table></div>`;
+  const tbody=document.getElementById('rufkw-tbody');
+  weeks.forEach(w=>{
+    const rawKW=rufKW[w.kwKey]; const names=rawKW?(Array.isArray(rawKW)?rawKW:[rawKW]):[];
+    const isCur=w.kwKey===todayKW;
+    const tr=document.createElement('tr');
+    if(isCur) tr.className='rufkw-cur-row';
+    const tdKW=document.createElement('td'); tdKW.className='rufkw-kw-col';
+    tdKW.innerHTML=`<strong>KW&nbsp;${w.kw}</strong>${isCur?'<br><span style="color:var(--blue);font-size:9px">◀ jetzt</span>':''}`;
+    tr.appendChild(tdKW);
+    const tdDate=document.createElement('td'); tdDate.className='rufkw-date-col';
+    tdDate.textContent=`${fmtDateShort(w.start)} – ${fmtDateShort(w.end)}`;
+    tr.appendChild(tdDate);
+    const tdP=document.createElement('td');
+    const cell=document.createElement('div'); cell.className='rufkw-person-cell'; cell.dataset.kwkey=w.kwKey;
+    names.forEach(name=>{
+      const m=mitarbeiter.find(x=>x.name===name);
+      const chip=document.createElement('span'); chip.className='rufkw-person-chip';
+      const av=`<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'11px':'8px'};color:#fff;font-weight:700;flex-shrink:0">${m?.icon||initials(name)}</span>`;
+      chip.innerHTML=`${av}<span>${esc(name)}</span><span data-rm-kw="${w.kwKey}" data-rm-name="${name}" style="margin-left:3px;cursor:pointer;opacity:.6;font-size:10px;padding:0 2px">✕</span>`;
+      cell.appendChild(chip);
+    });
+    const addBtn=document.createElement('span'); addBtn.className='rufkw-add'; addBtn.textContent='＋'; addBtn.title='Person hinzufügen';
+    addBtn.onclick=e=>{e.stopPropagation();openRufKWPicker(w.kwKey,addBtn);};
+    if(!names.length){const em=document.createElement('span');em.className='rufkw-empty';em.textContent='– niemand –';cell.appendChild(em);}
+    cell.appendChild(addBtn);
+    cell.addEventListener('click',e=>{
+      const rm=e.target.closest('[data-rm-kw]');
+      if(rm){e.stopPropagation();removeRufKWPerson(rm.dataset.rmKw,rm.dataset.rmName);return;}
+      openRufKWPicker(w.kwKey,addBtn);
+    });
+    tdP.appendChild(cell); tr.appendChild(tdP); tbody.appendChild(tr);
+  });
+}
+
+let _rufkwPickerKey=null;
+function openRufKWPicker(kwKey,anchor){
+  _rufkwPickerKey=kwKey;
+  let picker=document.getElementById('rufkw-picker');
+  if(!picker){
+    picker=document.createElement('div'); picker.id='rufkw-picker'; picker.className='rufkw-picker hidden';
+    document.body.appendChild(picker);
+    document.addEventListener('click',e=>{
+      if(!e.target.closest('#rufkw-picker')&&!e.target.closest('.rufkw-person-cell'))
+        picker.classList.add('hidden');
+    });
+  }
+  const rawKW2=rufKW[kwKey]; const current=new Set(rawKW2?(Array.isArray(rawKW2)?rawKW2:[rawKW2]):[]);
+  picker.innerHTML=`<div style="padding:6px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);font-family:'JetBrains Mono',monospace">Person wählen</div>`+
+    (mitarbeiter.map(m=>`<div class="rufkw-picker-item${current.has(m.name)?' selected':''}" data-pname="${m.name}">
+      <div class="avatar" style="background:${m.color};width:24px;height:24px;font-size:${m.icon?'14px':'9px'};flex-shrink:0">${m.icon||initials(m.name)}</div>
+      <span>${esc(m.name)}</span>${current.has(m.name)?'<span style="margin-left:auto;color:var(--ruf)">✓</span>':''}
+    </div>`).join('')||'<div style="padding:10px;color:var(--text3);font-size:12px">Keine Mitarbeiter</div>');
+  picker.querySelectorAll('[data-pname]').forEach(el=>{
+    el.addEventListener('click',e=>{
+      e.stopPropagation(); const name=el.dataset.pname;
+      if(!rufKW[_rufkwPickerKey]) rufKW[_rufkwPickerKey]=[];
+      const i=rufKW[_rufkwPickerKey].indexOf(name);
+      if(i===-1) rufKW[_rufkwPickerKey].push(name); else rufKW[_rufkwPickerKey].splice(i,1);
+      if(!rufKW[_rufkwPickerKey].length) delete rufKW[_rufkwPickerKey];
+      picker.classList.add('hidden'); renderRufKWTable();
+    });
+  });
+  picker.classList.remove('hidden');
+  const r=anchor.getBoundingClientRect();
+  let left=r.left, top=r.bottom+4;
+  if(left+290>window.innerWidth) left=window.innerWidth-295;
+  if(top+260>window.innerHeight) top=r.top-265;
+  picker.style.left=left+'px'; picker.style.top=top+'px';
+}
+
+function removeRufKWPerson(kwKey,name){
+  if(!rufKW[kwKey]) return;
+  const arr=Array.isArray(rufKW[kwKey])?rufKW[kwKey]:[rufKW[kwKey]];
+  rufKW[kwKey]=arr.filter(n=>n!==name);
+  if(!rufKW[kwKey].length) delete rufKW[kwKey];
+  renderRufKWTable();
+}
+
+async function saveRufKW(){
+  const r=await api('/api/ruf_kw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ruf_kw:rufKW})});
+  if(r.ok) toast('KW-Plan gespeichert'); else toast('Fehler beim Speichern');
+}
+
+function openApplyRufKW(){
+  initRufKWYear();
+  document.getElementById('rufkw-apply-result').style.display='none';
+  openModal('rufkw-apply-modal');
+}
+
+async function applyRufKW(){
+  const year=parseInt(document.getElementById('rufkw-apply-year').value);
+  const month=document.getElementById('rufkw-apply-month').value;
+  const overwrite=document.getElementById('rufkw-overwrite').checked;
+  const resEl=document.getElementById('rufkw-apply-result');
+  const d=await api('/api/ruf_kw/apply',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({year,month:month?parseInt(month):null,overwrite})});
+  if(d.error){resEl.style.cssText='display:block;background:rgba(239,68,68,.1);color:#f87171';resEl.textContent='Fehler: '+d.error;}
+  else{resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';resEl.textContent=d.applied+' Rufbereitschafts-Einträge übertragen.';
+    const data=await api('/api/data');schichten=data.schichten||{};renderCalendar();toast('Rufbereitschaft eingetragen');}
+}
+
+function exportRufKWCSV(){
+  const sel=document.getElementById('rufkw-year');
+  const year=sel?parseInt(sel.value):curYear;
+  const weeks=getISOWeeks(year);
+  let csv='KW,Von,Bis,Person\n';
+  weeks.forEach(w=>{
+    const names=rufKW[w.kwKey]||[];
+    if(!names.length) csv+=`KW ${w.kw},${fmtDate(w.start)},${fmtDate(w.end)},\n`;
+    else names.forEach(n=>{csv+=`KW ${w.kw},${fmtDate(w.start)},${fmtDate(w.end)},"${n}"\n`;});
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=`ruf_kw_${year}.csv`;a.click();URL.revokeObjectURL(url);
+  toast('CSV exportiert');
+}
+
+function applyData(d){
+  mitarbeiter=d.mitarbeiter||[]; schichten=d.schichten||{};
+  notizen=d.notizen||{}; soll=d.soll||{frueh:1,spaet:1,rufbereitschaft:1};
+  customHolidays=d.custom_holidays||[]; templates=d.templates||{}; rufKW=d.ruf_kw||{};
+  mitarbeiter.forEach(m=>{if(!m.color)m.color=AVATAR_COLORS[0];if(!m.icon)m.icon='';if(!m.prefs)m.prefs={};});
+  document.getElementById('soll-f').value=soll.frueh??1;
+  document.getElementById('soll-s').value=soll.spaet??1;
+  document.getElementById('soll-r').value=soll.rufbereitschaft??1;
+}
+
+function renderAll(){
+  updateLabel();
+  renderMembers();
+  renderCalendar();
+  renderStats();
+  renderCustomHolidays();
+  renderTemplateTable();
+  initRufSelects();
+  refreshFolderBar();
+}
+
+async function init(){
+  // Theme
+  const theme=localStorage.getItem('sp-theme')||'dark';
+  document.documentElement.dataset.theme=theme;
+  document.getElementById('btn-theme').textContent=theme==='dark'?'🌙':'☀️';
+
+  // Color init
+  newColor=randColor();
+  document.getElementById('new-color').style.background=newColor;
+
+  // Bind events first so UI is interactive immediately
+  bindEvents();
+
+  // Load data with retry (handles EXE startup timing)
+  let d={};
+  for(let i=0; i<10; i++){
+    try{
+      d = await api('/api/data');
+      // Accept if we have data, OR if server responded without error 3+ times
+      if(d && !d.error) break;
+    }catch(e){
+      await new Promise(r=>setTimeout(r,600));
+    }
+  }
+  applyData(d);
+
+  // Load holidays (non-blocking: render calendar first, update after)
+  renderAll();
+
+  // Load holidays in background, then re-render calendar
+  loadHolidays(curYear).then(()=>{
+    renderCalendar();
+  }).catch(()=>{});
+
+  // Warn if no folder is set
+  const dir = await api('/api/datadir').catch(()=>({}));
+  if(!dir.folder) toast('⚠ Kein Datenordner – bitte „Wechseln" klicken');
+}
+
+async function api(url,opts={}){
+  for(let attempt=0; attempt<10; attempt++){
+    try{
+      const r=await fetch(url,opts);
+      return r.json();
+    }catch(e){
+      if(attempt<9){ await new Promise(res=>setTimeout(res,600)); }
+      else throw e;
+    }
+  }
+}
+async function loadHolidays(y){ const h=await api('/api/holidays/'+y); Object.assign(holidays,h); }
+function randColor(){ return AVATAR_COLORS[Math.floor(Math.random()*AVATAR_COLORS.length)]; }
+
+// ══════════════════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════════════════
+function toggleAddForm(){
+  const form=document.getElementById('add-form');
+  const toggle=document.getElementById('add-toggle');
+  const isOpen=form.classList.contains('open');
+  form.classList.toggle('open',!isOpen);
+  toggle.classList.toggle('open',!isOpen);
+  if(!isOpen) setTimeout(()=>document.getElementById('new-name').focus(),50);
+}
+
+function bindEvents(){
+  document.getElementById('btn-prev').onclick=prevMonth;
+  document.getElementById('btn-next').onclick=nextMonth;
+  document.getElementById('btn-today').onclick=goToday;
+  document.getElementById('btn-add').onclick=addMitarbeiter;
+  document.getElementById('new-name').addEventListener('keydown',e=>{
+    if(e.key==='Enter') addMitarbeiter();
+    if(e.key==='Escape'){ document.getElementById('add-form').classList.remove('open'); document.getElementById('add-toggle').classList.remove('open'); }
+  });
+  document.getElementById('btn-undo').onclick=doUndo;
+  document.getElementById('btn-redo').onclick=doRedo;
+
+  document.getElementById('btn-theme').addEventListener('click',()=>{
+    const t=document.documentElement.dataset.theme==='dark'?'light':'dark';
+    document.documentElement.dataset.theme=t;
+    document.getElementById('btn-theme').textContent=t==='dark'?'🌙':'☀️';
+    localStorage.setItem('sp-theme',t);
+  });
+
+  document.getElementById('sidebar-toggle').addEventListener('click',()=>{
+    const m=document.getElementById('main'),btn=document.getElementById('sidebar-toggle');
+    const c=m.classList.toggle('collapsed');
+    btn.classList.toggle('closed',c); btn.textContent=c?'▶':'◀';
+    btn.style.left=c?'3px':'273px';
+  });
+
+  // View tabs
+function switchSubTab(view, subId){
+  currentSubTab[view]=subId;
+  document.querySelectorAll(`[data-sub]`).forEach(t=>{
+    if(t.closest('[data-panel="'+view+'"]')||t.closest('.view-panel.active'))
+      t.classList.toggle('active', t.dataset.sub===subId);
+  });
+  document.querySelectorAll('.sub-panel').forEach(p=>{
+    p.classList.toggle('active', p.id==='sub-'+subId);
+  });
+  if(subId==='ruf-overview') renderRufView();
+  if(subId==='ruf-kw') renderRufKWTable();
+}
+
+  document.querySelectorAll('.vtab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      const view=tab.dataset.view; activeView=view;
+      document.querySelector('[data-panel="'+view+'"]').classList.add('active');
+      if(view==='ruf') renderRufView();
+      if(view==='tmpl') renderTemplateTable();
+      if(view==='hol') renderCustomHolidays();
+      if(view==='rufkw') renderRufKWTable();
+    });
+  });
+
+  // Shift pills
+  ['modebar','modebar2'].forEach(id=>{
+    document.getElementById(id).addEventListener('click',e=>{
+      const p=e.target.closest('[data-shift]'); if(!p) return;
+      selectedShift=p.dataset.shift;
+      document.querySelectorAll('.pill').forEach(x=>x.classList.toggle('active',x===p));
+      updateSelInfo();
+    });
+  });
+
+  document.getElementById('btn-range').addEventListener('click',()=>{
+    rangeMode=!rangeMode;
+    document.getElementById('btn-range').classList.toggle('on',rangeMode);
+    rangeStart=null;previewEnd=null;  // reset range start on toggle
+    renderCalendar();updateSelInfo();
+  });
+
+  document.getElementById('btn-ics').addEventListener('click',openIcsModal);
+  document.getElementById('btn-print').addEventListener('click',()=>window.print());
+  document.getElementById('btn-check').addEventListener('click',showUnderstaffedReport);
+  document.getElementById('btn-folder').addEventListener('click',changeFolder);
+  document.getElementById('btn-export-data').addEventListener('click',()=>{
+    document.getElementById('backup-file').value='';
+    document.getElementById('backup-result').className='backup-result';
+    document.getElementById('backup-drop-label').textContent='📂 .json Backup hier ablegen oder klicken';
+    document.getElementById('backup-modal').classList.remove('hidden');
+  });
+  // Import via folder-bar label onchange (see HTML)
+  document.getElementById('backup-file').addEventListener('change',e=>{
+    if(e.target.files[0]) document.getElementById('backup-drop-label').textContent='📂 '+e.target.files[0].name;
+  });
+  document.getElementById('btn-refresh').addEventListener('click',refreshData);
+  // Template apply via onclick on btn-run-tmpl
+
+  ['f','s','r'].forEach(k=>document.getElementById('soll-'+k).addEventListener('change',saveSoll));
+
+  document.querySelectorAll('.sb-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.sb-tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.sb-panel').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelector('[data-panel="'+tab.dataset.tab+'"]').classList.add('active');
+      if(tab.dataset.tab==='stats') renderStats();
+    });
+  });
+
+  document.getElementById('member-list').addEventListener('click',handleMemberClick);
+  document.getElementById('new-color').addEventListener('click',e=>{e.stopPropagation();showColorPicker(e.target,null);});
+
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();doUndo();}
+    if((e.ctrlKey||e.metaKey)&&(e.shiftKey&&e.key==='Z'||e.key==='y')){e.preventDefault();doRedo();}
+    if(e.key==='Escape'){closeAllModals();clearAll();copiedDay=null;renderCalendar();}
+  });
+
+  document.querySelectorAll('.modal-bg').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)closeAllModals();});});
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('#cpop')&&!e.target.closest('.color-preview')&&!e.target.closest('.avatar'))
+      document.getElementById('cpop').classList.add('hidden');
+  });
+
+  document.addEventListener('dragstart',e=>{
+    const chip=e.target.closest('.chip'); if(!chip) return;
+    dragState={name:chip.dataset.name,fromKey:chip.dataset.key,fromShift:chip.dataset.shift};
+    e.dataTransfer.effectAllowed='move';
+    setTimeout(()=>chip.style.opacity='.3',0);
+  });
+  document.addEventListener('dragend',e=>{const chip=e.target.closest('.chip');if(chip)chip.style.opacity='';dragState=null;});
+
+  // Import data drop zone
+  const izone=document.getElementById('import-drop-zone');
+  if(izone){
+    izone.addEventListener('dragover',e=>{e.preventDefault();izone.classList.add('drag-over');});
+    izone.addEventListener('dragleave',()=>izone.classList.remove('drag-over'));
+    izone.addEventListener('drop',e=>{
+      e.preventDefault();izone.classList.remove('drag-over');
+      const file=e.dataTransfer.files[0];
+      if(file){try{const dt=new DataTransfer();dt.items.add(file);document.getElementById('import-file').files=dt.files;}catch(err){}
+      document.getElementById('import-drop-label').textContent='📄 '+file.name;}
+    });
+    document.getElementById('import-file').addEventListener('change',e=>{
+      if(e.target.files[0]) document.getElementById('import-drop-label').textContent='📄 '+e.target.files[0].name;
+    });
+  }
+
+  const zone=document.getElementById('drop-zone');
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault();zone.classList.remove('drag-over');
+    const file=e.dataTransfer.files[0];
+    if(file){try{const dt=new DataTransfer();dt.items.add(file);document.getElementById('ics-file').files=dt.files;}catch(err){}
+    document.getElementById('drop-label').textContent='📄 '+file.name;}
+  });
+  document.getElementById('ics-file').addEventListener('change',e=>{
+    if(e.target.files[0]) document.getElementById('drop-label').textContent='📄 '+e.target.files[0].name;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════════
+async function prevMonth(){
+  curMonth--;if(curMonth<1){curMonth=12;curYear--;await loadHolidays(curYear);}
+  clearAll();renderCalendar();updateLabel();
+}
+async function nextMonth(){
+  curMonth++;if(curMonth>12){curMonth=1;curYear++;await loadHolidays(curYear);}
+  clearAll();renderCalendar();updateLabel();
+}
+function goToday(){const n=new Date();curYear=n.getFullYear();curMonth=n.getMonth()+1;clearSelection();renderCalendar();updateLabel();}
+function updateLabel(){
+  // Sync month dropdown
+  const mSel=document.getElementById('nav-month');
+  if(mSel){
+    if(!mSel.options.length){
+      MONTHS.forEach((m,i)=>{ const o=document.createElement('option'); o.value=i+1; o.textContent=m; mSel.appendChild(o); });
+      mSel.addEventListener('change',()=>{ curMonth=parseInt(mSel.value); renderCalendar(); updateLabel(); });
+    }
+    mSel.value=curMonth;
+  }
+  // Sync year dropdown
+  const ySel=document.getElementById('nav-year');
+  if(ySel){
+    const todayY=new Date().getFullYear();
+    const years=new Set([todayY-1,todayY,todayY+1,todayY+2,curYear]);
+    const sorted=[...years].sort();
+    if(ySel.dataset.built!=='1'){
+      sorted.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y; ySel.appendChild(o); });
+      ySel.dataset.built='1';
+      ySel.addEventListener('change',async()=>{
+        const newY=parseInt(ySel.value);
+        if(newY!==curYear){ curYear=newY; await loadHolidays(curYear); }
+        updateLabel(); renderCalendar();
+      });
+    } else {
+      // Add curYear if not already present
+      if(![...ySel.options].find(o=>parseInt(o.value)===curYear)){
+        const o=document.createElement('option'); o.value=curYear; o.textContent=curYear;
+        // Insert in sorted order
+        let inserted=false;
+        for(let i=0;i<ySel.options.length;i++){
+          if(parseInt(ySel.options[i].value)>curYear){ ySel.insertBefore(o,ySel.options[i]); inserted=true; break; }
+        }
+        if(!inserted) ySel.appendChild(o);
+      }
+    }
+    ySel.value=curYear;
+  }
+  const tml=document.getElementById('tmpl-month-label'); if(tml) tml.textContent=MONTHS[curMonth-1]+' '+curYear;
+
+}
+
+// ══════════════════════════════════════════════════════════════
+// FOLDER
+// ══════════════════════════════════════════════════════════════
+async function refreshFolderBar(){
+  const d=await api('/api/datadir');
+  const lbl=document.getElementById('folder-label');
+  if(d.folder){
+    // Show only last part of path for brevity
+    const parts=d.folder.replace(/\\/g,'/').split('/');
+    lbl.textContent='📁 '+parts[parts.length-1];
+    lbl.title=d.folder+(d.file?'\n'+d.file:'');
+  } else {
+    lbl.textContent='Kein Ordner';
+  }
+}
+async function changeFolder(){
+  const btn=document.getElementById('btn-folder');btn.textContent='Wähle…';btn.disabled=true;
+  try{const d=await api('/api/pick_folder',{method:'POST'});if(d.ok){await refreshFolderBar();await refreshData();toast('Ordner gewechselt');}}
+  finally{btn.textContent='Ordner wechseln';btn.disabled=false;}
+}
+async function refreshData(){
+  const btn=document.getElementById('btn-refresh');btn.textContent='↻…';btn.disabled=true;
+  try{
+    const d=await api('/api/data');
+    applyData(d);
+    renderAll();
+    toast('Daten aktualisiert');
+  }finally{btn.textContent='↻';btn.disabled=false;}
+}
+
+
+function pushUndo(){
+  undoStack.push(JSON.parse(JSON.stringify(schichten)));
+  if(undoStack.length>50) undoStack.shift();
+  redoStack=[];
+  updateUndoBtns();
+}
+function updateUndoBtns(){
+  document.getElementById('btn-undo').disabled=!undoStack.length;
+  document.getElementById('btn-redo').disabled=!redoStack.length;
+}
+
+async function doUndo(){if(!undoStack.length)return;redoStack.push(JSON.parse(JSON.stringify(schichten)));schichten=undoStack.pop();await api('/api/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schichten})});renderCalendar();updateUndoBtns();toast('Rückgängig');}
+async function doRedo(){if(!redoStack.length)return;undoStack.push(JSON.parse(JSON.stringify(schichten)));schichten=redoStack.pop();await api('/api/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schichten})});renderCalendar();updateUndoBtns();toast('Wiederholt');}
+
+// ══════════════════════════════════════════════════════════════
+// COLOR PICKER
+// ══════════════════════════════════════════════════════════════
+function showColorPicker(anchor,memberName){
+  const pop=document.getElementById('cpop');
+  pop.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch" style="background:${c}" data-c="${c}" data-m="${memberName||''}"></div>`).join('');
+  pop.classList.remove('hidden');
+  const r=anchor.getBoundingClientRect();
+  pop.style.left=Math.min(r.left,window.innerWidth-190)+'px';
+  pop.style.top=(r.bottom+5)+'px';
+  pop.onclick=async e=>{
+    const sw=e.target.closest('[data-c]');if(!sw)return;
+    const color=sw.dataset.c,mname=sw.dataset.m;pop.classList.add('hidden');
+    if(mname){
+      await api('/api/mitarbeiter/'+encodeURIComponent(mname)+'/color',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({color})});
+      const m=mitarbeiter.find(x=>x.name===mname);if(m)m.color=color;renderMembers();renderCalendar();
+    } else {newColor=color;document.getElementById('new-color').style.background=color;}
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// MEMBERS
+// ══════════════════════════════════════════════════════════════
+function initials(name){return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+function avContent(m){return m.icon?`<span style="font-size:17px;line-height:1">${m.icon}</span>`:`<span>${initials(m.name)}</span>`;}
+
+function renderMembers(){
+  const search=(document.getElementById('sb-search')?.value||'').toLowerCase();
+  const teamF=document.getElementById('sb-team-filter')?.value||'';
+  const visible=mitarbeiter.filter(m=>
+    (!search||m.name.toLowerCase().includes(search))&&
+    (!teamF||m.team===teamF)
+  );
+  document.getElementById('member-list').innerHTML=visible.map(m=>{
+    const sel=selectedPerson?.name===m.name,picked=selectedPersons.has(m.name);
+    return `<div class="member-item${sel?' selected':''}${picked?' multi-picked':''}" data-member="${m.name}" style="${sel?`border-color:${m.color};color:${m.color}`:''}">
+      <input type="checkbox" class="member-cb" data-cb="${m.name}" ${picked?'checked':''}>
+      <div class="avatar" style="background:${m.color}">${avContent(m)}</div>
+      <span class="member-name">${esc(m.name)}</span>
+      <span class="badge badge-${m.team.toLowerCase()}">${m.team}</span>
+      <div class="member-btns">
+        <button class="mbtn mbtn-edit" data-edit="${m.name}">✎</button>
+        <button class="mbtn mbtn-del" data-del="${m.name}">✕</button>
+      </div>
+      <div class="member-confirm" data-cfor="${m.name}">
+        <span style="font-size:10px;color:var(--text2)">Löschen?</span>
+        <button class="cfbtn cfbtn-yes" data-cdel="${m.name}">Ja</button>
+        <button class="cfbtn cfbtn-no" data-cno="${m.name}">Nein</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function handleMemberClick(e){
+  if(e.target.classList.contains('member-cb')){
+    e.stopPropagation();const name=e.target.dataset.cb;
+    if(e.target.checked){selectedPersons.add(name);selectedPerson=null;}else selectedPersons.delete(name);
+    renderMembers();updateSelInfo();return;
+  }
+  const cdel=e.target.closest('[data-cdel]');
+  if(cdel){e.stopPropagation();await deleteMitarbeiter(cdel.dataset.cdel);return;}
+  const cno=e.target.closest('[data-cno]');
+  if(cno){
+    e.stopPropagation();
+    const conf=document.querySelector(`[data-cfor="${cno.dataset.cno}"]`);
+    const btns=conf?.previousElementSibling;
+    if(conf)conf.classList.remove('show');if(btns)btns.style.display='';return;
+  }
+  const del=e.target.closest('[data-del]');
+  if(del){
+    e.stopPropagation();const name=del.dataset.del;
+    const btns=document.querySelector(`.member-item[data-member="${name}"] .member-btns`);
+    const conf=document.querySelector(`[data-cfor="${name}"]`);
+    if(btns)btns.style.display='none';if(conf)conf.classList.add('show');return;
+  }
+  const edit=e.target.closest('[data-edit]');
+  if(edit){e.stopPropagation();openProfile(edit.dataset.edit);return;}
+  const item=e.target.closest('[data-member]');
+  if(item)selectPerson(item.dataset.member);
+}
+
+function selectPerson(name){
+  selectedPersons.clear();
+  selectedPerson=selectedPerson?.name===name?null:mitarbeiter.find(m=>m.name===name);
+  // Don't clear range when selecting a person - user may select person THEN set range
+  multiDays.clear();renderMembers();updateSelInfo();
+}
+
+function updateSelInfo(){
+  const el=document.getElementById('sel-info');
+  if(selectedPersons.size>0){
+    const names=[...selectedPersons];
+    const avs=names.map(n=>{const m=mitarbeiter.find(x=>x.name===n);
+      return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'13px':'9px'};font-weight:700;color:#fff;margin-right:2px">${m?.icon||initials(n)}</span>`;
+    }).join('');
+    const hint=rangeMode?(rangeStart?'2. Tag klicken zum Eintragen':'1. Tag klicken'):multiDays.size>0?multiDays.size+' Tage · Klick = Eintragen':'Tag anklicken = alle eintragen';
+    el.innerHTML=`<div style="margin-bottom:3px">${avs}</div><strong>${names.length} Mitarbeiter</strong> · <span style="font-size:11px">${SHIFT_LABEL[selectedShift]}</span><br><span style="font-size:10px;color:var(--text3)">${hint}</span>
+    <div style="margin-top:4px"><button onclick="selectedPersons.clear();renderMembers();updateSelInfo();" style="font-size:10px;background:none;border:1px solid var(--border2);color:var(--text3);padding:2px 7px;border-radius:5px;cursor:pointer">✕ Auswahl aufheben</button></div>`;
+    return;
+  }
+  if(!selectedPerson){
+    if(rangeMode&&rangeStart){
+      // Show delete options
+      const dates=getRangeDates();
+      const lo=dates[0],hi=dates[dates.length-1];
+      const fmt=k=>new Date(k+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});
+      const lbl=lo===hi?fmt(lo):fmt(lo)+' – '+fmt(hi);
+      // Who is in this range?
+      const allNames=new Set();
+      dates.forEach(d=>{ALL_SHIFTS.forEach(s=>(getSlot(d)[s]||[]).forEach(n=>allNames.add(n)));});
+      const personBtns=[...allNames].map(n=>{
+        const m=mitarbeiter.find(x=>x.name===n);
+        return `<button onclick="clearRangePerson('${n.replace(/'/g,"\\'")}') " style="padding:3px 8px;border-radius:6px;border:2px solid var(--border2);background:var(--surface3);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;border-left:3px solid ${m?m.color:'#64748b'}">${m?.icon?m.icon+' ':''}${esc(n)}</button>`;
+      }).join('');
+      const shiftBtns=ALL_SHIFTS.map(s=>
+        `<button onclick="clearRangeShift('${s}')" style="padding:3px 8px;border-radius:6px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);font-size:10px;font-weight:700;cursor:pointer">${SHIFT_SHORT[s][0]} ${SHIFT_LABEL[s]}</button>`
+      ).join('');
+      el.innerHTML=`<div style="font-weight:700;margin-bottom:4px">🗑 ${lbl}</div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">2. Tag klicken um Zeitraum zu setzen</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px">ALLES LÖSCHEN</div>
+        <div style="margin-bottom:5px"><button onclick="clearRangeAll()" style="padding:4px 10px;border-radius:7px;border:2px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;width:100%">✕ Alle Einträge (${dates.length} Tage)</button></div>
+        <div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px">NUR SCHICHT</div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${shiftBtns}</div>
+        ${allNames.size>0?`<div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px">NUR PERSON</div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${personBtns}</div>`:''}
+        <button onclick="clearSelection()" style="width:100%;padding:3px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text3);font-size:10px;cursor:pointer">← Abbrechen</button>`;
+      return;
+    }
+    if(rangeMode) {
+      el.innerHTML='<div style="font-size:11px">Zeitraum-Lösch-Modus</div><div style="font-size:10px;color:var(--text3)">1. Tag klicken, dann 2. Tag</div>';
+      return;
+    }
+    el.innerHTML='<div>Kein Mitarbeiter gewählt</div><div style="font-size:11px;color:var(--text3)">← Klicken</div>';return;
+  }
+  const flag=selectedPerson.team==='DE'?'🇩🇪':'🇮🇳';
+  const hint=multiDays.size>0?multiDays.size+' Tage · Klick = Eintragen'
+    :rangeMode?(rangeStart?'2. Tag klicken zum Eintragen':'1. Tag klicken')
+    :'Klick = Eintragen · Strg+Klick = Mehrfach';
+  el.innerHTML=`<strong style="color:${selectedPerson.color}">${esc(selectedPerson.name)}</strong> ${flag}<br><span style="font-size:11px">${SHIFT_LABEL[selectedShift]}</span><br><span style="font-size:10px;color:var(--text3)">${hint}</span>`;
+}
+
+async function addMitarbeiter(){
+  const name=document.getElementById('new-name').value.trim(),team=document.getElementById('new-team').value;
+  if(!name)return;
+  if(deletedBackups[name]&&Object.keys(deletedBackups[name]).length>0){pendingRestore={name,team,color:newColor};showRestoreModal(name,deletedBackups[name]);return;}
+  await doAdd(name,team,newColor);
+}
+async function doAdd(name,team,color){
+  const d=await api('/api/mitarbeiter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,team,color})});
+  if(d.error){toast(d.error);return;}
+  mitarbeiter.push({name,team,color:color||AVATAR_COLORS[0],icon:'',prefs:{}});
+  document.getElementById('new-name').value='';newColor=randColor();document.getElementById('new-color').style.background=newColor;
+  // Close add form after adding
+  document.getElementById('add-form').classList.remove('open');document.getElementById('add-toggle').classList.remove('open');
+  renderMembers();renderCalendar();renderTemplateTable();toast(name+' hinzugefügt');
+}
+async function deleteMitarbeiter(name){
+  try{
+    const d=await api('/api/mitarbeiter/'+encodeURIComponent(name),{method:'DELETE'});
+    if(d.error){toast('Fehler: '+d.error);return;}
+    if(d.backup&&Object.keys(d.backup).length>0)deletedBackups[name]=d.backup;
+    mitarbeiter=mitarbeiter.filter(m=>m.name!==name);
+    if(selectedPerson?.name===name){selectedPerson=null;updateSelInfo();}
+    selectedPersons.delete(name);
+    for(const k in schichten)for(const s in schichten[k]){const a=schichten[k][s];const i=a.indexOf(name);if(i!==-1)a.splice(i,1);}
+    renderMembers();renderCalendar();renderTemplateTable();toast(name+' entfernt');
+  }catch(err){toast('Fehler: '+err.message);}
+}
+function showRestoreModal(name,backup){
+  document.getElementById('restore-name').textContent=name;
+  const bs={};Object.values(backup).forEach(d=>Object.keys(d).forEach(s=>{bs[s]=(bs[s]||0)+1;}));
+  let html='<b>'+Object.keys(backup).length+'</b> Tage:<br>';
+  Object.entries(bs).forEach(([s,c])=>{html+='&nbsp;&nbsp;'+(SHIFT_LABEL[s]||s)+': <b>'+c+'×</b><br>';});
+  document.getElementById('restore-stats').innerHTML=html;openModal('restore-modal');
+}
+async function confirmRestore(doRestore){
+  closeModal('restore-modal');if(!pendingRestore)return;
+  const{name,team,color}=pendingRestore;pendingRestore=null;await doAdd(name,team,color);
+  if(doRestore&&deletedBackups[name]){
+    await api('/api/mitarbeiter/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,entries:deletedBackups[name]})});
+    const d=await api('/api/data');schichten=d.schichten||{};notizen=d.notizen||{};renderCalendar();toast(name+': Einträge wiederhergestellt');
+  }
+  delete deletedBackups[name];
+}
+function cancelRestore(){closeModal('restore-modal');pendingRestore=null;}
+
+// ══════════════════════════════════════════════════════════════
+// SOLL
+// ══════════════════════════════════════════════════════════════
+async function saveSoll(){
+  soll.frueh=+document.getElementById('soll-f').value||1;
+  soll.spaet=+document.getElementById('soll-s').value||1;
+  soll.rufbereitschaft=+document.getElementById('soll-r').value||1;
+  await api('/api/soll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(soll)});
+  renderCalendar();
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════════════════════════
+function renderStats(){
+  const wrap=document.getElementById('stats-wrap');if(!wrap)return;
+  const counts={};mitarbeiter.forEach(m=>{counts[m.name]={};ALL_SHIFTS.forEach(s=>counts[m.name][s]=0);});
+  const pre=curYear+'-'+String(curMonth).padStart(2,'0');
+  Object.entries(schichten).forEach(([k,slot])=>{if(!k.startsWith(pre))return;ALL_SHIFTS.forEach(s=>(slot[s]||[]).forEach(n=>{if(counts[n])counts[n][s]++;}));});
+  const mx=Math.max(1,...Object.values(counts).flatMap(c=>Object.values(c)));
+  const bclr={frueh:'var(--frueh)',spaet:'var(--spaet)',rufbereitschaft:'var(--ruf)',urlaub:'var(--urlaub)',krank:'var(--krank)',elternzeit:'var(--eltern)',sonderurlaub:'var(--sonder)'};
+  const slbl={frueh:'Früh',spaet:'Spät',rufbereitschaft:'Ruf',urlaub:'Url',krank:'Krank',elternzeit:'Eltern',sonderurlaub:'Sonder'};
+  wrap.innerHTML=mitarbeiter.map(m=>{
+    const c=counts[m.name]||{},total=Object.values(c).reduce((a,b)=>a+b,0);
+    const bars=ALL_SHIFTS.map(s=>`<div class="stat-bar-row"><div class="stat-bar-label">${slbl[s]}</div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(c[s]||0)/mx*100}%;background:${bclr[s]}"></div></div><div class="stat-bar-count">${c[s]||0}</div></div>`).join('');
+    return `<div class="stat-row"><div class="stat-name"><div class="avatar" style="background:${m.color};width:22px;height:22px;font-size:${m.icon?'13px':'9px'};flex-shrink:0">${m.icon||initials(m.name)}</div>${esc(m.name)}<span style="color:var(--text3);font-size:11px;margin-left:auto">${total}</span></div><div>${bars}</div></div>`;
+  }).join('')||'<div style="padding:14px;color:var(--text3)">Keine Mitarbeiter</div>';
+}
+
+// ══════════════════════════════════════════════════════════════
+// PROFILE
+// ══════════════════════════════════════════════════════════════
+function openProfile(name){
+  const m=mitarbeiter.find(x=>x.name===name);if(!m)return;
+  profOldName=name;profColor=m.color;profEmoji=m.icon||'';
+  profPrefs=Object.fromEntries(Object.entries(m.prefs||{}).map(([k,v])=>[parseInt(k),v]));
+  document.getElementById('prof-name').value=m.name;
+  document.getElementById('prof-team').value=m.team||'DE';
+  document.getElementById('prof-cur-name').textContent=m.name;
+  document.getElementById('prof-cur-team').textContent=m.team==='DE'?'🇩🇪 Deutschland':'🇮🇳 Indien';
+  document.getElementById('prof-err').style.display='none';
+  updateProfAvatar();
+  const cr=document.getElementById('prof-colors');
+  cr.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch-big${c===profColor?' sel':''}" style="background:${c}" data-pc="${c}"></div>`).join('');
+  cr.querySelectorAll('[data-pc]').forEach(sw=>sw.addEventListener('click',()=>{profColor=sw.dataset.pc;cr.querySelectorAll('[data-pc]').forEach(s=>s.classList.toggle('sel',s===sw));updateProfAvatar();}));
+  const eg=document.getElementById('prof-emojis');
+  eg.innerHTML=`<span class="emoji-none${profEmoji===''?' sel':''}" data-pe="">Kein Icon</span>`+EMOJIS.map(e=>`<span class="emoji-opt${e===profEmoji?' sel':''}" data-pe="${e}">${e}</span>`).join('');
+  eg.querySelectorAll('[data-pe]').forEach(el=>el.addEventListener('click',()=>{profEmoji=el.dataset.pe;eg.querySelectorAll('[data-pe]').forEach(x=>x.classList.toggle('sel',x===el));updateProfAvatar();}));
+  updatePrefButtons();
+  document.querySelectorAll('.pref-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    const dow=parseInt(btn.dataset.dow),val=btn.dataset.val;
+    if(val==='')delete profPrefs[dow];else profPrefs[dow]=val;updatePrefButtons();
+  }));
+  openModal('prof-modal');
+  document.getElementById('prof-name').focus();
+  document.getElementById('prof-name').oninput=updateProfAvatar;
+}
+function updateProfAvatar(){
+  const av=document.getElementById('prof-av');av.style.background=profColor;
+  document.getElementById('prof-emoji-disp').textContent=profEmoji;
+  const name=document.getElementById('prof-name').value.trim();
+  document.getElementById('prof-init-disp').textContent=profEmoji?'':name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+}
+function updatePrefButtons(){
+  document.querySelectorAll('.pref-btn').forEach(btn=>{
+    const dow=parseInt(btn.dataset.dow),val=btn.dataset.val,cur=profPrefs[dow]??'';
+    const isActive=(val===''&&cur==='')||(val!==''&&cur===val);
+    let cls='pref-btn';
+    if(isActive) cls+= val===''?' sel-f':val==='frueh'?' sel-f':val==='spaet'?' sel-s':val==='ruf'?' sel-r':' sel-frei';
+    btn.className=cls;
+  });
+}
+async function saveProfile(){
+  const newName=document.getElementById('prof-name').value.trim(),team=document.getElementById('prof-team').value;
+  const errEl=document.getElementById('prof-err');
+  if(!newName){errEl.textContent='Name darf nicht leer sein.';errEl.style.display='block';return;}
+  const d=await api('/api/mitarbeiter/'+encodeURIComponent(profOldName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newName,team,color:profColor,icon:profEmoji})});
+  if(d.error){errEl.textContent=d.error;errEl.style.display='block';return;}
+  if(d.ok) await api('/api/mitarbeiter/'+encodeURIComponent(newName)+'/prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefs:profPrefs})});
+  const m=mitarbeiter.find(x=>x.name===profOldName);
+  if(m){m.name=newName;m.team=team;m.color=profColor;m.icon=profEmoji;m.prefs={...profPrefs};}
+  if(newName!==profOldName){for(const k in schichten)for(const s in schichten[k])schichten[k][s]=schichten[k][s].map(n=>n===profOldName?newName:n);if(selectedPerson?.name===profOldName)selectedPerson=m;}
+  closeModal('prof-modal');renderMembers();renderCalendar();renderStats();renderTemplateTable();toast(newName+' gespeichert');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CALENDAR
+// ══════════════════════════════════════════════════════════════
+function dk(y,m,d){return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+// isoWeek() used instead (see below)
+
+// Alias for compatibility
+function getISOWeek(d){ return isoWeek(d); }
+
+function isoWeek(d){
+  // Returns ISO week number for date d
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  return Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+}
+
+function renderCalendar(){
+  const grid = document.getElementById('cal-grid');
+  // Remove all but the 8 headers (KW + Mo..So)
+  while(grid.children.length > 8) grid.removeChild(grid.lastChild);
+
+  const today = new Date();
+  const firstDow = (new Date(curYear, curMonth-1, 1).getDay() + 6) % 7;
+  const dim      = new Date(curYear, curMonth, 0).getDate();
+  const prevDim  = new Date(curYear, curMonth-1, 0).getDate();
+  const prevY = curMonth===1 ? curYear-1 : curYear;
+  const prevM = curMonth===1 ? 12 : curMonth-1;
+  const nextY = curMonth===12 ? curYear+1 : curYear;
+  const nextM = curMonth===12 ? 1 : curMonth+1;
+
+  const allCells = [];
+  for(let i=0; i<firstDow; i++)
+    allCells.push({key:dk(prevY,prevM,prevDim-firstDow+1+i), num:prevDim-firstDow+1+i, other:true});
+  for(let d=1; d<=dim; d++)
+    allCells.push({key:dk(curYear,curMonth,d), num:d, other:false});
+  const needed = Math.ceil((firstDow+dim)/7)*7 - (firstDow+dim);
+  for(let d=1; d<=needed; d++)
+    allCells.push({key:dk(nextY,nextM,d), num:d, other:true});
+
+  allCells.forEach((c, i) => {
+    if(i % 7 === 0){
+      const kwDiv = document.createElement('div');
+      const kwDate = new Date(c.key + 'T00:00:00');
+      const kw = isoWeek(kwDate);
+      kwDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;' +
+        'font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;' +
+        'color:var(--text3);background:var(--surface);border-radius:6px;' +
+        'cursor:pointer;user-select:none;transition:background .15s,color .15s;';
+      kwDiv.title = 'KW ' + kw + ' – Klick: Rufbereitschaft für ganze Woche zuweisen';
+      kwDiv.textContent = kw;
+      kwDiv.addEventListener('mouseenter', () => { kwDiv.style.background='var(--surface3)'; kwDiv.style.color='var(--ruf)'; });
+      kwDiv.addEventListener('mouseleave', () => { kwDiv.style.background='var(--surface)';  kwDiv.style.color='var(--text3)'; });
+      const weekDates = allCells.slice(i, i+7).map(x => x.key);
+      kwDiv.addEventListener('click', e => { e.stopPropagation(); showKwRufDialog(kw, weekDates); });
+      grid.appendChild(kwDiv);
+    }
+    grid.appendChild(makeCell(c.key, c.num, c.other));
+  });
+  renderStats();
+}
+
+function makeCell(key,dayNum,other){
+  const d=new Date(key+'T00:00:00'),dow=d.getDay();
+  const today=new Date(),isToday=d.toDateString()===today.toDateString();
+  const hol=holidays[key],slot=getSlot(key);
+  const {schichtC,holC,hasAny}=getConflicts(slot,key);
+  const isUnder=!other&&isUnderstaffed(slot,key);
+  const note=notizen[key],isCopied=copiedDay?.key===key,isMulti=multiDays.has(key);
+  const rc=other?'':rangeClass(key);
+
+  let cls='day-cell';
+  if(other) cls+=' other';
+  else{
+    if(dow===0||dow===6) cls+=' weekend';
+    if(hol && hol.bridge) cls+=' bridge';
+    else if(hol) cls+=hol.country==='DE'?' hol-de':hol.country==='IN'?' hol-in':' hol-both';
+    if(isToday) cls+=' today';
+    if(hasAny) cls+=' conflict';
+    else if(isUnder) cls+=' understaffed';
+    if(note) cls+=' has-note';
+    if(isCopied) cls+=' copied';
+    if(isMulti) cls+=' multi-day';
+    if(rc) cls+=' '+rc;
+  }
+
+  const el=document.createElement('div');el.className=cls;el.dataset.key=key;
+  const numRow=document.createElement('div');numRow.className='day-num';
+  const numLeft=document.createElement('div');numLeft.style.cssText='display:flex;align-items:center;gap:4px';
+  const numSpan=document.createElement('span');numSpan.className='day-number'+(isToday?' is-today':'');numSpan.textContent=dayNum;
+  numLeft.appendChild(numSpan);
+  if(!other&&note){const p=document.createElement('span');p.style.cssText='width:5px;height:5px;border-radius:50%;background:var(--spaet);display:inline-block';numLeft.appendChild(p);}
+  if(!other&&isMulti){const p=document.createElement('span');p.textContent='✓';p.style.cssText='font-size:9px;color:var(--ruf);font-weight:700';numLeft.appendChild(p);}
+  numRow.appendChild(numLeft);
+
+  if(!other){
+    const acts=document.createElement('div');acts.className='day-actions';
+    const mkBtn=(title,icon,action,extra='')=>{const b=document.createElement('button');b.className='dab'+extra;b.title=title;b.textContent=icon;b.dataset.action=action;b.dataset.key=key;return b;};
+    acts.appendChild(mkBtn('Details/Notiz','📝','open'));
+    if(copiedDay) acts.appendChild(mkBtn('Einfügen','📋','paste'));
+    acts.appendChild(mkBtn('Kopieren','⧉','copy'));
+    acts.appendChild(mkBtn('Leeren','✕','clear',' red'));
+    numRow.appendChild(acts);
+  }
+  el.appendChild(numRow);
+
+  if(!other){
+    if(hol){
+      const ht=document.createElement('div');
+      if(hol.bridge){
+        ht.className='bridge-tag';ht.textContent='🌉 Brückentag';ht.title='Brückentag';
+      } else {
+        const isCustom=hol.custom;
+        ht.className='hol-tag '+(hol.country==='DE'?'hol-de-tag':hol.country==='IN'?'hol-in-tag':isCustom?'hol-custom-tag':'');
+        ht.title=hol.name+(isCustom?' (eigener Feiertag)':'');ht.textContent=(isCustom?'★ ':'')+hol.name;
+      }
+      el.appendChild(ht);
+    }
+    if(hasAny){const cb=document.createElement('div');cb.className='conflict-badge';const parts=[];if(schichtC.length)parts.push('Konfl.: '+schichtC.join(', '));if(holC.length){const h=holidays[key];parts.push('Feiertag ('+h.country+'): '+holC.join(', '));}cb.textContent='⚠ '+parts.join(' | ');el.appendChild(cb);}
+    else if(isUnder){const ub=document.createElement('div');ub.className='understaffed-badge';ub.textContent='⚠ Unterbesetzt';el.appendChild(ub);}
+    const si=document.createElement('div');si.className='soll-ist';
+    ['frueh','spaet','rufbereitschaft'].forEach(s=>{const ist=(slot[s]||[]).length,tgt=soll[s]||1;const bar=document.createElement('div');bar.className='si-bar';bar.title=SHIFT_LABEL[s]+': '+ist+'/'+tgt;const fill=document.createElement('div');fill.className='si-fill';fill.style.width=Math.min(100,ist/tgt*100)+'%';fill.style.background=ist===0?'var(--border)':ist<tgt?'var(--spaet)':ist===tgt?'var(--frueh)':'var(--krank)';bar.appendChild(fill);si.appendChild(bar);});
+    el.appendChild(si);
+    const ca=document.createElement('div');ca.className='chips-area';
+    ALL_SHIFTS.forEach(s=>{
+      const people=slot[s]||[];if(!people.length)return;
+      const row=document.createElement('div');row.className='chips-row';
+      const lbl=document.createElement('span');lbl.className='chips-label';lbl.textContent=SHIFT_SHORT[s][0];lbl.style.color=SHIFT_SHORT[s][1];lbl.title=SHIFT_LABEL[s];row.appendChild(lbl);
+      const chips=document.createElement('div');chips.className='chips';
+      people.forEach(name=>{const m=mitarbeiter.find(x=>x.name===name);const chip=document.createElement('span');chip.className='chip '+SHIFT_CSS[s];chip.draggable=true;chip.dataset.key=key;chip.dataset.shift=s;chip.dataset.name=name;chip.style.borderLeft='2px solid '+(m?m.color:'#64748b');chip.textContent=(m?.icon?m.icon+' ':'')+name.split(' ')[0];chip.title=name+' · '+SHIFT_LABEL[s];chips.appendChild(chip);});
+      row.appendChild(chips);ca.appendChild(row);
+    });
+    el.appendChild(ca);
+    el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drag-over');});
+    el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+    el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drag-over');handleDrop(key);});
+    el.addEventListener('mouseenter',()=>showTooltip(el,key));
+    el.addEventListener('mouseleave',hideTooltip);
+    el.addEventListener('click',e=>handleCellClick(e,key));
+  }
+  return el;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CELL CLICK
+// ══════════════════════════════════════════════════════════════
+async function handleCellClick(e,key){
+  const btn=e.target.closest('[data-action]');
+  if(btn){
+    e.stopPropagation();const act=btn.dataset.action,k=btn.dataset.key,slot=getSlot(k);
+    if(act==='open') openDayModal(k);
+    else if(act==='copy'){copiedDay={key:k,slot:JSON.parse(JSON.stringify(slot))};toast('Tag kopiert');renderCalendar();}
+    else if(act==='paste'&&copiedDay){pushUndo();await pasteDay([k],'replace');copiedDay=null;renderCalendar();}
+    else if(act==='clear') await clearDay(k);
+    return;
+  }
+  const chip=e.target.closest('.chip');
+  if(chip){pushUndo();await applySchicht([chip.dataset.key],'remove',chip.dataset.shift,chip.dataset.name);return;}
+  if(selectedPersons.size>0) await handleMultiPersonClick(key,e.ctrlKey||e.metaKey);
+  else if(selectedPerson) await handleSinglePersonClick(key,e.ctrlKey||e.metaKey);
+  else if(rangeMode){
+    // No person selected — range mode for delete
+    if(!rangeStart){rangeStart=key;previewEnd=key;updateSelInfo();renderCalendar();}
+    else{previewEnd=key;frozenRangeEnd=key;renderCalendar();updateSelInfo();}
+  } else toast('Bitte erst einen Mitarbeiter auswählen');
+}
+
+async function handleSinglePersonClick(key,ctrl){
+  if(ctrl){if(multiDays.has(key))multiDays.delete(key);else multiDays.add(key);renderCalendar();updateSelInfo();return;}
+  if(multiDays.size>0){await applyToDateList([...multiDays],[selectedPerson.name],'add');multiDays.clear();renderCalendar();updateSelInfo();return;}
+  if(rangeMode){
+    if(!rangeStart){
+      rangeStart=key; previewEnd=key;
+      updateSelInfo(); renderCalendar();
+    } else {
+      // 2nd click: apply immediately
+      const lo=rangeStart<key?rangeStart:key;
+      const hi=rangeStart<key?key:rangeStart;
+      const dates=datesInRange(lo,hi);
+      rangeStart=null; previewEnd=null;
+      renderCalendar(); updateSelInfo();
+      await applyToDateList(dates,[selectedPerson.name],'add');
+    }
+    return;
+  }
+  pushUndo();
+  const res=await postSchicht([key],'toggle',selectedShift,selectedPerson.name);
+  const r=res?.results?.[key];
+  if(r?.error==='needs_confirm'){
+    undoStack.pop();updateUndoBtns();
+    const blockNames=r.blocking.map(s=>SHIFT_LABEL[s]).join(', ');
+    const ok=await confirmDialog('Schicht ersetzen?',`<strong>${esc(selectedPerson.name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`);
+    if(ok){pushUndo();const r2=await postSchicht([key],'add',selectedShift,selectedPerson.name,true);applyResults(r2.results);showHolWarnings(r2.hol_warnings);}
+  } else if(r?.error){undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich');}
+  else{applyResults(res.results);showHolWarnings(res.hol_warnings);}
+}
+
+async function handleMultiPersonClick(key,ctrl){
+  if(ctrl){if(multiDays.has(key))multiDays.delete(key);else multiDays.add(key);renderCalendar();updateSelInfo();return;}
+  if(rangeMode){
+    if(!rangeStart){
+      rangeStart=key; previewEnd=key;
+      updateSelInfo(); renderCalendar();
+    } else {
+      const lo=rangeStart<key?rangeStart:key;
+      const hi=rangeStart<key?key:rangeStart;
+      const dates=datesInRange(lo,hi);
+      rangeStart=null; previewEnd=null;
+      renderCalendar(); updateSelInfo();
+      await applyToDateList(dates,[...selectedPersons],'add');
+    }
+    return;
+  }
+  const dates=multiDays.size>0?[...multiDays]:[key];
+  await applyToDateList(dates,[...selectedPersons],'add');
+  if(multiDays.size>0){multiDays.clear();renderCalendar();}
+}
+
+async function applyToDateList(dates,names,action){
+  pushUndo();let entered=0,replaced=0,skipped=0;
+  for(const name of names){
+    const res=await postSchicht(dates,action,selectedShift,name);
+    const holDays=Object.entries(res.results).filter(([,r])=>r.error==='holiday_conflict');
+    const confirmDays=Object.entries(res.results).filter(([,r])=>r.error==='needs_confirm');
+    const okR=Object.fromEntries(Object.entries(res.results).filter(([,r])=>!r.error));
+    applyResults(okR);showHolWarnings(res.hol_warnings);entered+=Object.keys(okR).length;
+    if(holDays.length>0){
+      const holName=holDays[0][1].holiday,flag=holDays[0][1].country==='DE'?'🇩🇪':holDays[0][1].country==='IN'?'🇮🇳':'🌍';
+      const ok=await confirmDialog('Feiertag – trotzdem eintragen?',
+        `${flag} <strong>${esc(holName)}</strong> ist ein Feiertag für das Team von <strong>${esc(name)}</strong> (${holDays.length} Tag(e)).<br>Trotzdem als <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> eintragen?`);
+      if(ok){const r2=await postSchicht(holDays.map(([d])=>d),'add',selectedShift,name,true);applyResults(r2.results);replaced+=holDays.length;}
+      else skipped+=holDays.length;
+    }
+    if(confirmDays.length>0){
+      const blockNames=[...new Set(confirmDays.flatMap(([,r])=>r.blocking))].map(s=>SHIFT_LABEL[s]).join(', ');
+      const ok=await confirmDialog('Schicht ersetzen?',`<strong>${esc(name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`);
+      if(ok){const r2=await postSchicht(confirmDays.map(([d])=>d),'add',selectedShift,name,true);applyResults(r2.results);showHolWarnings(r2.hol_warnings);replaced+=confirmDays.length;}
+      else skipped+=confirmDays.length;
+    }
+  }
+  const msg=names.length>1?names.length+' Mitarbeiter':names[0];
+  if(skipped>0)toast(msg+': '+skipped+' übersprungen');
+  else if(replaced>0)toast(msg+' eingetragen ('+replaced+' ersetzt)');
+  else toast(msg+' auf '+dates.length+' Tag(e) eingetragen');
+}
+
+async function postSchicht(dates,action,schicht,name,force=false){
+  return api('/api/schicht',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dates,schicht,name,action,force})});
+}
+async function applySchicht(dates,action,schicht,name){const res=await postSchicht(dates,action,schicht,name);if(res)applyResults(res.results);}
+function applyResults(results){if(!results)return;Object.entries(results).forEach(([k,v])=>{if(!v.error)schichten[k]=v;});renderCalendar();renderStats();}
+async function clearDay(key){pushUndo();const empty={frueh:[],spaet:[],rufbereitschaft:[],urlaub:[],krank:[],elternzeit:[],sonderurlaub:[]};const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:empty,dates:[key],mode:'replace'})});if(r.ok){schichten[key]={...empty};renderCalendar();toast('Tag geleert');}}
+async function pasteDay(dates,mode){if(!copiedDay)return;const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:copiedDay.slot,dates,mode})});if(r.ok){const d=await api('/api/data');schichten=d.schichten||{};renderCalendar();toast(dates.length+' Tag(e) eingefügt');}}
+async function handleDrop(toKey){if(!dragState)return;const{name,fromKey,fromShift}=dragState;dragState=null;if(fromKey===toKey)return;pushUndo();await applySchicht([fromKey],'remove',fromShift,name);await applySchicht([toKey],'add',fromShift,name);toast(name+' verschoben');}
+
+// ══════════════════════════════════════════════════════════════
+// RANGE
+// ══════════════════════════════════════════════════════════════
+function getRangeDates(){
+  const end=previewEnd||rangeStart;
+  return datesInRange(rangeStart<end?rangeStart:end, rangeStart<end?end:rangeStart);
+}
+
+function buildRangePanel(person){
+  const dates=getRangeDates();
+  const lo=dates[0],hi=dates[dates.length-1];
+  const fmt=k=>new Date(k+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});
+  const rangeLabel=lo===hi?fmt(lo):fmt(lo)+' – '+fmt(hi);
+
+  // Person chips for "delete single person" section
+  const allNames=new Set();
+  dates.forEach(d=>{ALL_SHIFTS.forEach(s=>(getSlot(d)[s]||[]).forEach(n=>allNames.add(n)));});
+  const personChips=[...allNames].map(n=>{
+    const m=mitarbeiter.find(x=>x.name===n);const color=m?m.color:'#64748b';
+    return `<button class="rpbtn" onclick="clearRangePerson('${n.replace(/'/g,"\'")}')" style="border-left:3px solid ${color}">
+      ${m?.icon?m.icon+' ':''}${esc(n)}</button>`;
+  }).join('');
+
+  // Shift buttons
+  const shiftBtns=ALL_SHIFTS.map(s=>
+    `<button class="rpbtn orange" onclick="clearRangeShift('${s}')">${SHIFT_SHORT[s][0]} ${SHIFT_LABEL[s]}</button>`
+  ).join('');
+
+  return `<div class="range-panel">
+    <h4>📅 ${rangeLabel} · ${dates.length} Tag(e)</h4>
+    <div class="rp-label">Alles löschen</div>
+    <div class="range-panel-row">
+      <button class="rpbtn red" onclick="clearRangeAll()">✕ Alle Einträge löschen</button>
+    </div>
+    <div class="rp-label">Nur eine Schicht</div>
+    <div class="range-panel-row">${shiftBtns}</div>
+    ${allNames.size>0?`<div class="rp-label">Nur eine Person</div><div class="range-panel-row">${personChips}</div>`:''}
+    <div style="margin-top:7px;display:flex;gap:5px">
+      ${(selectedPerson||selectedPersons.size>0)?`<button class="rpbtn blue" onclick="applyRangeEntry()">✓ Eintragen (${SHIFT_LABEL[selectedShift]})</button>`:''}
+      <button class="rpbtn" onclick="clearSelection()">← Abbrechen</button>
+    </div>
+  </div>`;
+}
+
+async function applyRangeEntry(){
+  const dates=getRangeDates();
+  const names=selectedPersons.size>0?[...selectedPersons]:(selectedPerson?[selectedPerson.name]:[]);
+  if(!names.length){toast('Kein Mitarbeiter gewählt');return;}
+  rangeStart=null;previewEnd=null;
+  renderCalendar();updateSelInfo();
+  await applyToDateList(dates,names,'add');
+}
+
+async function clearRangeAll(){
+  frozenRangeEnd=null;
+  const dates=getRangeDates();
+  if(dates.length>1){
+    const ok=await confirmDialog('Zeitraum leeren?',
+      `${dates.length} Tage vollständig leeren? Diese Aktion kann per Undo rückgängig gemacht werden.`);
+    if(!ok) return;
+  }
+  pushUndo();
+  const empty={frueh:[],spaet:[],rufbereitschaft:[],urlaub:[],krank:[],elternzeit:[],sonderurlaub:[]};
+  await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({slot:empty,dates,mode:'replace'})});
+  dates.forEach(k=>{schichten[k]={...empty};});
+  rangeStart=null;previewEnd=null;renderCalendar();updateSelInfo();
+  toast(dates.length+' Tag(e) vollständig geleert');
+}
+
+async function clearRangeShift(shift){
+  frozenRangeEnd=null;   const dates=getRangeDates(); pushUndo();
+  dates.forEach(k=>{if(schichten[k]&&schichten[k][shift]) schichten[k][shift]=[];});
+  // Sync to server via paste with selective slot
+  for(const d of dates){
+    await api('/api/schicht',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dates:[d],schicht:shift,name:'__clear__',action:'clear_shift'})});
+  }
+  rangeStart=null;previewEnd=null;renderCalendar();updateSelInfo();
+  toast(dates.length+' Tag(e): '+SHIFT_LABEL[shift]+' geleert');
+}
+
+async function clearRangePerson(name){
+  frozenRangeEnd=null;   const dates=getRangeDates(); pushUndo();
+  dates.forEach(k=>{
+    if(!schichten[k]) return;
+    ALL_SHIFTS.forEach(s=>{
+      if(schichten[k][s]){const i=schichten[k][s].indexOf(name);if(i!==-1)schichten[k][s].splice(i,1);}
+    });
+  });
+  // Sync: remove person from all shifts on all dates
+  for(const shift of ALL_SHIFTS){
+    await api('/api/schicht',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dates,schicht:shift,name,action:'remove'})});
+  }
+  rangeStart=null;previewEnd=null;renderCalendar();updateSelInfo();
+  toast(name+' aus '+dates.length+' Tag(en) entfernt');
+}
+
+async function clearRangeAllShifts(){ await clearRangeAll(); }
+async function clearRangeOneShift(){ await clearRangeShift(selectedShift); }
+
+function clearSelection(){
+  rangeStart=null;previewEnd=null;frozenRangeEnd=null;multiDays.clear();
+  renderCalendar();updateSelInfo();
+}
+function clearAll(){
+  rangeMode=false;
+  document.getElementById('btn-range').classList.remove('on');
+  rangeStart=null;previewEnd=null;frozenRangeEnd=null;multiDays.clear();
+  renderCalendar();updateSelInfo();
+}
+function rangeClass(key){
+  if(!rangeStart)return '';const end=previewEnd||rangeStart;
+  const lo=rangeStart<end?rangeStart:end,hi=rangeStart<end?end:rangeStart;
+  if(key===lo&&lo===hi)return 'range-start';if(key===lo)return 'in-range range-start';
+  if(key===hi)return 'in-range range-end';if(key>lo&&key<hi)return 'in-range';return '';
+}
+function datesInRange(a,b){const lo=a<b?a:b,hi=a<b?b:a,out=[];let cur=new Date(lo+'T00:00:00'),end=new Date(hi+'T00:00:00');while(cur<=end){out.push(dk(cur.getFullYear(),cur.getMonth()+1,cur.getDate()));cur.setDate(cur.getDate()+1);}return out;}
+document.addEventListener('mouseover',e=>{if(!rangeMode||!rangeStart||frozenRangeEnd)return;const cell=e.target.closest('.day-cell:not(.other)');if(cell&&cell.dataset.key!==previewEnd){previewEnd=cell.dataset.key;renderCalendar();}});
+
+// ══════════════════════════════════════════════════════════════
+// CONFLICTS & UNDERSTAFFED
+// ══════════════════════════════════════════════════════════════
+function getConflicts(slot,key){
+  const absents=new Set(ALL_SHIFTS.filter(s=>ABSENCE.has(s)).flatMap(s=>slot[s]||[]));
+  const schichtC=[];ALL_SHIFTS.filter(s=>WORK_SHIFTS.has(s)).forEach(s=>(slot[s]||[]).forEach(n=>{if(absents.has(n)&&!schichtC.includes(n))schichtC.push(n);}));
+  const holC=[];const hol=key?holidays[key]:null;
+  if(hol&&hol.country!=='DE+IN'){ALL_SHIFTS.filter(s=>WORK_SHIFTS.has(s)).forEach(s=>{(slot[s]||[]).forEach(n=>{const m=mitarbeiter.find(x=>x.name===n);if(m&&m.team===hol.country&&!holC.includes(n))holC.push(n);});});}
+  return{schichtC,holC,hasAny:schichtC.length>0||holC.length>0};
+}
+function isUnderstaffed(slot,key){
+  if(!slot)return false;
+  if(key){const dow=new Date(key+'T00:00:00').getDay();if(dow===0||dow===6)return(slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1);}
+  return(slot.frueh||[]).length<(soll.frueh||1)||(slot.spaet||[]).length<(soll.spaet||1)||(slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1);
+}
+function jumpToDate(key){
+  const d=new Date(key+'T00:00:00');
+  curYear=d.getFullYear(); curMonth=d.getMonth()+1;
+  updateLabel(); renderCalendar();
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('[data-view="cal"]').classList.add('active');
+  document.querySelector('[data-panel="cal"]').classList.add('active');
+  activeView='cal'; closeAllModals();
+  setTimeout(()=>{
+    const cell=document.querySelector(`.day-cell[data-key="${key}"]`);
+    if(cell){cell.scrollIntoView({behavior:'smooth',block:'center'});
+      cell.style.outline='3px solid var(--blue)';
+      setTimeout(()=>cell.style.outline='',1800);}
+  },80);
+}
+
+function showUnderstaffedReport(){
+  const dim=new Date(curYear,curMonth,0).getDate(),issues=[];
+  for(let d=1;d<=dim;d++){
+    const key=dk(curYear,curMonth,d),slot=getSlot(key),dow=new Date(key+'T00:00:00').getDay(),isWE=dow===0||dow===6;
+    const missing=[];
+    if(!isWE&&(slot.frueh||[]).length<(soll.frueh||1))missing.push({s:'frueh',ist:(slot.frueh||[]).length,soll:soll.frueh||1});
+    if(!isWE&&(slot.spaet||[]).length<(soll.spaet||1))missing.push({s:'spaet',ist:(slot.spaet||[]).length,soll:soll.spaet||1});
+    if((slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1))missing.push({s:'rufbereitschaft',ist:(slot.rufbereitschaft||[]).length,soll:soll.rufbereitschaft||1});
+    if(missing.length)issues.push({key,missing});
+  }
+  document.getElementById('under-label').textContent=MONTHS[curMonth-1]+' '+curYear;
+  const cont=document.getElementById('under-content');
+  if(!issues.length){cont.innerHTML='<div style="padding:14px;color:var(--frueh);font-size:14px;text-align:center">✓ Alle Tage vollständig besetzt!</div>';}
+  else{
+    const date=k=>{const dt=new Date(k+'T00:00:00');return dt.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});};
+    cont.innerHTML=`<div class="under-panel"><h4>⚠ ${issues.length} Tage mit Unterbesetzung</h4><div class="under-list">${issues.map(({key,missing})=>`<div class="under-item" onclick="jumpToDate('${key}')" style="cursor:pointer" title="Im Kalender öffnen"><span class="under-date" style="color:var(--blue);text-decoration:underline dotted">${date(key)}</span><div class="under-shifts">${missing.map(m=>`<span class="under-tag" style="background:color-mix(in srgb,var(${SHIFT_VAR[m.s]}) 15%,transparent);color:var(${SHIFT_VAR[m.s]})">${SHIFT_SHORT[m.s][0]} ${m.ist}/${m.soll}</span>`).join('')}</div></div>`).join('')}</div></div>`;
+  }
+  openModal('under-modal');
+}
+
+// ══════════════════════════════════════════════════════════════
+// DAY MODAL
+// ══════════════════════════════════════════════════════════════
+function openDayModal(key){
+  activeDayKey=key;const d=new Date(key+'T00:00:00');
+  document.getElementById('dm-title').textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const slot=getSlot(key),absents=new Set(ALL_SHIFTS.filter(s=>ABSENCE.has(s)).flatMap(s=>slot[s]||[]));
+  document.getElementById('dm-slots').innerHTML=ALL_SHIFTS.map(s=>{
+    const color=`var(${SHIFT_VAR[s]})`,people=slot[s]||[];
+    const ph=people.length?people.map(name=>{const m=mitarbeiter.find(x=>x.name===name),av=m?m.color:'#64748b';const conf=WORK_SHIFTS.has(s)&&absents.has(name);const avC=m?.icon?`<span style="font-size:12px">${m.icon}</span>`:`<span>${initials(name)}</span>`;return `<div class="dm-chip" style="background:color-mix(in srgb,${color} 15%,transparent);color:${color}${conf?';outline:2px solid #f87171':''}"><div class="dm-av" style="background:${av}">${avC}</div>${esc(name)}${conf?' ⚠':''}</div>`;}).join(''):'<div class="dm-empty">Niemand</div>';
+    return `<div class="dm-shift"><div class="dm-shift-hdr"><div class="dm-dot" style="background:${color}"></div><div class="dm-shift-name">${SHIFT_LABEL[s]}</div><div class="dm-meta">${SHIFT_TIME[s]}</div></div><div class="dm-people">${ph}</div></div>`;
+  }).join('');
+  document.getElementById('dm-note').value=notizen[key]||'';
+  openModal('day-modal');
+}
+async function saveDayNote(){
+  const text=document.getElementById('dm-note').value;
+  await api('/api/notiz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:activeDayKey,text})});
+  if(text)notizen[activeDayKey]=text;else delete notizen[activeDayKey];
+  closeModal('day-modal');renderCalendar();toast('Notiz gespeichert');
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUTOPLAN
+// ══════════════════════════════════════════════════════════════
+async function applyTemplateDirectly(){
+  const name=document.getElementById('tmpl-name-input')?.value?.trim()||'default';
+  if(!templates[name]&&!Object.keys(templates).length){
+    toast('Bitte zuerst ein Template speichern'); return;
+  }
+  const tname=templates[name]?name:Object.keys(templates)[0];
+
+  // Build month/year picker dialog
+  const todayY=new Date().getFullYear();
+  const yearOpts=[todayY-1,todayY,todayY+1,todayY+2].map(y=>`<option value="${y}"${y===curYear?' selected':''}>${y}</option>`).join('');
+  const monthOpts=MONTHS.map((m,i)=>`<option value="${i+1}"${i+1===curMonth?' selected':''}>${m}</option>`).join('');
+  const selStyle='background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:6px 9px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer';
+  const overwriteId='_tmpl-ow-'+Date.now();
+
+  const ok=await confirmDialog(
+    `Template anwenden`,
+    `Template: <strong>${esc(tname)}</strong><br><br>
+     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+       <select id="_tmpl-month" style="${selStyle}">${monthOpts}</select>
+       <select id="_tmpl-year"  style="${selStyle}">${yearOpts}</select>
+     </div>
+     <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+       <input type="checkbox" id="${overwriteId}" style="accent-color:var(--blue)">
+       Bestehende Einträge überschreiben
+     </label>`
+  );
+  if(!ok) return;
+
+  const selMonth=parseInt(document.getElementById('_tmpl-month')?.value||curMonth);
+  const selYear =parseInt(document.getElementById('_tmpl-year')?.value||curYear);
+  const overwrite=document.getElementById(overwriteId)?.checked||false;
+
+  pushUndo();
+  const d=await api('/api/autoplan',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({year:selYear,month:selMonth,template:tname,overwrite})});
+  if(d.error) toast('Fehler: '+d.error);
+  else{
+    const data=await api('/api/data'); schichten=data.schichten||{};
+    // Navigate to the applied month
+    curYear=selYear; curMonth=selMonth;
+    updateLabel(); renderCalendar();
+    document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
+    document.querySelector('[data-view="cal"]').classList.add('active');
+    document.querySelector('[data-panel="cal"]').classList.add('active');
+    activeView='cal';
+    toast(`Template "${tname}" auf ${MONTHS[selMonth-1]} ${selYear} angewendet (${d.planned} Einträge)`);
+  }
+}
+
+
+
+// ══════════════════════════════════════════════════════════════
+// TEMPLATE EDITOR
+// ══════════════════════════════════════════════════════════════
+const TMPL_CYCLE=['','frueh','spaet','rufbereitschaft','frei'];
+const TMPL_CYCLE_WE=['','rufbereitschaft','frei'];
+
+function fillTemplateFromPrefs(){
+  // Populate tmplData from each mitarbeiter's prefs
+  let filled=0;
+  mitarbeiter.forEach(m=>{
+    const prefs=m.prefs||{};
+    if(!Object.keys(prefs).length) return;
+    if(!tmplData[m.name]) tmplData[m.name]={};
+    Object.entries(prefs).forEach(([dow,val])=>{
+      const d=parseInt(dow);
+      if(val&&val!=='frei') tmplData[m.name][d]=val;
+      else if(val==='frei') tmplData[m.name][d]='frei';
+    });
+    filled++;
+  });
+  if(filled===0){
+    toast('Keine Präferenzen in Profilen gefunden – bitte in ✎ Profil bearbeiten eintragen');
+  } else {
+    renderTemplateTable();
+    toast(filled+' Mitarbeiter aus Profil-Präferenzen eingetragen – bitte mit 💾 Speichern sichern');
+  }
+}
+
+function renderTemplateTable(){
+  const tbl=document.getElementById('tmpl-table');
+  tbl.innerHTML='';
+  // Header
+  const hdrs=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const hdrRow=document.createElement('tr');
+  const thP=document.createElement('th');thP.className='person-col';thP.textContent='Mitarbeiter';hdrRow.appendChild(thP);
+  hdrs.forEach((h,i)=>{const th=document.createElement('th');th.textContent=h;if(i>=5)th.style.opacity='.6';hdrRow.appendChild(th);});
+  tbl.appendChild(hdrRow);
+
+  if(!mitarbeiter.length){
+    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=8;td.style.cssText='text-align:center;padding:20px;color:var(--text3);font-size:13px';td.textContent='Keine Mitarbeiter vorhanden';tr.appendChild(td);tbl.appendChild(tr);return;
+  }
+
+  mitarbeiter.forEach(m=>{
+    const tr=document.createElement('tr');
+    const tdP=document.createElement('td');tdP.className='person-cell';
+    tdP.innerHTML=`<div class="tmpl-person-chip"><div class="avatar" style="background:${m.color};width:26px;height:26px;font-size:${m.icon?'14px':'10px'}">${m.icon||initials(m.name)}</div><span style="font-size:13px;font-weight:600">${esc(m.name)}</span></div>`;
+    tr.appendChild(tdP);
+
+    for(let dow=0;dow<7;dow++){
+      const td=document.createElement('td');
+      const isWE=dow>=5;
+      const cycle=isWE?TMPL_CYCLE_WE:TMPL_CYCLE;
+      const cur=(tmplData[m.name]||{})[dow]||'';
+      const btn=document.createElement('div');btn.className='tmpl-cell-btn';
+      btn.textContent=cellLabel(cur);btn.className='tmpl-cell-btn '+cellClass(cur);
+      if(isWE)btn.style.opacity='.75';
+      btn.addEventListener('click',()=>{
+        if(!tmplData[m.name])tmplData[m.name]={};
+        const curr=(tmplData[m.name])[dow]||'';
+        const idx=cycle.indexOf(curr);const next=cycle[(idx+1)%cycle.length];
+        if(next==='')delete tmplData[m.name][dow];else tmplData[m.name][dow]=next;
+        btn.textContent=cellLabel(next);btn.className='tmpl-cell-btn '+cellClass(next);
+        if(isWE)btn.style.opacity='.75';
+      });
+      td.appendChild(btn);tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  });
+
+  // Load saved templates list
+  loadTemplates();
+}
+
+function cellLabel(val){
+  if(!val||val==='')return '–';
+  if(val==='frueh')return 'Früh';if(val==='spaet')return 'Spät';
+  if(val==='rufbereitschaft')return 'Ruf';if(val==='frei')return 'Frei';return val;
+}
+function cellClass(val){
+  if(!val||val==='')return '';if(val==='frueh')return 't-f';if(val==='spaet')return 't-s';
+  if(val==='rufbereitschaft')return 't-r';if(val==='frei')return 't-frei';return '';
+}
+
+async function loadTemplates(){
+  const d=await api('/api/templates');templates=d||{};
+  const wrap=document.getElementById('tmpl-saved');
+  const current=document.getElementById('tmpl-name-input').value.trim();
+  wrap.innerHTML=Object.keys(templates).map(n=>`<div style="display:flex;gap:3px;align-items:center">
+    <div class="tmpl-saved-btn${n===current?' active':''}" data-tmpl="${n}">${esc(n)}</div>
+    <button onclick="deleteTemplate('${n.replace(/'/g,"\\'")}') " style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:#f87171;cursor:pointer;font-size:10px;padding:2px 5px;border-radius:4px;font-weight:600">✕</button>
+  </div>`).join('')||'<div style="font-size:11px;color:var(--text3)">Noch keine Templates gespeichert</div>';
+  wrap.querySelectorAll('[data-tmpl]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const name=btn.dataset.tmpl;
+      document.getElementById('tmpl-name-input').value=name;
+      // Load template data into editor
+      const tmpl=templates[name]||{};
+      tmplData={};
+      Object.entries(tmpl).forEach(([person,days])=>{
+        tmplData[person]={};Object.entries(days).forEach(([d,s])=>{tmplData[person][parseInt(d)]=s;});
+      });
+      renderTemplateTable();toast('Template "'+name+'" geladen');
+    });
+  });
+}
+
+async function saveTemplate(){
+  const name=document.getElementById('tmpl-name-input').value.trim();
+  if(!name){toast('Template-Name eingeben');return;}
+  // Convert tmplData to string-keyed for JSON
+  const payload={};
+  Object.entries(tmplData).forEach(([person,days])=>{payload[person]={};Object.entries(days).forEach(([d,s])=>{payload[person][String(d)]=s;});});
+  await api('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,template:payload})});
+  templates[name]=payload;await loadTemplates();toast('Template "'+name+'" gespeichert');
+}
+
+async function deleteTemplate(name){
+  await api('/api/templates/'+encodeURIComponent(name),{method:'DELETE'});
+  delete templates[name];await loadTemplates();toast('Template gelöscht');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RUFBEREITSCHAFT OVERVIEW
+// ══════════════════════════════════════════════════════════════
+function initRufSelects(){
+  const years=new Set(Object.keys(schichten).map(k=>k.slice(0,4)));years.add(String(curYear));
+  const ySel=document.getElementById('ruf-year');
+  ySel.innerHTML=[...years].sort().reverse().map(y=>`<option value="${y}"${y==curYear?' selected':''}>${y}</option>`).join('');
+  const mSel=document.getElementById('ruf-month');
+  mSel.innerHTML='<option value="">Alle Monate</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
+}
+
+function renderRufView(){
+  const year=parseInt(document.getElementById('ruf-year').value);
+  const month=document.getElementById('ruf-month').value;
+  const pre=month?year+'-'+String(month).padStart(2,'0'):String(year);
+
+  // Collect ruf entries
+  const entries=[];
+  Object.entries(schichten).forEach(([key,slot])=>{
+    if(!key.startsWith(pre))return;
+    (slot.rufbereitschaft||[]).forEach(name=>entries.push({key,name}));
+  });
+  entries.sort((a,b)=>a.key.localeCompare(b.key));
+
+  // Summary per person
+  const perPerson={};
+  mitarbeiter.forEach(m=>{perPerson[m.name]=0;});
+  entries.forEach(e=>{if(perPerson[e.name]!==undefined)perPerson[e.name]++;else perPerson[e.name]=1;});
+
+  // Summary cards
+  const sumWrap=document.getElementById('ruf-summary');
+  const sorted=Object.entries(perPerson).filter(([,c])=>c>0).sort((a,b)=>b[1]-a[1]);
+  sumWrap.innerHTML=sorted.map(([name,count])=>{
+    const m=mitarbeiter.find(x=>x.name===name);const color=m?m.color:'#64748b';
+    return `<div class="ruf-sum-card">
+      <div class="ruf-sum-av" style="background:${color}">${m?.icon||initials(name)}</div>
+      <div><div class="ruf-sum-name">${esc(name)}</div><div class="ruf-sum-label">Rufbereitschaften</div></div>
+      <div class="ruf-sum-count">${count}</div>
+    </div>`;
+  }).join('')||'<div style="color:var(--text3);font-size:13px">Keine Einträge</div>';
+
+  // Table
+  const twrap=document.getElementById('ruf-table-wrap');
+  if(!entries.length){twrap.innerHTML='<div class="ruf-empty">Keine Rufbereitschaftseinträge für diesen Zeitraum</div>';return;}
+
+  const dayNames=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  // Group by date
+  const byDate={};
+  entries.forEach(e=>{if(!byDate[e.key])byDate[e.key]=[];byDate[e.key].push(e.name);});
+
+  twrap.innerHTML=`<table class="ruf-table">
+    <thead><tr>
+      <th>KW</th><th>Datum</th><th>Tag</th><th>Rufbereitschaft</th>
+    </tr></thead>
+    <tbody>${Object.entries(byDate).map(([key,names])=>{
+      const d=new Date(key+'T00:00:00');
+      const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+      const dayName=dayNames[d.getDay()];
+      const isWE=d.getDay()===0||d.getDay()===6;
+      const chips=names.map(name=>{const m=mitarbeiter.find(x=>x.name===name);const color=m?m.color:'#64748b';
+        return `<span class="ruf-person-chip"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${color};font-size:${m?.icon?'11px':'8px'};color:#fff;font-weight:700;flex-shrink:0">${m?.icon||initials(name)}</span>${esc(name)}</span>`;
+      }).join('');
+      const kwNum=getISOWeek(d);
+      return `<tr><td class="ruf-date-col" style="color:var(--ruf);font-size:10px">KW ${kwNum}</td><td class="ruf-date-col">${dateStr}</td><td class="ruf-day-col" style="${isWE?'color:var(--text3)':''}">${dayName}</td><td>${chips}</td></tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function exportRufCSV(){
+  const year=parseInt(document.getElementById('ruf-year').value);
+  const month=document.getElementById('ruf-month').value;
+  const pre=month?year+'-'+String(month).padStart(2,'0'):String(year);
+  const entries=[];
+  Object.entries(schichten).forEach(([key,slot])=>{
+    if(!key.startsWith(pre))return;
+    (slot.rufbereitschaft||[]).forEach(name=>{
+      const d=new Date(key+'T00:00:00');
+      const dayNames=['So','Mo','Di','Mi','Do','Fr','Sa'];
+      entries.push([key,dayNames[d.getDay()],name]);
+    });
+  });
+  entries.sort((a,b)=>a[0].localeCompare(b[0]));
+  let csv='Datum,Wochentag,Mitarbeiter\n'+entries.map(r=>r.map(v=>'"'+v+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='rufbereitschaft_'+pre+'.csv';a.click();URL.revokeObjectURL(url);
+  toast('CSV exportiert');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CUSTOM HOLIDAYS
+// ══════════════════════════════════════════════════════════════
+function renderCustomHolidays(){
+  const list=document.getElementById('hol-list');
+  if(!customHolidays.length){list.innerHTML='<div class="hol-empty">Noch keine eigenen Feiertage</div>';return;}
+  const countryBadge={DE:'<span class="hol-item-country hol-de-badge">🇩🇪 DE</span>',IN:'<span class="hol-item-country hol-in-badge">🇮🇳 IN</span>','DE+IN':'<span class="hol-item-country hol-both-badge">🌍 Beide</span>'};
+  list.innerHTML=customHolidays.map(h=>{
+    const d=new Date(h.date+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    return `<div class="hol-item">
+      <span class="hol-item-date" onclick="jumpToDate('${h.date}')" style="cursor:pointer;color:var(--blue);text-decoration:underline dotted" title="Im Kalender anzeigen">${d}</span>
+      <span class="hol-item-name">★ ${esc(h.name)}</span>
+      ${countryBadge[h.country]||countryBadge['DE']}
+      <button class="hol-del-btn" onclick="deleteCustomHoliday('${h.date}','${h.name.replace(/'/g,"\\'")}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function addCustomHoliday(){
+  const date=document.getElementById('hol-date').value;
+  const name=document.getElementById('hol-name').value.trim();
+  const country=document.getElementById('hol-country').value;
+  if(!date||!name){toast('Datum und Name ausfüllen');return;}
+  await api('/api/custom_holidays',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date,name,country})});
+  customHolidays=customHolidays.filter(h=>!(h.date===date&&h.name===name));
+  customHolidays.push({date,name,country});
+  customHolidays.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('hol-name').value='';document.getElementById('hol-date').value='';
+  // Reload holidays to include new custom one
+  const yr=parseInt(date.slice(0,4));if(!holidays[date])await loadHolidays(yr);else{const h=await api('/api/holidays/'+yr);Object.assign(holidays,h);}
+  renderCustomHolidays();renderCalendar();toast('Feiertag hinzugefügt');
+}
+
+async function deleteCustomHoliday(date,name){
+  await api('/api/custom_holidays/'+encodeURIComponent(date+'|'+name),{method:'DELETE'});
+  customHolidays=customHolidays.filter(h=>!(h.date===date&&h.name===name));
+  delete holidays[date];const yr=parseInt(date.slice(0,4));const h=await api('/api/holidays/'+yr);Object.assign(holidays,h);
+  renderCustomHolidays();renderCalendar();toast('Feiertag entfernt');
+}
+
+// ══════════════════════════════════════════════════════════════
+// ICS
+// ══════════════════════════════════════════════════════════════
+function openIcsModal(){
+  document.getElementById('exp-person').innerHTML='<option value="">Alle</option>'+mitarbeiter.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
+  const years=new Set(Object.keys(schichten).map(k=>k.slice(0,4)));years.add(String(curYear));
+  document.getElementById('exp-year').innerHTML='<option value="">Alle Jahre</option>'+[...years].sort().map(y=>`<option value="${y}"${y==curYear?' selected':''}>${y}</option>`).join('');
+  document.getElementById('exp-month').innerHTML='<option value="">Alle Monate</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
+  document.getElementById('imp-result').className='imp-result';
+  openModal('ics-modal');
+}
+function doExport(){const p=document.getElementById('exp-person').value,y=document.getElementById('exp-year').value,m=document.getElementById('exp-month').value;let url='/api/export_ics?x=1';if(p)url+='&person='+encodeURIComponent(p);if(y)url+='&year='+y;if(m)url+='&month='+m;window.location=url;}
+async function doImport(){
+  const input=document.getElementById('ics-file'),resEl=document.getElementById('imp-result');
+  if(!input.files.length){resEl.textContent='Datei auswählen.';resEl.className='imp-result err';return;}
+  const fd=new FormData();fd.append('file',input.files[0]);
+  const d=await fetch('/api/import_ics',{method:'POST',body:fd}).then(r=>r.json());
+  if(d.error){resEl.textContent='Fehler: '+d.error;resEl.className='imp-result err';}
+  else{resEl.textContent=d.imported+' importiert'+(d.skipped?', '+d.skipped+' übersprungen':'');resEl.className='imp-result ok';const data=await api('/api/data');schichten=data.schichten||{};notizen=data.notizen||{};renderCalendar();if(d.imported>0)toast(d.imported+' Einträge importiert');}
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOOLTIP
+// ══════════════════════════════════════════════════════════════
+function showTooltip(cellEl,key){
+  const slot=getSlot(key),hol=holidays[key],note=notizen[key],d=new Date(key+'T00:00:00'),tt=document.getElementById('tooltip');
+  const{schichtC,holC}=getConflicts(slot,key);
+  const row=(lbl,ppl,clr)=>ppl?.length?`<div class="tt-row"><span class="tt-lbl" style="color:${clr}">${lbl}</span><span class="tt-names">${ppl.map(esc).join(', ')}</span></div>`:'';
+  const siRows=['frueh','spaet','rufbereitschaft'].map(s=>{const ist=(slot[s]||[]).length,tgt=soll[s]||1;const cls=ist===0?'tt-si-low':ist<tgt?'tt-si-low':ist===tgt?'tt-si-ok':'tt-si-over';return `<span class="${cls}">${SHIFT_SHORT[s][0]}: ${ist}/${tgt}</span>`;}).join(' · ');
+  tt.innerHTML=`<div class="tt-date">${d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${hol?'<br>'+(hol.bridge?'🌉 Brückentag':hol.custom?'★ '+hol.name:'🎉 '+hol.name):''}</div>`+row('Früh',slot.frueh,'var(--frueh)')+row('Spät',slot.spaet,'var(--spaet)')+row('Ruf',slot.rufbereitschaft,'var(--ruf)')+row('Urlaub',slot.urlaub,'var(--urlaub)')+row('Krank',slot.krank,'var(--krank)')+row('Elternz.',slot.elternzeit,'var(--eltern)')+row('Sonder.',slot.sonderurlaub,'var(--sonder)')+(schichtC.length?`<div class="tt-warn">⚠ ${schichtC.map(esc).join(', ')}</div>`:''  )+(holC.length?`<div class="tt-hol-warn">${holidays[key]?.country==='DE'?'🇩🇪':'🇮🇳'} Feiertag, eingeteilt: ${holC.map(esc).join(', ')}</div>`:'')+(isUnderstaffed(slot,key)?'<div class="tt-under">⚠ Unterbesetzt</div>':'')+(note?`<div class="tt-note">📝 ${esc(note)}</div>`:'')+`<div class="tt-soll">${siRows}</div>`;
+  const r=cellEl.getBoundingClientRect();let left=r.right+8,top=r.top;
+  if(left+255>window.innerWidth)left=r.left-263;if(top+300>window.innerHeight)top=window.innerHeight-308;
+  tt.style.left=left+'px';tt.style.top=top+'px';tt.classList.add('show');
+}
+function hideTooltip(){document.getElementById('tooltip').classList.remove('show');}
+
+// ══════════════════════════════════════════════════════════════
+// HOLIDAY WARNINGS
+// ══════════════════════════════════════════════════════════════
+function showHolWarnings(warnings){
+  if(!warnings?.length)return;
+  const byDate={};warnings.forEach(w=>{if(!byDate[w.date])byDate[w.date]=[];byDate[w.date].push(w);});
+  Object.entries(byDate).slice(0,3).forEach(([dt,ws])=>{const d=new Date(dt+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});const flag=ws[0].country==='DE'?'🇩🇪':'🇮🇳';toast(`${flag} ${ws.map(w=>w.name).join(', ')} arbeitet an Feiertag „${ws[0].holiday}" (${d})`);});
+}
+
+// ══════════════════════════════════════════════════════════════
+// CONFIRM DIALOG
+// ══════════════════════════════════════════════════════════════
+function confirmDialog(title,html){
+  return new Promise(resolve=>{
+    const ex=document.getElementById('_cdlg');if(ex)ex.remove();
+    const dlg=document.createElement('div');dlg.id='_cdlg';
+    dlg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)';
+    dlg.innerHTML=`<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:22px;max-width:360px;width:92vw;box-shadow:0 20px 60px var(--shadow)"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;margin-bottom:11px">${title}</div><p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">${html}</p><div style="display:flex;gap:8px"><button id="_cdlg-yes" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:700;cursor:pointer">Ja, ersetzen</button><button id="_cdlg-no" style="flex:1;padding:9px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:600;cursor:pointer">Abbrechen</button></div></div>`;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#_cdlg-yes').onclick=()=>{dlg.remove();resolve(true);};
+    dlg.querySelector('#_cdlg-no').onclick=()=>{dlg.remove();resolve(false);};
+    dlg.addEventListener('click',e=>{if(e.target===dlg){dlg.remove();resolve(false);}});
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════
+function doExportData(){
+  // Direct download of the full JSON backup
+  window.location = '/api/export_data';
+  toast('Backup wird heruntergeladen…');
+}
+
+
+
+function getSlot(key){const s=schichten[key]||{};return ALL_SHIFTS.reduce((o,k)=>{o[k]=s[k]||[];return o;},{});}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
+function exportAllData(){
+  window.location = '/api/export_data';
+  toast('Export wird heruntergeladen…');
+}
+
+async function handleBackupImport(input){
+  if(!input.files.length) return;
+  const file=input.files[0]; input.value='';
+  const ok=await confirmDialog('⚠ Backup importieren?',
+    `Datei: <strong>${esc(file.name)}</strong><br><br>Alle aktuellen Daten werden <strong>vollständig ersetzt</strong>.<br><small style="color:var(--text3)">Tipp: Vorher exportieren um aktuelle Daten zu sichern.</small>`);
+  if(!ok) return;
+  const fd=new FormData(); fd.append('file',file);
+  try{
+    const d=await fetch('/api/import_data',{method:'POST',body:fd}).then(r=>r.json());
+    if(d.error) toast('✗ Import fehlgeschlagen: '+d.error);
+    else{ toast(`✓ ${d.mitarbeiter} Mitarbeiter, ${d.tage||0} Tage importiert`); await refreshData(); await loadHolidays(curYear); }
+  }catch(e){ toast('✗ Fehler: '+e.message); }
+}
+
+function openImportModal(){
+  document.getElementById('import-result').style.display='none';
+  document.getElementById('import-drop-label').textContent='📄 .json Datei hier ablegen oder klicken';
+  document.getElementById('import-file').value='';
+  openModal('data-import-modal');
+}
+
+async function doImportData(){
+  const input=document.getElementById('import-file');
+  const resEl=document.getElementById('import-result');
+  if(!input.files.length){
+    resEl.style.cssText='display:block;background:rgba(248,113,113,.1);color:#f87171';
+    resEl.textContent='Bitte eine .json Datei auswählen.'; return;
+  }
+  const ok=await confirmDialog('Wirklich importieren?',
+    'Alle aktuellen Daten werden durch den Import <strong>vollständig ersetzt</strong>.<br>Diese Aktion kann nicht rückgängig gemacht werden.<br><br>Fortfahren?');
+  if(!ok) return;
+  const fd=new FormData(); fd.append('file',input.files[0]);
+  const d=await fetch('/api/import_data',{method:'POST',body:fd}).then(r=>r.json());
+  if(d.error){
+    resEl.style.cssText='display:block;background:rgba(248,113,113,.1);color:#f87171';
+    resEl.textContent='Fehler: '+d.error;
+  } else {
+    resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';
+    resEl.textContent=`✓ Import erfolgreich: ${d.mitarbeiter} Mitarbeiter, ${d.schichten} Tage, ${d.templates} Templates`;
+    // Reload all data
+    const data=await api('/api/data');
+    mitarbeiter=data.mitarbeiter||[]; schichten=data.schichten||{};
+    notizen=data.notizen||{}; soll=data.soll||{frueh:1,spaet:1,rufbereitschaft:1};
+    customHolidays=data.custom_holidays||[]; templates=data.templates||{}; rufKW=data.ruf_kw||{};
+    mitarbeiter.forEach(m=>{if(!m.color)m.color=AVATAR_COLORS[0];if(!m.icon)m.icon='';if(!m.prefs)m.prefs={};});
+    document.getElementById('soll-f').value=soll.frueh??1;
+    document.getElementById('soll-s').value=soll.spaet??1;
+    document.getElementById('soll-r').value=soll.rufbereitschaft??1;
+    await loadHolidays(curYear);
+    renderMembers(); renderCalendar(); renderStats();
+    setTimeout(()=>closeModal('data-import-modal'),1800);
+    toast('Daten erfolgreich importiert!');
+  }
+}
+
+function closeModal(id){
+  const el=document.getElementById(id);
+  const box=el?.querySelector('.modal-box');
+  if(box){box.style.animation='scaleIn .18s ease reverse';
+    setTimeout(()=>{el.classList.add('hidden');box.style.animation='';},160);}
+  else el?.classList.add('hidden');
+}
+function closeAllModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.add('hidden'));}
+function openModal(id){
+  const el=document.getElementById(id);
+  el.classList.remove('hidden');
+  const box=el?.querySelector('.modal-box');
+  if(box){box.style.animation='none';void box.offsetWidth;box.style.animation='scaleIn .18s cubic-bezier(.34,1.2,.64,1)';}
+}
+
+init();
+</script>
+</body>
+</html>
