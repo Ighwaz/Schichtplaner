@@ -22,12 +22,14 @@ type Employee struct {
 // aber nirgends mehr gelesen oder geschrieben.
 type DaySlot struct {
 	Frueh           []string `json:"frueh"`
+	Normal          []string `json:"normal"`
 	Spaet           []string `json:"spaet"`
 	Rufbereitschaft []string `json:"rufbereitschaft"`
 }
 
 type SollBesetzung struct {
 	Frueh           int `json:"frueh"`
+	Normal          int `json:"normal"`
 	Spaet           int `json:"spaet"`
 	Rufbereitschaft int `json:"rufbereitschaft"`
 }
@@ -88,7 +90,7 @@ func defaultData() AppData {
 		Mitarbeiter:    []Employee{},
 		Schichten:      map[string]DaySlot{},
 		Notizen:        map[string]string{},
-		Soll:           SollBesetzung{Frueh: 1, Spaet: 1, Rufbereitschaft: 1},
+		Soll:           SollBesetzung{Frueh: 1, Normal: 0, Spaet: 1, Rufbereitschaft: 1},
 		CustomHolidays: []CustomHoliday{},
 		Templates:      map[string]Template{},
 		RufKW:          map[string]interface{}{},
@@ -98,6 +100,7 @@ func defaultData() AppData {
 func emptySlot() DaySlot {
 	return DaySlot{
 		Frueh:           []string{},
+		Normal:          []string{},
 		Spaet:           []string{},
 		Rufbereitschaft: []string{},
 	}
@@ -122,7 +125,7 @@ func normalizeData(d *AppData) {
 		d.Mitarbeiter = []Employee{}
 	}
 	if d.Soll == (SollBesetzung{}) {
-		d.Soll = SollBesetzung{Frueh: 1, Spaet: 1, Rufbereitschaft: 1}
+		d.Soll = SollBesetzung{Frueh: 1, Normal: 0, Spaet: 1, Rufbereitschaft: 1}
 	}
 	d.RufKW = unwrapRufKW(d.RufKW)
 	for i := range d.Mitarbeiter {
@@ -157,6 +160,8 @@ func slotField(s *DaySlot, shift string) *[]string {
 	switch shift {
 	case "frueh":
 		return &s.Frueh
+	case "normal":
+		return &s.Normal
 	case "spaet":
 		return &s.Spaet
 	case "rufbereitschaft":
@@ -206,7 +211,9 @@ func removeFromSlot(slot *DaySlot, shift, name string) bool {
 // blockingShifts lists the work shifts name already holds that day and that
 // cannot be combined with shift. Rufbereitschaft runs alongside everything.
 func blockingShifts(slot *DaySlot, shift, name string) []string {
-	if !workShifts[shift] {
+	// Rufbereitschaft laeuft neben jeder Arbeitsschicht her und wird deshalb
+	// weder blockiert noch blockiert sie selbst.
+	if !workShifts[shift] || shift == "rufbereitschaft" {
 		return nil
 	}
 	var blocking []string
@@ -241,10 +248,12 @@ func remove(arr []string, s string) []string {
 }
 
 // workShifts sind die Schichten, die miteinander kollidieren koennen.
+// "normal" ist der Tagdienst mit Gleitzeit - er liegt zwischen Frueh und
+// Spaet und schliesst beide aus.
 var workShifts = map[string]bool{
-	"frueh": true, "spaet": true, "rufbereitschaft": true,
+	"frueh": true, "normal": true, "spaet": true, "rufbereitschaft": true,
 }
 
 var allShifts = []string{
-	"frueh", "spaet", "rufbereitschaft",
+	"frueh", "normal", "spaet", "rufbereitschaft",
 }

@@ -651,3 +651,68 @@ func TestBulkRejectsEmptyInput(t *testing.T) {
 		}
 	}
 }
+
+// ── Normaldienst ──────────────────────────────────────────────────────────────
+
+func TestNormaldienstIsAWorkShift(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Clara", "DE")
+	addShift(t, a, "2026-04-02", "normal", "Clara")
+
+	if got := entered(t, a, "2026-04-02", "normal"); len(got) != 1 {
+		t.Fatalf("Normaldienst not stored: %#v", got)
+	}
+	// Normal excludes Früh and Spät on the same day, Rufbereitschaft does not.
+	res := call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-04-02"],"schicht":"frueh","name":"Clara","action":"add"}`)
+	blocking := result(t, res, "2026-04-02")["blocking"].([]interface{})
+	if len(blocking) != 1 || blocking[0] != "normal" {
+		t.Fatalf("Normaldienst should block Frühschicht: %#v", blocking)
+	}
+	call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["2026-04-02"],"schicht":"rufbereitschaft","name":"Clara","action":"add"}`)
+	if got := entered(t, a, "2026-04-02", "rufbereitschaft"); len(got) != 1 {
+		t.Fatalf("Rufbereitschaft must run alongside Normaldienst: %#v", got)
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/api/export_ics?year=2026", nil)
+	w := httptest.NewRecorder()
+	a.ServeHTTP(w, r)
+	if !strings.Contains(w.Body.String(), "SUMMARY:Clara – Normaldienst") {
+		t.Errorf("Normaldienst missing from ICS export")
+	}
+}
+
+func TestAutoplanWithNormaldienst(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Clara", "DE")
+	call(t, a, http.MethodPost, "/api/templates",
+		`{"name":"Tag","template":{"Clara":{"0":"normal","2":"normal"}}}`)
+
+	res := call(t, a, http.MethodPost, "/api/autoplan", `{"year":2026,"month":6,"template":"Tag"}`)
+	// Juni 2026: 5 Montage, 4 Mittwoche - keiner davon ein Feiertag in BW.
+	if res["planned"].(float64) != 9 {
+		t.Fatalf("expected 9 planned days, got %v", res["planned"])
+	}
+	if got := entered(t, a, "2026-06-01", "normal"); len(got) != 1 {
+		t.Fatalf("Monday not planned: %#v", got)
+	}
+}
+
+func TestRufbereitschaftNeverNeedsConfirmation(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
+	// Rufbereitschaft läuft neben jeder Arbeitsschicht her - egal welcher.
+	for _, shift := range []string{"frueh", "normal", "spaet"} {
+		date := "2026-07-0" + string(rune('1'+len(shift)%3))
+		addShift(t, a, date, shift, "Anna")
+		res := call(t, a, http.MethodPost, "/api/schicht",
+			`{"dates":["`+date+`"],"schicht":"rufbereitschaft","name":"Anna","action":"add"}`)
+		if got := result(t, res, date)["error"]; got != nil {
+			t.Errorf("Rufbereitschaft neben %s sollte ohne Rückfrage gehen, kam: %v", shift, got)
+		}
+		if got := entered(t, a, date, "rufbereitschaft"); len(got) != 1 {
+			t.Errorf("Rufbereitschaft neben %s nicht eingetragen: %#v", shift, got)
+		}
+	}
+}
