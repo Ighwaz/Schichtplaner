@@ -23,8 +23,9 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   Früh und Spät desselben Tages steht, wird im Kalender und in der
   Monatsübersicht markiert
 - **Templates** pro Wochentag und Person, per Autoplan auf einen Monat anwendbar
-- **Rufbereitschaft** in einer Ansicht: links der Wochenplan je KW, rechts die
-  daraus entstandenen Tage
+- **Rufbereitschaft** in einer Tabelle: je Kalenderwoche der geplante Name und
+  daneben, wer tatsächlich im Kalender steht. Noch nicht übertragene Wochen und
+  Abweichungen sind markiert und lassen sich einzeln herausfiltern
 - **Massenanlage** für Mitarbeiter und eigene Feiertage: Liste einfügen
   (auch aus Excel), Vorschau prüfen, anlegen
 - **Wochenenden** brauchen nur Rufbereitschaft – Früh und Spät werden dort
