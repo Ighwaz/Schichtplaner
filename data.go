@@ -16,14 +16,14 @@ type Employee struct {
 	Prefs map[string]string `json:"prefs"`
 }
 
+// DaySlot holds the entries of one day. Diese Fassung plant nur Schichten:
+// Abwesenheiten (Urlaub, Krank, Elternzeit, Sonderurlaub) kommen nicht mehr
+// vor. Vorhandene Zeilen dieser Art bleiben in der Datenbank liegen, werden
+// aber nirgends mehr gelesen oder geschrieben.
 type DaySlot struct {
 	Frueh           []string `json:"frueh"`
 	Spaet           []string `json:"spaet"`
 	Rufbereitschaft []string `json:"rufbereitschaft"`
-	Urlaub          []string `json:"urlaub"`
-	Krank           []string `json:"krank"`
-	Elternzeit      []string `json:"elternzeit"`
-	Sonderurlaub    []string `json:"sonderurlaub"`
 }
 
 type SollBesetzung struct {
@@ -100,10 +100,6 @@ func emptySlot() DaySlot {
 		Frueh:           []string{},
 		Spaet:           []string{},
 		Rufbereitschaft: []string{},
-		Urlaub:          []string{},
-		Krank:           []string{},
-		Elternzeit:      []string{},
-		Sonderurlaub:    []string{},
 	}
 }
 
@@ -165,14 +161,6 @@ func slotField(s *DaySlot, shift string) *[]string {
 		return &s.Spaet
 	case "rufbereitschaft":
 		return &s.Rufbereitschaft
-	case "urlaub":
-		return &s.Urlaub
-	case "krank":
-		return &s.Krank
-	case "elternzeit":
-		return &s.Elternzeit
-	case "sonderurlaub":
-		return &s.Sonderurlaub
 	}
 	return nil
 }
@@ -252,11 +240,11 @@ func remove(arr []string, s string) []string {
 	return out
 }
 
-// workShifts are shifts that conflict with absences
+// workShifts sind die Schichten, die miteinander kollidieren koennen.
 var workShifts = map[string]bool{
 	"frueh": true, "spaet": true, "rufbereitschaft": true,
 }
 
 var allShifts = []string{
-	"frueh", "spaet", "rufbereitschaft", "urlaub", "krank", "elternzeit", "sonderurlaub",
+	"frueh", "spaet", "rufbereitschaft",
 }

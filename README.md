@@ -1,22 +1,37 @@
 # Schichtplaner DE/IN
 
+> **Branch `schlank`.** Diese Fassung plant nur Schichten: Früh, Spät und
+> Rufbereitschaft. Urlaub, Krank, Elternzeit und Sonderurlaub gibt es nicht
+> mehr. Vorhandene Einträge dieser Art bleiben unangetastet in der Datenbank
+> liegen – ein Wechsel zurück auf `main` bringt sie zurück.
+
 Desktop-Schichtplanung für ein Team, das über Deutschland (Baden-Württemberg)
 und Indien verteilt arbeitet. Go + [Wails v2](https://wails.io) mit einer
 Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 
 ## Funktionen
 
-- **Kalender** mit Früh-, Spät- und Rufbereitschaftsschichten sowie Urlaub,
-  Krank, Elternzeit und Sonderurlaub
+- **Kalender**: jeder Tag zeigt immer alle drei Schichten in derselben
+  Reihenfolge, mit Besetzung als `1/1` je Zeile – rot, sobald das Soll fehlt
+- **Monatsübersicht**: eine Zeile je Person, eine Spalte je Tag. Zeigt Lücken,
+  Häufungen und Doppelbelegungen auf einen Blick; Klick auf eine Zelle trägt
+  die gewählte Schicht ein
 - **Feiertage** DE (BW) und IN inkl. Brückentagen und eigenen Feiertagen.
   Ein Eintrag am Feiertag des eigenen Teams wird abgefragt, nicht verhindert
-- **Konfliktprüfung**: wer schon in einer anderen Arbeitsschicht steht, wird
-  nur nach Rückfrage umgetragen – Rufbereitschaft bleibt dabei erhalten
+- **Konfliktprüfung**: wer schon in einer anderen Schicht steht, wird nur nach
+  Rückfrage umgetragen – Rufbereitschaft bleibt dabei erhalten. Wer trotzdem in
+  Früh und Spät desselben Tages steht, wird im Kalender und in der
+  Monatsübersicht markiert
 - **Templates** pro Wochentag und Person, per Autoplan auf einen Monat anwendbar
-- **Rufbereitschaft nach KW** – Wochenplan, der auf einen Monat oder ein ganzes
-  Jahr übertragen werden kann
+- **Rufbereitschaft** in einer Ansicht: links der Wochenplan je KW, rechts die
+  daraus entstandenen Tage
 - **Massenanlage** für Mitarbeiter und eigene Feiertage: Liste einfügen
   (auch aus Excel), Vorschau prüfen, anlegen
+- **Wochenenden** brauchen nur Rufbereitschaft – Früh und Spät werden dort
+  nicht als fehlend angemahnt
+- **Zwei Leisten statt drei**: oben Ansichten und Werkzeuge, darunter eine
+  Leiste, die sich nach der offenen Ansicht richtet – Monatsnavigation und
+  Schichtauswahl erscheinen dort, wo sie gebraucht werden
 - **Druckansicht** im Querformat: nur die offene Ansicht, mit Kopfzeile,
   Legende und ausgeschriebenen Notizen – unabhängig vom Theme immer auf Weiß
 - **Import/Export** als ICS (Kalender) und JSON (vollständiges Backup)
@@ -34,7 +49,7 @@ fünf Jahresplänen (13.000 Einträge): kompletter Ladevorgang 14 ms, ein Klick
 | Tabelle | Inhalt |
 |---|---|
 | `employees` | Mitarbeiter mit Team, Farbe, Icon, Wunsch-Schichten |
-| `shifts` | je Zeile ein Eintrag `(Datum, Schicht, Name)` |
+| `shifts` | je Zeile ein Eintrag `(Datum, Schicht, Name)` – nur `frueh`, `spaet`, `rufbereitschaft` werden gelesen |
 | `notes` | Tagesnotizen |
 | `custom_holidays` | eigene Feiertage |
 | `templates` | Wochen-Templates |
