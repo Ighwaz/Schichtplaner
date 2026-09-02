@@ -45,6 +45,8 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 - **Druckansicht** im Querformat: nur die offene Ansicht, mit Kopfzeile,
   Legende und ausgeschriebenen Notizen – unabhängig vom Theme immer auf Weiß
 - **Import/Export** als ICS (Kalender) und JSON (vollständiges Backup)
+- **Anzeigegröße** über A− / A+ in der Kopfzeile (90 % bis 160 %), die
+  Mitarbeiterleiste lässt sich ausklappen – beides wird gemerkt
 - **Datenordner frei wählbar**
 
 ## Datenhaltung

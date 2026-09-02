@@ -147,7 +147,11 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .view-panel.active{display:flex;animation:fadeIn .18s ease}
 
 /* SIDEBAR */
-.sidebar{background:var(--surface);border-right:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;width:274px}
+.sidebar{background:var(--surface);border-right:2px solid var(--border);display:flex;flex-direction:column;
+  overflow:hidden;min-width:0;width:100%}
+/* Die Breite gibt allein die Rasterspalte vor - eine feste Breite am Element
+   wuerde das Einklappen (0px-Spalte) wirkungslos machen. */
+.main.collapsed .sidebar{border-right:none}
 .sb-sec{padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
 .sb-sec h3{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:6px}
 
@@ -589,7 +593,7 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   }
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact;
     box-shadow:none!important;animation:none!important;transition:none!important}
-  html,body{height:auto!important;overflow:visible!important;background:#fff!important;font-size:11px}
+  html,body{height:auto!important;overflow:visible!important;background:#fff!important;font-size:11px;zoom:1!important}
 
   /* Alles, was nur zum Bedienen da ist */
   header,.context-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
@@ -696,6 +700,8 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     <div class="sep"></div>
     <button class="ur-btn" id="btn-undo" disabled title="Rückgängig (Strg+Z)">↩</button>
     <button class="ur-btn" id="btn-redo" disabled title="Wiederholen (Strg+Y)">↪</button>
+    <button class="fbtn ic" id="btn-zoom-out" title="Kleiner darstellen">A−</button>
+    <button class="fbtn ic" id="btn-zoom-in" title="Größer darstellen">A+</button>
     <button class="theme-btn" id="btn-theme" title="Hell/Dunkel">🌙</button>
   </div>
 </header>
@@ -1731,6 +1737,8 @@ async function init(){
 
   // Bind events first so UI is interactive immediately
   bindEvents();
+  ladeZoom();
+  ladeSidebar();
 
   // Load data with retry (handles EXE startup timing)
   let d={};
@@ -1798,6 +1806,8 @@ function bindEvents(){
   document.getElementById('btn-undo').onclick=doUndo;
   document.getElementById('btn-redo').onclick=doRedo;
 
+  document.getElementById('btn-zoom-in').addEventListener('click',()=>setZoom(zoomStufe+1));
+  document.getElementById('btn-zoom-out').addEventListener('click',()=>setZoom(zoomStufe-1));
   document.getElementById('btn-theme').addEventListener('click',()=>{
     const t=document.documentElement.dataset.theme==='dark'?'light':'dark';
     document.documentElement.dataset.theme=t;
@@ -1806,10 +1816,7 @@ function bindEvents(){
   });
 
   document.getElementById('sidebar-toggle').addEventListener('click',()=>{
-    const m=document.getElementById('main'),btn=document.getElementById('sidebar-toggle');
-    const c=m.classList.toggle('collapsed');
-    btn.classList.toggle('closed',c); btn.textContent=c?'▶':'◀';
-    btn.style.left=c?'3px':'273px';
+    setSidebar(!document.getElementById('main').classList.contains('collapsed'));
   });
 
   // View tabs
@@ -1860,9 +1867,8 @@ function switchSubTab(view, subId){
   });
 
   document.getElementById('btn-range').addEventListener('click',()=>{
-    rangeMode=!rangeMode;
-    document.getElementById('btn-range').classList.toggle('on',rangeMode);
-    rangeStart=null;previewEnd=null;  // reset range start on toggle
+    setRangeMode(!rangeMode);
+    if(rangeMode) multiDays.clear();   // sonst waere unklar, was gilt
     renderCalendar();updateSelInfo();
   });
 
@@ -2177,7 +2183,7 @@ function updateSelInfo(){
     const avs=names.map(n=>{const m=mitarbeiter.find(x=>x.name===n);
       return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'13px':'9px'};font-weight:700;color:#fff;margin-right:2px">${m?.icon||initials(n)}</span>`;
     }).join('');
-    const hint=rangeMode?(rangeStart?'2. Tag klicken zum Eintragen':'1. Tag klicken'):multiDays.size>0?multiDays.size+' Tage · Klick = Eintragen':'Tag anklicken = alle eintragen';
+    const hint=rangeMode?(rangeStart?'2. Tag klicken zum Eintragen':'1. Tag klicken'):multiDays.size>0?multiDays.size+' Tage · Klick = Ein-/Austragen':'Tag anklicken = alle eintragen';
     el.innerHTML=`<div style="margin-bottom:3px">${avs}</div><strong>${names.length} Mitarbeiter</strong> · <span style="font-size:11px">${SHIFT_LABEL[selectedShift]}</span><br><span style="font-size:10px;color:var(--text3)">${hint}</span>
     <div style="margin-top:4px"><button onclick="selectedPersons.clear();renderMembers();updateSelInfo();" style="font-size:10px;background:none;border:1px solid var(--border2);color:var(--text3);padding:2px 7px;border-radius:5px;cursor:pointer">✕ Auswahl aufheben</button></div>`;
     return;
@@ -2216,9 +2222,9 @@ function updateSelInfo(){
     el.innerHTML='<div>Kein Mitarbeiter gewählt</div><div style="font-size:11px;color:var(--text3)">← Klicken</div>';return;
   }
   const flag=selectedPerson.team==='DE'?'🇩🇪':'🇮🇳';
-  const hint=multiDays.size>0?multiDays.size+' Tage · Klick = Eintragen'
+  const hint=multiDays.size>0?multiDays.size+' Tage · Klick = Ein-/Austragen'
     :rangeMode?(rangeStart?'2. Tag klicken zum Eintragen':'1. Tag klicken')
-    :'Klick = Eintragen · Strg+Klick = Mehrfach';
+    :'Klick = Ein-/Austragen · Strg+Klick = Mehrfach';
   el.innerHTML=`<strong style="color:${selectedPerson.color}">${esc(selectedPerson.name)}</strong> ${flag}<br><span style="font-size:11px">${SHIFT_LABEL[selectedShift]}</span><br><span style="font-size:10px;color:var(--text3)">${hint}</span>`;
 }
 
@@ -2568,34 +2574,63 @@ async function handleRangeClick(key,names){
   const dates=datesInRange(lo,hi);
   rangeStart=null; previewEnd=null;
   renderCalendar(); updateSelInfo();
-  await applyToDateList(dates,names,'add');
+  await schichtAufTagen(dates,names);
   return true;
 }
 
-async function handleSinglePersonClick(key,ctrl){
-  if(ctrl){if(multiDays.has(key))multiDays.delete(key);else multiDays.add(key);renderCalendar();updateSelInfo();return;}
-  if(multiDays.size>0){await applyToDateList([...multiDays],[selectedPerson.name],'add');multiDays.clear();renderCalendar();updateSelInfo();return;}
-  if(rangeMode){ await handleRangeClick(key,[selectedPerson.name]); return; }
-  pushUndo();
-  const res=await postSchicht([key],'toggle',selectedShift,selectedPerson.name);
-  const r=res?.results?.[key];
-  if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
-    undoStack.pop();updateUndoBtns();
-    const replace=r.error==='needs_confirm';
-    const ok=replace
-      ? await confirmReplaceShift(selectedPerson.name,r.blocking)
-      : await confirmHolidayEntry(selectedPerson.name,[[key,r]]);
-    if(ok){pushUndo();const r2=await postSchicht([key],'add',selectedShift,selectedPerson.name,true,replace);applyResults(r2.results);showHolWarnings(r2.hol_warnings);}
-  } else if(r?.error){undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich');}
-  else{applyResults(res.results);showHolWarnings(res.hol_warnings);}
+// Ein Klick auf einen Tag - fuer eine wie fuer mehrere Personen derselbe
+// Ablauf, damit sich beide Auswahlarten nicht widersprechen.
+async function handleDayClick(key,ctrl,namen){
+  if(!namen.length) return;
+  if(ctrl){
+    // Strg-Auswahl und Zeitraum sind zwei Wege, dieselbe Menge zu waehlen.
+    // Nebeneinander waere unklar, worauf der naechste Klick wirkt - also
+    // beendet eine Strg-Auswahl den Zeitraum-Modus.
+    if(rangeMode) setRangeMode(false);
+    if(multiDays.has(key)) multiDays.delete(key); else multiDays.add(key);
+    renderCalendar(); updateSelInfo(); return;
+  }
+  if(multiDays.size>0){
+    const tage=[...multiDays];
+    multiDays.clear();
+    await schichtAufTagen(tage,namen);
+    renderCalendar(); updateSelInfo(); return;
+  }
+  if(rangeMode){ await handleRangeClick(key,namen); return; }
+  await schichtAufTagen([key],namen);
 }
 
+async function handleSinglePersonClick(key,ctrl){
+  return handleDayClick(key,ctrl,[selectedPerson.name]);
+}
 async function handleMultiPersonClick(key,ctrl){
-  if(ctrl){if(multiDays.has(key))multiDays.delete(key);else multiDays.add(key);renderCalendar();updateSelInfo();return;}
-  if(rangeMode){ await handleRangeClick(key,[...selectedPersons]); return; }
-  const dates=multiDays.size>0?[...multiDays]:[key];
-  await applyToDateList(dates,[...selectedPersons],'add');
-  if(multiDays.size>0){multiDays.clear();renderCalendar();}
+  return handleDayClick(key,ctrl,[...selectedPersons]);
+}
+
+// Eintragen oder entfernen - je nachdem, ob schon alle Genannten an allen
+// Tagen in der gewaehlten Schicht stehen. Ein einzelner Klick verhaelt sich
+// damit genauso wie einer auf eine Mehrfachauswahl oder einen Zeitraum.
+async function schichtAufTagen(tage,namen){
+  const alleDrin=tage.every(k=>{
+    const drin=(schichten[k]?.[selectedShift])||[];
+    return namen.every(n=>drin.includes(n));
+  });
+  if(!alleDrin){ await applyToDateList(tage,namen,'add'); return; }
+  pushUndo();
+  for(const name of namen){
+    const res=await postSchicht(tage,'remove',selectedShift,name);
+    applyResults(res.results);
+  }
+  renderStats();
+  const wer=namen.length>1?namen.length+' Mitarbeiter':namen[0];
+  toast(`${wer} aus ${tage.length} Tag(en) entfernt`);
+}
+
+// Zeitraum-Modus an oder aus, samt Knopf und angefangener Auswahl.
+function setRangeMode(an){
+  rangeMode=an;
+  document.getElementById('btn-range')?.classList.toggle('on',an);
+  rangeStart=null; previewEnd=null; frozenRangeEnd=null;
 }
 
 // Beide Konfliktdialoge - vom Einzelklick und vom Bereich gemeinsam genutzt.
@@ -3455,6 +3490,52 @@ function doExportData(){
 
 function getSlot(key){const s=schichten[key]||{};return ALL_SHIFTS.reduce((o,k)=>{o[k]=s[k]||[];return o;},{});}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// ══════════════════════════════════════════════════════════════
+// ANZEIGEGRÖSSE
+// ══════════════════════════════════════════════════════════════
+// Die Oberflaeche ist in Pixeln gesetzt; eine Schriftgroesse am Wurzelelement
+// wuerde daran nichts aendern. zoom skaliert das komplette Layout mit - im
+// Ausdruck wird es zurueckgesetzt, dort gilt die eigene Druckgroesse.
+const ZOOM_STUFEN=[0.9,1,1.1,1.25,1.4,1.6];
+let zoomStufe=1;
+
+function setZoom(stufe){
+  zoomStufe=Math.max(0,Math.min(ZOOM_STUFEN.length-1,stufe));
+  document.body.style.zoom=ZOOM_STUFEN[zoomStufe];
+  try{ localStorage.setItem('schichtplaner-zoom',zoomStufe); }catch(e){}
+  const proz=Math.round(ZOOM_STUFEN[zoomStufe]*100);
+  document.getElementById('btn-zoom-in')?.toggleAttribute('disabled',zoomStufe===ZOOM_STUFEN.length-1);
+  document.getElementById('btn-zoom-out')?.toggleAttribute('disabled',zoomStufe===0);
+  const t=document.getElementById('btn-zoom-in');
+  if(t) t.title=`Größer darstellen (aktuell ${proz}%)`;
+  const t2=document.getElementById('btn-zoom-out');
+  if(t2) t2.title=`Kleiner darstellen (aktuell ${proz}%)`;
+  return proz;
+}
+
+// Seitenleiste ein- oder ausklappen; die Wahl wird gemerkt.
+function setSidebar(zu){
+  const m=document.getElementById('main'), btn=document.getElementById('sidebar-toggle');
+  m.classList.toggle('collapsed',zu);
+  btn.classList.toggle('closed',zu);
+  btn.textContent=zu?'▶':'◀';
+  btn.title=zu?'Mitarbeiterleiste einblenden':'Mitarbeiterleiste ausblenden';
+  try{ localStorage.setItem('schichtplaner-sidebar',zu?'zu':'auf'); }catch(e){}
+}
+
+function ladeSidebar(){
+  let zu=false;
+  try{ zu=localStorage.getItem('schichtplaner-sidebar')==='zu'; }catch(e){}
+  setSidebar(zu);
+}
+
+function ladeZoom(){
+  // Vorgabe eine Stufe ueber 100% - die Oberflaeche ist von Haus aus klein.
+  let s=2;
+  try{ const v=localStorage.getItem('schichtplaner-zoom'); if(v!==null) s=parseInt(v); }catch(e){}
+  setZoom(isNaN(s)?1:s);
+}
+
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
 function exportAllData(){
   window.location = '/api/export_data';
