@@ -51,12 +51,16 @@ func unfoldICS(r io.Reader) ([]string, error) {
 
 var shiftLabels = map[string]string{
 	"frueh":           "Frühschicht",
+	"normal":          "Normaldienst",
 	"spaet":           "Spätschicht",
 	"rufbereitschaft": "Rufbereitschaft",
 }
 
 var shiftTimes = map[string][2]string{
-	"frueh":           {"060000", "140000"},
+	"frueh": {"060000", "140000"},
+	// Normaldienst ist Gleitzeit; die Zeiten sind nur ein Anhalt fuer den
+	// Kalendereintrag, nicht die tatsaechliche Anwesenheit.
+	"normal":          {"080000", "170000"},
 	"spaet":           {"140000", "220000"},
 	"rufbereitschaft": {"000000", "235959"},
 }

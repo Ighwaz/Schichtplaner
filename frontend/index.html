@@ -24,6 +24,7 @@
   --shadow:rgba(0,0,0,.6);--chip-alpha:.2;--day-other:.35;
   --frueh-text:#4ade80;--spaet-text:#fcd34d;--ruf-text:#c4b5fd;
   --urlaub-text:#f9a8d4;--krank-text:#fca5a5;--eltern-text:#67e8f9;--sonder-text:#fde68a;
+  --normal-text:#67e8f9;
 }
 [data-theme="light"]{
   --bg:#f1f3f9;--surface:#fff;--surface2:#f6f8fd;--surface3:#eef0f8;
@@ -32,10 +33,12 @@
   --shadow:rgba(50,60,110,.1);--chip-alpha:.1;--day-other:.3;
   --frueh-text:#15803d;--spaet-text:#b45309;--ruf-text:#6d28d9;
   --urlaub-text:#9d174d;--krank-text:#b91c1c;--eltern-text:#0e7490;--sonder-text:#92400e;
+  --normal-text:#0e7490;
 }
 :root{
   /* Shift colors — more saturated, better dark-mode contrast */
   --frueh:#16a34a;--frueh-bg:rgba(22,163,74,.13);--frueh-text:#4ade80;
+  --normal:#0891b2;--normal-bg:rgba(8,145,178,.13);--normal-text:#22d3ee;
   --spaet:#d97706;--spaet-bg:rgba(217,119,6,.13);--spaet-text:#fbbf24;
   --ruf:#7c3aed;--ruf-bg:rgba(124,58,237,.13);--ruf-text:#a78bfa;
   --urlaub:#be185d;--urlaub-bg:rgba(190,24,93,.13);--urlaub-text:#f472b6;
@@ -80,10 +83,12 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .pill:hover{background:var(--surface3);color:var(--text)}
 .pill:active{transform:scale(.94)}
 .pill .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.dot-f{width:5px;height:5px;border-radius:50%;background:var(--frueh);flex-shrink:0}.dot-s{width:5px;height:5px;border-radius:50%;background:var(--spaet);flex-shrink:0}.dot-r{width:5px;height:5px;border-radius:50%;background:var(--ruf);flex-shrink:0}
+.dot-f{width:5px;height:5px;border-radius:50%;background:var(--frueh);flex-shrink:0}.dot-n{width:5px;height:5px;border-radius:50%;background:var(--normal);flex-shrink:0}
+.dot-s{width:5px;height:5px;border-radius:50%;background:var(--spaet);flex-shrink:0}.dot-r{width:5px;height:5px;border-radius:50%;background:var(--ruf);flex-shrink:0}
 .dot-u{width:5px;height:5px;border-radius:50%;background:var(--urlaub);flex-shrink:0}.dot-k{width:5px;height:5px;border-radius:50%;background:var(--krank);flex-shrink:0}.dot-e{width:5px;height:5px;border-radius:50%;background:var(--eltern);flex-shrink:0}.dot-so{width:5px;height:5px;border-radius:50%;background:var(--sonder);flex-shrink:0}
 .pill.active{border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
-.pill.active[data-shift=frueh]{color:var(--frueh)}.pill.active[data-shift=spaet]{color:var(--spaet)}
+.pill.active[data-shift=frueh]{color:var(--frueh)}.pill.active[data-shift=normal]{color:var(--normal)}
+.pill.active[data-shift=spaet]{color:var(--spaet)}
 .pill.active[data-shift=rufbereitschaft]{color:var(--ruf)}
 .sep{width:1px;height:22px;background:var(--border);flex-shrink:0;align-self:center}
 .hbtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:2px solid var(--border);
@@ -285,6 +290,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .chip{font-size:10px;padding:2px 7px 2px 5px;border-radius:var(--radius-chip);font-weight:600;cursor:grab;white-space:nowrap;max-width:82px;transition:opacity .15s,transform .12s;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;line-height:1.4}
 .chip:hover{opacity:.65}
 .chip.frueh{background:var(--frueh-bg);color:var(--frueh-text);border:1px solid color-mix(in srgb,var(--frueh) 35%,transparent)}
+.chip.normal{background:var(--normal-bg);color:var(--normal-text);border:1px solid color-mix(in srgb,var(--normal) 35%,transparent)}
 .chip.spaet{background:var(--spaet-bg);color:var(--spaet-text);border:1px solid color-mix(in srgb,var(--spaet) 35%,transparent)}
 .chip.ruf{background:var(--ruf-bg);color:var(--ruf-text);border:1px solid color-mix(in srgb,var(--ruf) 35%,transparent)}
 
@@ -306,6 +312,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .mx-cell:hover{outline:2px solid var(--blue);outline-offset:-2px}
 .mx-cell.we{background:var(--surface3)}
 .mx-cell.frueh{background:var(--frueh-bg);color:var(--frueh-text)}
+.mx-cell.normal{background:var(--normal-bg);color:var(--normal-text)}
 .mx-cell.spaet{background:var(--spaet-bg);color:var(--spaet-text)}
 .mx-cell.rufbereitschaft{background:var(--ruf-bg);color:var(--ruf-text)}
 .mx-cell.doppelt{background:var(--krank-bg);color:var(--krank-text);outline:1px solid var(--krank)}
@@ -320,6 +327,18 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .mx-legend i{font-style:normal;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;
   padding:1px 5px;border-radius:4px}
 .ruf-col-hdr{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.reihum-liste{display:flex;flex-direction:column;gap:4px;max-height:230px;overflow-y:auto}
+.reihum-zeile{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--border);
+  border-radius:8px;background:var(--surface2);font-size:13px}
+.reihum-zeile.aus{opacity:.45}
+.reihum-nr{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--text3);width:16px}
+.reihum-zeile input[type=checkbox]{accent-color:var(--blue);cursor:pointer}
+.reihum-zeile .reihum-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reihum-pfeil{background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:5px;
+  cursor:pointer;font-size:10px;line-height:1;padding:3px 5px}
+.reihum-pfeil:hover{border-color:var(--blue);color:var(--blue)}
+#reihum-modal select{background:var(--surface2);border:2px solid var(--border);color:var(--text);
+  padding:5px 8px;border-radius:7px;font-size:12.5px}
 .ruf-filter{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap}
 .ruf-filter input{accent-color:var(--blue);cursor:pointer}
 /* Abgleich Plan gegen Kalender */
@@ -562,9 +581,9 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     --bg:#fff;--surface:#fff;--surface2:#fff;--surface3:#f2f2f2;
     --border:#9aa0ad;--border2:#6b7280;
     --text:#000;--text2:#26292f;--text3:#4b5060;
-    --frueh-text:#15803d;--spaet-text:#a45309;--ruf-text:#6d28d9;
+    --frueh-text:#15803d;--normal-text:#0e6b82;--spaet-text:#a45309;--ruf-text:#6d28d9;
     --urlaub-text:#a3164f;--krank-text:#b91c1c;--eltern-text:#0e7490;--sonder-text:#8a4308;
-    --frueh-bg:#eaf7ee;--spaet-bg:#fdf1e0;--ruf-bg:#f1ebfd;
+    --frueh-bg:#eaf7ee;--normal-bg:#e4f5fa;--spaet-bg:#fdf1e0;--ruf-bg:#f1ebfd;
     --urlaub-bg:#fdebf3;--krank-bg:#fdecec;--eltern-bg:#e6f6fa;--sonder-bg:#fbf0e3;
     --today:transparent;--shadow:transparent;--day-other:1;
   }
@@ -697,7 +716,8 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     <span class="ctx-lbl">Schicht</span>
     <div class="hdr-pills" id="modebar">
       <div class="pill active" role="button" tabindex="0" data-shift="frueh" title="Frühschicht"><span class="dot dot-f"></span>F</div>
-      <div class="pill" role="button" tabindex="0" data-shift="spaet" title="Spätschicht"><span class="dot dot-s"></span>S</div>
+      <div class="pill" role="button" tabindex="0" data-shift="normal" title="Normaldienst (Gleitzeit)"><span class="dot dot-n"></span>N</div>
+    <div class="pill" role="button" tabindex="0" data-shift="spaet" title="Spätschicht"><span class="dot dot-s"></span>S</div>
       <div class="pill" role="button" tabindex="0" data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
     </div>
   </div>
@@ -743,6 +763,11 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
         <div class="soll-pill" style="border-color:rgba(34,197,94,.3)">
           <span style="color:var(--frueh);font-size:10px">F</span>
           <input type="number" id="soll-f" min="0" max="20" value="1" onchange="saveSoll()">
+          <span style="color:var(--text3);font-size:9px">P</span>
+        </div>
+        <div class="soll-pill" style="border-color:rgba(8,145,178,.3)">
+          <span style="color:var(--normal);font-size:10px">N</span>
+          <input type="number" id="soll-n" min="0" max="20" value="0" onchange="saveSoll()">
           <span style="color:var(--text3);font-size:9px">P</span>
         </div>
         <div class="soll-pill" style="border-color:rgba(245,158,11,.3)">
@@ -804,6 +829,7 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
         <select id="rufkw-year"></select>
         <button class="btn-p" onclick="saveRufKW()">Speichern</button>
         <button class="btn-p" onclick="openApplyRufKW()" style="background:var(--frueh);color:#000">▶ In den Kalender übertragen</button>
+        <button class="btn-s" onclick="openRufReihum()" title="Kalenderwochen reihum an mehrere Personen verteilen">⟳ Reihum</button>
         <button class="btn-s" onclick="syncRufKWFromCalendar()" title="Bestehende Rufbereitschafts-Einträge aus dem Kalender in den Plan einlesen">↙ Aus Kalender</button>
         <button class="btn-s" onclick="exportRufKWCSV()" title="Wochenplan als CSV">↓ Wochen</button>
         <button class="btn-s" onclick="exportRufCSV()" title="Eingetragene Tage als CSV">↓ Tage</button>
@@ -876,6 +902,33 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     </div>
   </div>
 
+
+  <!-- RUFBEREITSCHAFT REIHUM -->
+  <div class="modal-bg hidden" id="reihum-modal">
+    <div class="modal-box" style="width:460px">
+      <div class="modal-hdr"><div class="modal-title">⟳ Rufbereitschaft reihum</div><button class="modal-close" onclick="closeModal('reihum-modal')">✕</button></div>
+      <p style="font-size:12.5px;color:var(--text2);line-height:1.6;margin-bottom:10px">
+        Die Kalenderwochen werden der Reihe nach an die gewählten Personen verteilt –
+        eine Woche je Person, dann wieder von vorn.
+      </p>
+      <div id="reihum-liste" class="reihum-liste"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:11px 0 8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text3)">von</span>
+        <select id="reihum-von"></select>
+        <span style="font-size:12px;color:var(--text3)">bis</span>
+        <select id="reihum-bis"></select>
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="reihum-ueber" style="accent-color:var(--blue)">
+        bereits zugewiesene Wochen überschreiben
+      </label>
+      <div id="reihum-vorschau" style="font-size:12px;color:var(--text3);margin:8px 0 2px;line-height:1.6"></div>
+      <div class="modal-footer" style="margin-top:10px">
+        <button class="btn-p" id="reihum-go" onclick="rufReihumFuellen()" style="flex:1">Verteilen</button>
+        <button class="btn-s" onclick="closeModal('reihum-modal')">Abbrechen</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MASSENANLAGE -->
   <div class="modal-bg hidden" id="bulk-modal">
@@ -1069,16 +1122,16 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════
 // Diese Fassung plant nur Schichten - keine Abwesenheiten.
-const ALL_SHIFTS  = ['frueh','spaet','rufbereitschaft'];
-const EXCLUSIVE   = new Set(['frueh','spaet']);
+const ALL_SHIFTS  = ['frueh','normal','spaet','rufbereitschaft'];
+const EXCLUSIVE   = new Set(['frueh','normal','spaet']);
 const WORK_SHIFTS = new Set(['frueh','spaet','rufbereitschaft']);
-const SHIFT_LABEL = {frueh:'Frühschicht',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft'};
+const SHIFT_LABEL = {frueh:'Frühschicht',normal:'Normaldienst',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft'};
 // Frischer, leerer Tag - jeder Aufruf liefert eigene Arrays.
 function emptyDay(){return Object.fromEntries(ALL_SHIFTS.map(s=>[s,[]]));}
-const SHIFT_TIME  = {frueh:'06:00–14:00',spaet:'14:00–22:00',rufbereitschaft:'22:00–06:00'};
-const SHIFT_CSS   = {frueh:'frueh',spaet:'spaet',rufbereitschaft:'ruf'};
-const SHIFT_VAR   = {frueh:'--frueh',spaet:'--spaet',rufbereitschaft:'--ruf'};
-const SHIFT_SHORT = {frueh:['F','var(--frueh)'],spaet:['S','var(--spaet)'],rufbereitschaft:['R','var(--ruf)']};
+const SHIFT_TIME  = {frueh:'06:00–14:00',normal:'Gleitzeit',spaet:'14:00–22:00',rufbereitschaft:'22:00–06:00'};
+const SHIFT_CSS   = {frueh:'frueh',normal:'normal',spaet:'spaet',rufbereitschaft:'ruf'};
+const SHIFT_VAR   = {frueh:'--frueh',normal:'--normal',spaet:'--spaet',rufbereitschaft:'--ruf'};
+const SHIFT_SHORT = {frueh:['F','var(--frueh)'],normal:['N','var(--normal)'],spaet:['S','var(--spaet)'],rufbereitschaft:['R','var(--ruf)']};
 const DOW_NAMES   = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 const MONTHS      = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const MONTH_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -1349,6 +1402,103 @@ function renderRufKWTable(){
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// RUFBEREITSCHAFT REIHUM
+// ══════════════════════════════════════════════════════════════
+// Reihenfolge der Personen fuer die Rotation; ueberlebt das Schliessen.
+let reihumFolge=[];
+
+function openRufReihum(){
+  const jahr=parseInt(document.getElementById('rufkw-year')?.value||curYear);
+  const wochen=getISOWeeks(jahr);
+  // Namen ergaenzen, die noch nicht in der Reihenfolge stehen
+  mitarbeiter.forEach(m=>{ if(!reihumFolge.some(r=>r.name===m.name)) reihumFolge.push({name:m.name,an:true}); });
+  reihumFolge=reihumFolge.filter(r=>mitarbeiter.some(m=>m.name===r.name));
+
+  const opt=w=>`<option value="${w.kwKey}">KW ${w.kw} · ${fmtDateShort(w.start)}</option>`;
+  const von=document.getElementById('reihum-von'), bis=document.getElementById('reihum-bis');
+  von.innerHTML=wochen.map(opt).join('');
+  bis.innerHTML=wochen.map(opt).join('');
+  const heute=getTodayKwKey();
+  von.value=wochen.some(w=>w.kwKey===heute)?heute:wochen[0].kwKey;
+  bis.value=wochen[wochen.length-1].kwKey;
+  von.onchange=bis.onchange=renderReihumVorschau;
+  document.getElementById('reihum-ueber').onchange=renderReihumVorschau;
+
+  renderReihumListe();
+  openModal('reihum-modal');
+}
+
+function renderReihumListe(){
+  const box=document.getElementById('reihum-liste');
+  box.innerHTML=reihumFolge.map((r,i)=>{
+    const m=mitarbeiter.find(x=>x.name===r.name);
+    return `<div class="reihum-zeile${r.an?'':' aus'}">
+      <input type="checkbox" data-an="${i}"${r.an?' checked':''}>
+      <span class="reihum-nr">${r.an?nummerVon(i):'–'}</span>
+      <span class="avatar" style="background:${m?m.color:'#64748b'};width:20px;height:20px;font-size:9px">${m?.icon||initials(r.name)}</span>
+      <span class="reihum-name">${esc(r.name)}</span>
+      <button class="reihum-pfeil" data-hoch="${i}" title="nach oben"${i===0?' disabled':''}>▲</button>
+      <button class="reihum-pfeil" data-runter="${i}" title="nach unten"${i===reihumFolge.length-1?' disabled':''}>▼</button>
+    </div>`;
+  }).join('')||'<span style="font-size:12px;color:var(--text3)">Keine Mitarbeiter angelegt.</span>';
+
+  box.querySelectorAll('[data-an]').forEach(el=>el.onchange=()=>{
+    reihumFolge[+el.dataset.an].an=el.checked; renderReihumListe();
+  });
+  box.querySelectorAll('[data-hoch]').forEach(el=>el.onclick=()=>{
+    const i=+el.dataset.hoch; [reihumFolge[i-1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i-1]]; renderReihumListe();
+  });
+  box.querySelectorAll('[data-runter]').forEach(el=>el.onclick=()=>{
+    const i=+el.dataset.runter; [reihumFolge[i+1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i+1]]; renderReihumListe();
+  });
+  renderReihumVorschau();
+}
+
+// Platz in der Rotation (nur die aktiven zaehlen mit)
+function nummerVon(i){ return reihumFolge.slice(0,i+1).filter(r=>r.an).length; }
+
+// Welche Wochen wuerden gefuellt - und mit wem?
+function reihumPlan(){
+  const jahr=parseInt(document.getElementById('rufkw-year')?.value||curYear);
+  const wochen=getISOWeeks(jahr);
+  const von=document.getElementById('reihum-von')?.value, bis=document.getElementById('reihum-bis')?.value;
+  const i=wochen.findIndex(w=>w.kwKey===von), j=wochen.findIndex(w=>w.kwKey===bis);
+  const leute=reihumFolge.filter(r=>r.an).map(r=>r.name);
+  const ueber=document.getElementById('reihum-ueber')?.checked;
+  const plan=[], uebersprungen=[];
+  if(i<0||j<0||j<i||!leute.length) return {plan,uebersprungen,leute};
+  let n=0;
+  for(let k=i;k<=j;k++){
+    const w=wochen[k];
+    if(!ueber&&rufKW[w.kwKey]){ uebersprungen.push(w.kw); continue; }
+    plan.push({kwKey:w.kwKey,kw:w.kw,name:leute[n%leute.length]});
+    n++;
+  }
+  return {plan,uebersprungen,leute};
+}
+
+function renderReihumVorschau(){
+  const el=document.getElementById('reihum-vorschau'); if(!el) return;
+  const {plan,uebersprungen,leute}=reihumPlan();
+  document.getElementById('reihum-go').disabled=!plan.length;
+  if(!leute.length){ el.innerHTML='<span style="color:var(--krank)">Niemand ausgewählt.</span>'; return; }
+  if(!plan.length){ el.innerHTML='<span style="color:var(--krank)">Keine Woche zu füllen – alle sind schon vergeben.</span>'; return; }
+  const beispiel=plan.slice(0,4).map(p=>`KW ${p.kw} ${esc(p.name)}`).join(' · ');
+  el.innerHTML=`<b style="color:var(--frueh)">${plan.length} Wochen</b> werden verteilt: ${beispiel}${plan.length>4?' …':''}`+
+    (uebersprungen.length?`<br><span style="color:var(--spaet)">${uebersprungen.length} bereits vergebene Woche(n) bleiben unberührt.</span>`:'');
+}
+
+async function rufReihumFuellen(){
+  const {plan}=reihumPlan();
+  if(!plan.length) return;
+  plan.forEach(p=>{ rufKW[p.kwKey]=[p.name]; });
+  await saveRufKW();
+  renderRufKWTable();
+  closeModal('reihum-modal');
+  toast(`${plan.length} Wochen verteilt – mit „▶ In den Kalender übertragen" eintragen`);
+}
+
 // Welche Wochen gerade aufgeklappt sind - bleibt ueber das Neuzeichnen hinweg.
 const offeneWochen=new Set();
 
@@ -1550,10 +1700,11 @@ async function reloadSchichten(){
 
 function applyData(d){
   mitarbeiter=d.mitarbeiter||[]; schichten=d.schichten||{};
-  notizen=d.notizen||{}; soll=d.soll||{frueh:1,spaet:1,rufbereitschaft:1};
+  notizen=d.notizen||{}; soll=d.soll||{frueh:1,normal:0,spaet:1,rufbereitschaft:1};
   customHolidays=d.custom_holidays||[]; templates=d.templates||{}; rufKW=d.ruf_kw||{};
   mitarbeiter.forEach(m=>{if(!m.color)m.color=AVATAR_COLORS[0];if(!m.icon)m.icon='';if(!m.prefs)m.prefs={};});
   document.getElementById('soll-f').value=soll.frueh??1;
+  document.getElementById('soll-n').value=soll.normal??0;
   document.getElementById('soll-s').value=soll.spaet??1;
   document.getElementById('soll-r').value=soll.rufbereitschaft??1;
 }
@@ -2138,9 +2289,10 @@ function cancelRestore(){closeModal('restore-modal');pendingRestore=null;}
 // SOLL
 // ══════════════════════════════════════════════════════════════
 async function saveSoll(){
-  soll.frueh=+document.getElementById('soll-f').value||1;
-  soll.spaet=+document.getElementById('soll-s').value||1;
-  soll.rufbereitschaft=+document.getElementById('soll-r').value||1;
+  soll.frueh=+document.getElementById('soll-f').value||0;
+  soll.normal=+document.getElementById('soll-n').value||0;
+  soll.spaet=+document.getElementById('soll-s').value||0;
+  soll.rufbereitschaft=+document.getElementById('soll-r').value||0;
   await api('/api/soll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(soll)});
   renderCalendar();
 }
@@ -2746,20 +2898,40 @@ async function applyTemplateDirectly(){
   const ok=await confirmDialog(
     `Template anwenden`,
     `Template: <strong>${esc(tname)}</strong><br><br>
-     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+       <span style="font-size:12px;color:var(--text3);width:26px">von</span>
        <select id="_tmpl-month" style="${selStyle}">${monthOpts}</select>
        <select id="_tmpl-year"  style="${selStyle}">${yearOpts}</select>
      </div>
-     <div style="font-size:12px;color:var(--text3)">Bereits vorhandene Einträge bleiben erhalten.</div>`,
+     <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+       <span style="font-size:12px;color:var(--text3);width:26px">bis</span>
+       <select id="_tmpl-month2" style="${selStyle}">${monthOpts}</select>
+       <select id="_tmpl-year2"  style="${selStyle}">${yearOpts}</select>
+     </div>
+     <div style="font-size:12px;color:var(--text3)">Bereits vorhandene Einträge bleiben erhalten;
+     Tage mit einer anderen Schicht werden übersprungen.</div>`,
     'Anwenden'
   );
   if(!ok) return;
 
-  const selMonth=parseInt(document.getElementById('_tmpl-month')?.value||curMonth);
-  const selYear =parseInt(document.getElementById('_tmpl-year')?.value||curYear);
+  const vonM=parseInt(document.getElementById('_tmpl-month')?.value||curMonth);
+  const vonJ=parseInt(document.getElementById('_tmpl-year')?.value||curYear);
+  const bisM=parseInt(document.getElementById('_tmpl-month2')?.value||vonM);
+  const bisJ=parseInt(document.getElementById('_tmpl-year2')?.value||vonJ);
+  const selMonth=vonM, selYear=vonJ;
+  if(bisJ*12+bisM < vonJ*12+vonM){ toast('„bis" liegt vor „von"'); return; }
+
   pushUndo();
-  const d=await api('/api/autoplan',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({year:selYear,month:selMonth,template:tname})});
+  // Monat fuer Monat anwenden - jeder Aufruf ist eine eigene Transaktion.
+  const d={planned:0,skipped_conflict:0,skipped_holiday:0};
+  for(let t=vonJ*12+vonM-1; t<=bisJ*12+bisM-1; t++){
+    const j=Math.floor(t/12), m=t%12+1;
+    const r=await api('/api/autoplan',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({year:j,month:m,template:tname})});
+    if(r.error){ d.error=r.error; break; }
+    d.planned+=r.planned||0; d.skipped_conflict+=r.skipped_conflict||0; d.skipped_holiday+=r.skipped_holiday||0;
+  }
+  const monate=bisJ*12+bisM-(vonJ*12+vonM)+1;
   if(d.error) toast('Fehler: '+d.error);
   else{
     await reloadSchichten();
@@ -2769,7 +2941,8 @@ async function applyTemplateDirectly(){
     showCalendarView();
     const uebersprungen=(d.skipped_conflict||0)+(d.skipped_holiday||0);
     const zusatz=uebersprungen?` – ${uebersprungen} übersprungen (${d.skipped_conflict||0}× Konflikt, ${d.skipped_holiday||0}× Feiertag)`:'';
-    toast(`Template "${tname}" auf ${MONTHS[selMonth-1]} ${selYear} angewendet: ${d.planned} Einträge${zusatz}`);
+    const zeitraum=monate===1?`${MONTHS[selMonth-1]} ${selYear}`:`${monate} Monate ab ${MONTHS[selMonth-1]} ${selYear}`;
+    toast(`Template "${tname}" auf ${zeitraum}: ${d.planned} Einträge${zusatz}`);
   }
 }
 
@@ -2778,8 +2951,10 @@ async function applyTemplateDirectly(){
 // ══════════════════════════════════════════════════════════════
 // TEMPLATE EDITOR
 // ══════════════════════════════════════════════════════════════
-const TMPL_CYCLE=['','frueh','spaet','rufbereitschaft','frei'];
-const TMPL_CYCLE_WE=['','rufbereitschaft','frei'];
+// Im Template steht nur die Arbeitsschicht. Rufbereitschaft laeuft ueber den
+// KW-Plan und wuerde hier nur doppelt gepflegt.
+const TMPL_CYCLE=['','frueh','normal','spaet','frei'];
+const TMPL_CYCLE_WE=TMPL_CYCLE;
 
 function fillTemplateFromPrefs(){
   // Populate tmplData from each mitarbeiter's prefs
@@ -3255,7 +3430,13 @@ function confirmDialog(title,html,yesLabel='Ja'){
     dlg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)';
     dlg.innerHTML=`<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:22px;max-width:360px;width:92vw;box-shadow:0 20px 60px var(--shadow)"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;margin-bottom:11px">${title}</div><p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">${html}</p><div style="display:flex;gap:8px"><button id="_cdlg-yes" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:700;cursor:pointer">${yesLabel}</button><button id="_cdlg-no" style="flex:1;padding:9px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:600;cursor:pointer">Abbrechen</button></div></div>`;
     document.body.appendChild(dlg);
-    dlg.querySelector('#_cdlg-yes').onclick=()=>{dlg.remove();resolve(true);};
+    // Erst ausblenden, dann aufloesen, und erst im naechsten Durchlauf entfernen:
+    // Aufrufer lesen ihre eigenen Eingabefelder aus dem Dialog aus, nachdem das
+    // Versprechen erfuellt ist. Wird sofort entfernt, sind die Felder weg und
+    // die Auswahl faellt stillschweigend auf die Vorgabe zurueck.
+    dlg.querySelector('#_cdlg-yes').onclick=()=>{
+      dlg.style.display='none'; resolve(true); setTimeout(()=>dlg.remove(),0);
+    };
     dlg.querySelector('#_cdlg-no').onclick=()=>{dlg.remove();resolve(false);};
     dlg.addEventListener('click',e=>{if(e.target===dlg){dlg.remove();resolve(false);}});
   });

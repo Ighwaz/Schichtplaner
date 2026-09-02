@@ -11,7 +11,10 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 
 ## Funktionen
 
-- **Kalender**: jeder Tag zeigt immer alle drei Schichten in derselben
+- **Vier Schichten**: Früh, Normaldienst (Gleitzeit, zeitlich zwischen Früh und
+  Spät), Spät – die drei schließen sich gegenseitig aus – sowie Rufbereitschaft,
+  die immer zusätzlich dazu läuft und nie nachfragt
+- **Kalender**: jeder Tag zeigt immer alle Schichten in derselben
   Reihenfolge, mit Besetzung als `1/1` je Zeile – rot, sobald das Soll fehlt
 - **Monatsübersicht**: eine Zeile je Person, eine Spalte je Tag. Zeigt Lücken,
   Häufungen und Doppelbelegungen auf einen Blick; Klick auf eine Zelle trägt
@@ -22,7 +25,11 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   Rückfrage umgetragen – Rufbereitschaft bleibt dabei erhalten. Wer trotzdem in
   Früh und Spät desselben Tages steht, wird im Kalender und in der
   Monatsübersicht markiert
-- **Templates** pro Wochentag und Person, per Autoplan auf einen Monat anwendbar
+- **Templates** pro Wochentag und Person – nur die Arbeitsschicht, ohne
+  Rufbereitschaft – und über einen frei gewählten Zeitraum anwendbar,
+  z. B. Januar bis Dezember in einem Zug
+- **Rufbereitschaft reihum**: Personen in eine Reihenfolge bringen, Zeitraum
+  wählen, und der KW-Plan wird Woche für Woche durchrotiert
 - **Rufbereitschaft** in einer Tabelle: je Kalenderwoche der geplante Name und
   daneben, wer tatsächlich im Kalender steht. Noch nicht übertragene Wochen und
   Abweichungen sind markiert und lassen sich einzeln herausfiltern. Eine Woche
