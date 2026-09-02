@@ -53,20 +53,12 @@ var shiftLabels = map[string]string{
 	"frueh":           "Frühschicht",
 	"spaet":           "Spätschicht",
 	"rufbereitschaft": "Rufbereitschaft",
-	"urlaub":          "Urlaub",
-	"krank":           "Krank",
-	"elternzeit":      "Elternzeit",
-	"sonderurlaub":    "Sonderurlaub",
 }
 
 var shiftTimes = map[string][2]string{
 	"frueh":           {"060000", "140000"},
 	"spaet":           {"140000", "220000"},
 	"rufbereitschaft": {"000000", "235959"},
-	"urlaub":          {"000000", "235959"},
-	"krank":           {"000000", "235959"},
-	"elternzeit":      {"000000", "235959"},
-	"sonderurlaub":    {"000000", "235959"},
 }
 
 func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {

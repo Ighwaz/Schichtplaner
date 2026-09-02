@@ -68,9 +68,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 .dot-u{width:5px;height:5px;border-radius:50%;background:var(--urlaub);flex-shrink:0}.dot-k{width:5px;height:5px;border-radius:50%;background:var(--krank);flex-shrink:0}.dot-e{width:5px;height:5px;border-radius:50%;background:var(--eltern);flex-shrink:0}.dot-so{width:5px;height:5px;border-radius:50%;background:var(--sonder);flex-shrink:0}
 .pill.active{border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
 .pill.active[data-shift=frueh]{color:var(--frueh)}.pill.active[data-shift=spaet]{color:var(--spaet)}
-.pill.active[data-shift=rufbereitschaft]{color:var(--ruf)}.pill.active[data-shift=urlaub]{color:var(--urlaub)}
-.pill.active[data-shift=krank]{color:var(--krank)}.pill.active[data-shift=elternzeit]{color:var(--eltern)}
-.pill.active[data-shift=sonderurlaub]{color:var(--sonder)}
+.pill.active[data-shift=rufbereitschaft]{color:var(--ruf)}
 .sep{width:1px;height:32px;background:var(--border);flex-shrink:0;align-self:center}
 .hbtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:2px solid var(--border);
   background:var(--surface2);cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;white-space:nowrap;flex-shrink:0}
@@ -240,27 +238,67 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 .dab.red:hover{color:#f87171;background:rgba(248,113,113,.1)}
 .hol-tag{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;line-height:1.3;font-weight:500}
 .hol-de-tag{color:var(--blue)}.hol-in-tag{color:var(--orange)}.hol-custom-tag{color:var(--sonder)}
-.conflict-badge{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--krank);border:2px solid var(--surface)}
+.conflict-badge{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--krank);
+  border:2px solid var(--surface);overflow:hidden;text-indent:-999px;white-space:nowrap}
 .understaffed-badge{font-size:9px;background:rgba(245,158,11,.12);color:var(--spaet);border-radius:4px;padding:1px 4px;font-weight:700;flex-shrink:0;font-family:'JetBrains Mono',monospace}
 .soll-ist{display:flex;gap:2px;flex-shrink:0;margin-top:1px}
 .si-bar{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
 .si-fill{height:100%;border-radius:2px;transition:width .2s}
 .chips-area{display:flex;flex-direction:column;gap:2px;flex:1}
 .chips-row{display:flex;align-items:flex-start;gap:3px}
-.chips-label{font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;min-width:10px;padding-top:3px;flex-shrink:0;opacity:.75}
+.chips-label{font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;flex-shrink:0;
+  display:flex;align-items:center;gap:3px;min-width:28px;padding-top:2px}
+.chips-label i{font-style:normal;font-size:7.5px;opacity:.7;letter-spacing:-.2px}
+.chips-label.unter{color:var(--krank)}
+.chips-label.unter i{opacity:1;font-weight:800}
+.chips-row.leer{opacity:.5}
+.chip-leer{font-size:9px;color:var(--text3);padding-left:2px}
 .chips{display:flex;flex-wrap:wrap;gap:2px;flex:1}
 .chip{font-size:10px;padding:2px 7px 2px 5px;border-radius:var(--radius-chip);font-weight:600;cursor:grab;white-space:nowrap;max-width:82px;transition:opacity .15s,transform .12s;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;line-height:1.4}
 .chip:hover{opacity:.65}
 .chip.frueh{background:var(--frueh-bg);color:var(--frueh-text);border:1px solid color-mix(in srgb,var(--frueh) 35%,transparent)}
 .chip.spaet{background:var(--spaet-bg);color:var(--spaet-text);border:1px solid color-mix(in srgb,var(--spaet) 35%,transparent)}
 .chip.ruf{background:var(--ruf-bg);color:var(--ruf-text);border:1px solid color-mix(in srgb,var(--ruf) 35%,transparent)}
-.chip.urlaub{background:var(--urlaub-bg);color:var(--urlaub-text);border:1px solid color-mix(in srgb,var(--urlaub) 35%,transparent)}
-.chip.krank{background:var(--krank-bg);color:var(--krank-text);border:1px solid color-mix(in srgb,var(--krank) 35%,transparent)}
-.chip.elternzeit{background:var(--eltern-bg);color:var(--eltern-text);border:1px solid color-mix(in srgb,var(--eltern) 35%,transparent)}
-.chip.sonderurlaub{background:var(--sonder-bg);color:var(--sonder-text);border:1px solid color-mix(in srgb,var(--sonder) 35%,transparent)}
 
 /* ── RUFBEREITSCHAFT OVERVIEW ── */
 .ruf-wrap{overflow-y:auto;flex:1;padding:14px;background:var(--bg);height:100%}
+/* Monatsuebersicht: Zeilen = Personen, Spalten = Tage */
+.mx-scroll{overflow:auto;max-height:calc(100vh - 190px);border:2px solid var(--border);border-radius:11px;background:var(--surface)}
+.mx-table{border-collapse:separate;border-spacing:0;font-size:11px;width:max-content;min-width:100%}
+.mx-table th,.mx-table td{border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:0;text-align:center}
+.mx-table thead th{position:sticky;top:0;z-index:3;background:var(--surface2);font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:700;color:var(--text2);padding:4px 0;min-width:24px}
+.mx-table thead th.we{color:var(--text3);background:var(--surface3)}
+.mx-table thead th.hol{color:var(--spaet)}
+.mx-name{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left!important;
+  padding:3px 9px!important;white-space:nowrap;font-weight:600;min-width:150px}
+.mx-table thead .mx-name{z-index:4;background:var(--surface2)}
+.mx-name .mx-team{font-size:9px;color:var(--text3);margin-left:5px;font-family:'JetBrains Mono',monospace}
+.mx-cell{cursor:pointer;height:24px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;color:var(--text3)}
+.mx-cell:hover{outline:2px solid var(--blue);outline-offset:-2px}
+.mx-cell.we{background:var(--surface3)}
+.mx-cell.frueh{background:var(--frueh-bg);color:var(--frueh-text)}
+.mx-cell.spaet{background:var(--spaet-bg);color:var(--spaet-text)}
+.mx-cell.rufbereitschaft{background:var(--ruf-bg);color:var(--ruf-text)}
+.mx-cell.doppelt{background:var(--krank-bg);color:var(--krank-text);outline:1px solid var(--krank)}
+.mx-sum{position:sticky;right:0;background:var(--surface2);font-family:'JetBrains Mono',monospace;
+  font-size:10px;color:var(--text2);padding:0 8px!important;white-space:nowrap;border-left:2px solid var(--border)}
+.mx-foot td{background:var(--surface2);font-family:'JetBrains Mono',monospace;font-size:9.5px;
+  color:var(--text2);height:20px;position:sticky;bottom:0;z-index:2}
+.mx-foot td.unter{color:var(--krank);font-weight:800;background:var(--krank-bg)}
+.mx-legend{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:11.5px;color:var(--text2);
+  margin-bottom:9px;padding:0 2px}
+.mx-legend span{display:inline-flex;align-items:center;gap:5px}
+.mx-legend i{font-style:normal;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;
+  padding:1px 5px;border-radius:4px}
+.ruf-split{display:grid;grid-template-columns:minmax(360px,42%) 1fr;gap:14px;align-items:start}
+@media(max-width:1100px){.ruf-split{grid-template-columns:1fr}}
+.ruf-col{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:11px 12px;min-width:0}
+.ruf-col-hdr{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.ruf-col-hdr h3{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;margin-right:auto;white-space:nowrap}
+.ruf-col-hdr select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:5px 8px;border-radius:7px;font-size:12px}
+.ruf-col-body{max-height:calc(100vh - 230px);overflow-y:auto}
+.ruf-hint{font-size:11.5px;color:var(--text3);line-height:1.55;margin-bottom:9px}
 .ruf-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .ruf-toolbar select{background:var(--surface);border:2px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:13px;font-family:inherit}
 .ruf-toolbar select:focus{outline:none;border-color:var(--blue)}
@@ -499,6 +537,14 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
   .view-panel{display:none!important}
   .view-panel.active{display:block!important}
   .cal-wrap,.ruf-wrap{overflow:visible!important;padding:0!important;background:#fff!important}
+  /* Monatsuebersicht: Deckel und Klebespalten aufheben, sonst wird die
+     Tabelle im Ausdruck abgeschnitten. */
+  .mx-scroll{max-height:none!important;overflow:visible!important;border:none!important}
+  .mx-name,.mx-sum,.mx-table thead th,.mx-foot td{position:static!important}
+  .mx-cell{height:auto!important;padding:2px 0!important}
+  .ruf-col-body{max-height:none!important;overflow:visible!important}
+  .ruf-split{display:block!important}
+  .ruf-col{border:none!important;padding:0!important;margin-bottom:14px}
 
   /* Kopfzeile und Legende erscheinen nur auf dem Papier */
   .print-head.print-only{display:flex!important}
@@ -524,7 +570,8 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
      also als lesbare Zeile ausgeben statt als Punkt mit ueberlaufendem Text. */
   .conflict-badge{position:static!important;width:auto!important;height:auto!important;
     border-radius:3px!important;background:#fff!important;border:1px solid var(--krank-text)!important;
-    color:var(--krank-text)!important;font-size:8px;font-weight:700;padding:1px 3px;margin-bottom:2px}
+    color:var(--krank-text)!important;font-size:8px;font-weight:700;padding:1px 3px;margin-bottom:2px;
+    overflow:visible!important;text-indent:0!important;white-space:normal!important}
 }
 
 .chips-row{animation:slideDown .15s ease both}
@@ -569,12 +616,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
     <div class="pill"        role="button" tabindex="0" data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
   </div>
   <div class="sep"></div>
-  <div class="hdr-pills" id="modebar2">
-    <div class="pill" role="button" tabindex="0" data-shift="urlaub"      title="Urlaub"><span class="dot dot-u"></span>U</div>
-    <div class="pill" role="button" tabindex="0" data-shift="krank"       title="Krank"><span class="dot dot-k"></span>K</div>
-    <div class="pill" role="button" tabindex="0" data-shift="elternzeit"  title="Elternzeit"><span class="dot dot-e"></span>E</div>
-    <div class="pill" role="button" tabindex="0" data-shift="sonderurlaub" title="Sonderurlaub"><span class="dot dot-so"></span>So</div>
-  </div>
+
   <div class="sep"></div>
   <div style="display:flex;gap:3px;align-items:center">
     <div class="hbtn" id="btn-range" title="Zeitraum auswählen">⇿ Zeitraum</div>
@@ -610,10 +652,10 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 
 <div class="view-tabs">
   <div class="vtab active" data-view="cal">📅 Kalender</div>
+  <div class="vtab" data-view="matrix">▦ Monatsübersicht</div>
   <div class="vtab" data-view="ruf">🔔 Rufbereitschaft</div>
   <div class="vtab" data-view="tmpl">⚙ Autoplan-Template</div>
   <div class="vtab" data-view="hol">🎉 Eigene Feiertage</div>
-  <div class="vtab" data-view="rufkw">📋 Ruf-KW Plan</div>
 </div>
 
 <button class="sidebar-toggle" id="sidebar-toggle">◀</button>
@@ -693,38 +735,47 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
     </div>
   </div>
 
-  <!-- RUFBEREITSCHAFT VIEW (merged with KW) -->
-  <!-- RUFBEREITSCHAFT VIEW -->
-  <div class="view-panel" data-panel="ruf">
-    <div class="ruf-wrap" id="ruf-wrap">
-      <div class="ruf-toolbar">
-        <select id="ruf-year"></select>
-        <select id="ruf-month"><option value="">Alle Monate</option></select>
-        <button class="btn-p" onclick="renderRufView()">Anzeigen</button>
-        <button class="btn-s" onclick="exportRufCSV()">↓ CSV</button>
-        <button class="btn-s" onclick="window.print()">🖨 Drucken</button>
-      </div>
-      <div id="ruf-summary" class="ruf-summary"></div>
-      <div id="ruf-table-wrap" class="ruf-table-wrap"><div class="ruf-empty">Monat wählen und „Anzeigen" klicken</div></div>
+  <!-- MONATSÜBERSICHT: Personen über die Tage des Monats -->
+  <div class="view-panel" data-panel="matrix">
+    <div class="cal-wrap">
+      <div class="mx-legend" id="mx-legend"></div>
+      <div class="mx-scroll"><table class="mx-table" id="mx-table"></table></div>
     </div>
   </div>
 
-  <!-- RUF-KW VIEW -->
-  <div class="view-panel" data-panel="rufkw">
-    <div class="ruf-wrap" id="rufkw-wrap">
-      <div class="ruf-toolbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">📋 Rufbereitschaft KW-Plan</div>
-        <select id="rufkw-year" style="background:var(--surface);border:2px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:13px"></select>
-        <button class="btn-p" onclick="saveRufKW()">💾 Speichern</button>
-        <button class="btn-s" onclick="syncRufKWFromCalendar()" title="Bestehende Rufbereitschafts-Einträge aus dem Kalender in diesen Plan einlesen">↙ Aus Kalender einlesen</button>
-        <button class="btn-p" onclick="openApplyRufKW()" style="background:var(--frueh);color:#000">▶ Auf Kalender anwenden</button>
-        <button class="btn-s" onclick="exportRufKWCSV()">↓ CSV</button>
+  <!-- RUFBEREITSCHAFT: Wochenplan und eingetragene Tage in einer Ansicht -->
+  <div class="view-panel" data-panel="ruf">
+    <div class="ruf-wrap" id="ruf-wrap">
+      <div class="ruf-split">
+
+        <section class="ruf-col">
+          <div class="ruf-col-hdr">
+            <h3>Wochenplan</h3>
+            <select id="rufkw-year"></select>
+            <button class="btn-p" onclick="saveRufKW()">Speichern</button>
+            <button class="btn-s" onclick="syncRufKWFromCalendar()" title="Bestehende Rufbereitschafts-Einträge aus dem Kalender in diesen Plan einlesen">↙ Aus Kalender</button>
+            <button class="btn-p" onclick="openApplyRufKW()" style="background:var(--frueh);color:#000">▶ Anwenden</button>
+            <button class="btn-s" onclick="exportRufKWCSV()">↓ CSV</button>
+          </div>
+          <p class="ruf-hint">Je Kalenderwoche eine oder mehrere Personen zuweisen – Klick auf eine Zelle öffnet die Auswahl.
+            <strong>▶ Anwenden</strong> überträgt den Plan in den Kalender.</p>
+          <div id="rufkw-table-wrap" class="ruf-col-body"></div>
+        </section>
+
+        <section class="ruf-col">
+          <div class="ruf-col-hdr">
+            <h3>Eingetragene Tage</h3>
+            <select id="ruf-year"></select>
+            <select id="ruf-month"><option value="">Alle Monate</option></select>
+            <button class="btn-p" onclick="renderRufView()">Anzeigen</button>
+            <button class="btn-s" onclick="exportRufCSV()">↓ CSV</button>
+            <button class="btn-s" onclick="window.print()">🖨 Drucken</button>
+          </div>
+          <div id="ruf-summary" class="ruf-summary"></div>
+          <div id="ruf-table-wrap" class="ruf-table-wrap ruf-col-body"><div class="ruf-empty">Monat wählen und „Anzeigen" klicken</div></div>
+        </section>
+
       </div>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;line-height:1.6">
-        Weise jeder Kalenderwoche eine oder mehrere Personen für Rufbereitschaft zu. Klick auf eine Zelle öffnet die Personenauswahl.
-        Danach mit <strong>▶ Auf Kalender anwenden</strong> die Einträge in den Kalender übernehmen.
-      </p>
-      <div id="rufkw-table-wrap"></div>
     </div>
   </div>
 
@@ -979,17 +1030,17 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 // ══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════
-const ALL_SHIFTS  = ['frueh','spaet','rufbereitschaft','urlaub','krank','elternzeit','sonderurlaub'];
-const EXCLUSIVE   = new Set(['frueh','spaet','urlaub','krank','elternzeit','sonderurlaub']);
+// Diese Fassung plant nur Schichten - keine Abwesenheiten.
+const ALL_SHIFTS  = ['frueh','spaet','rufbereitschaft'];
+const EXCLUSIVE   = new Set(['frueh','spaet']);
 const WORK_SHIFTS = new Set(['frueh','spaet','rufbereitschaft']);
-const ABSENCE     = new Set(['urlaub','krank','elternzeit','sonderurlaub']);
-const SHIFT_LABEL = {frueh:'Frühschicht',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft',urlaub:'Urlaub',krank:'Krank',elternzeit:'Elternzeit',sonderurlaub:'Sonderurlaub'};
+const SHIFT_LABEL = {frueh:'Frühschicht',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft'};
 // Frischer, leerer Tag - jeder Aufruf liefert eigene Arrays.
 function emptyDay(){return Object.fromEntries(ALL_SHIFTS.map(s=>[s,[]]));}
-const SHIFT_TIME  = {frueh:'06:00–14:00',spaet:'14:00–22:00',rufbereitschaft:'22:00–06:00',urlaub:'ganztägig',krank:'ganztägig',elternzeit:'ganztägig',sonderurlaub:'ganztägig'};
-const SHIFT_CSS   = {frueh:'frueh',spaet:'spaet',rufbereitschaft:'ruf',urlaub:'urlaub',krank:'krank',elternzeit:'elternzeit',sonderurlaub:'sonderurlaub'};
-const SHIFT_VAR   = {frueh:'--frueh',spaet:'--spaet',rufbereitschaft:'--ruf',urlaub:'--urlaub',krank:'--krank',elternzeit:'--eltern',sonderurlaub:'--sonder'};
-const SHIFT_SHORT = {frueh:['F','var(--frueh)'],spaet:['S','var(--spaet)'],rufbereitschaft:['R','var(--ruf)'],urlaub:['U','var(--urlaub)'],krank:['K','var(--krank)'],elternzeit:['E','var(--eltern)'],sonderurlaub:['So','var(--sonder)']};
+const SHIFT_TIME  = {frueh:'06:00–14:00',spaet:'14:00–22:00',rufbereitschaft:'22:00–06:00'};
+const SHIFT_CSS   = {frueh:'frueh',spaet:'spaet',rufbereitschaft:'ruf'};
+const SHIFT_VAR   = {frueh:'--frueh',spaet:'--spaet',rufbereitschaft:'--ruf'};
+const SHIFT_SHORT = {frueh:['F','var(--frueh)'],spaet:['S','var(--spaet)'],rufbereitschaft:['R','var(--ruf)']};
 const DOW_NAMES   = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 const MONTHS      = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const MONTH_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -1430,10 +1481,10 @@ function switchSubTab(view, subId){
       tab.classList.add('active');
       const view=tab.dataset.view; activeView=view;
       document.querySelector('[data-panel="'+view+'"]').classList.add('active');
-      if(view==='ruf') renderRufView();
+      if(view==='matrix') renderMatrix();
+      if(view==='ruf'){ renderRufKWTable(); renderRufView(); }
       if(view==='tmpl') renderTemplateTable();
       if(view==='hol') renderCustomHolidays();
-      if(view==='rufkw') renderRufKWTable();
       updatePrintHead();
     });
   });
@@ -1444,7 +1495,7 @@ function switchSubTab(view, subId){
     document.querySelectorAll('.pill').forEach(x=>x.classList.toggle('active',x===p));
     updateSelInfo();
   };
-  ['modebar','modebar2'].forEach(id=>{
+  ['modebar'].forEach(id=>{
     const bar=document.getElementById(id);
     bar.addEventListener('click',e=>{
       const p=e.target.closest('[data-shift]'); if(p) pickShift(p);
@@ -1573,8 +1624,8 @@ function updatePrintHead(){
     const m=document.getElementById('ruf-month');
     const mn=m&&m.value?` ${m.options[m.selectedIndex].textContent}`:'';
     text=`Rufbereitschaft${mn} ${j}`;
-  }else if(activeView==='rufkw'){
-    text=`Rufbereitschaft KW-Plan ${document.getElementById('rufkw-year')?.value||curYear}`;
+  }else if(activeView==='matrix'){
+    text=`Monatsübersicht ${monat}`;
   }else if(activeView==='tmpl'){
     text='Autoplan-Template';
   }else if(activeView==='hol'){
@@ -1702,13 +1753,18 @@ function showColorPicker(anchor,memberName){
 function initials(name){return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
 function avContent(m){return m.icon?`<span style="font-size:17px;line-height:1">${m.icon}</span>`:`<span>${initials(m.name)}</span>`;}
 
-function renderMembers(){
+// Suche und Team-Filter der Seitenleiste gelten auch fuer die Monatsuebersicht.
+function visibleMembers(){
   const search=(document.getElementById('sb-search')?.value||'').toLowerCase();
   const teamF=document.getElementById('sb-team-filter')?.value||'';
-  const visible=mitarbeiter.filter(m=>
+  return mitarbeiter.filter(m=>
     (!search||m.name.toLowerCase().includes(search))&&
     (!teamF||m.team===teamF)
   );
+}
+
+function renderMembers(){
+  const visible=visibleMembers();
   document.getElementById('member-list').innerHTML=visible.map(m=>{
     const sel=selectedPerson?.name===m.name,picked=selectedPersons.has(m.name);
     return `<div class="member-item${sel?' selected':''}${picked?' multi-picked':''}" data-member="${m.name}" style="${sel?`border-color:${m.color};color:${m.color}`:''}">
@@ -2088,18 +2144,23 @@ function makeCell(key,dayNum,other){
       }
       el.appendChild(ht);
     }
-    if(hasAny){const cb=document.createElement('div');cb.className='conflict-badge';const parts=[];if(schichtC.length)parts.push('Konfl.: '+schichtC.join(', '));if(holC.length){const h=holidays[key];parts.push('Feiertag ('+h.country+'): '+holC.join(', '));}cb.textContent='⚠ '+parts.join(' | ');el.appendChild(cb);}
-    else if(isUnder){const ub=document.createElement('div');ub.className='understaffed-badge';ub.textContent='⚠ Unterbesetzt';el.appendChild(ub);}
-    const si=document.createElement('div');si.className='soll-ist';
-    ['frueh','spaet','rufbereitschaft'].forEach(s=>{const ist=(slot[s]||[]).length,tgt=soll[s]||1;const bar=document.createElement('div');bar.className='si-bar';bar.title=SHIFT_LABEL[s]+': '+ist+'/'+tgt;const fill=document.createElement('div');fill.className='si-fill';fill.style.width=Math.min(100,ist/tgt*100)+'%';fill.style.background=ist===0?'var(--border)':ist<tgt?'var(--spaet)':ist===tgt?'var(--frueh)':'var(--krank)';bar.appendChild(fill);si.appendChild(bar);});
-    el.appendChild(si);
+    if(hasAny){const cb=document.createElement('div');cb.className='conflict-badge';const parts=[];if(schichtC.length)parts.push('Konfl.: '+schichtC.join(', '));if(holC.length){const h=holidays[key];parts.push('Feiertag ('+h.country+'): '+holC.join(', '));}cb.textContent='⚠ '+parts.join(' | ');cb.title=cb.textContent;el.appendChild(cb);}
+    // Jeder Tag zeigt immer alle drei Schichten in derselben Reihenfolge, auch
+    // wenn eine leer ist - so steht dieselbe Schicht in jeder Zelle an
+    // derselben Stelle und Luecken fallen beim Ueberfliegen auf.
     const ca=document.createElement('div');ca.className='chips-area';
     ALL_SHIFTS.forEach(s=>{
-      const people=slot[s]||[];if(!people.length)return;
-      const row=document.createElement('div');row.className='chips-row';
-      const lbl=document.createElement('span');lbl.className='chips-label';lbl.textContent=SHIFT_SHORT[s][0];lbl.style.color=SHIFT_SHORT[s][1];lbl.title=SHIFT_LABEL[s];row.appendChild(lbl);
+      const people=slot[s]||[], tgt=sollFor(s,key), fehlt=people.length<tgt;
+      const row=document.createElement('div');row.className='chips-row'+(people.length?'':' leer');
+      const lbl=document.createElement('span');lbl.className='chips-label'+(fehlt?' unter':'');
+      lbl.style.color=fehlt?'':SHIFT_SHORT[s][1];
+      lbl.innerHTML=`${SHIFT_SHORT[s][0]}<i>${tgt?people.length+'/'+tgt:people.length||''}</i>`;
+      lbl.title=tgt?`${SHIFT_LABEL[s]}: ${people.length} von ${tgt}`
+                  :`${SHIFT_LABEL[s]}: ${people.length} (am Wochenende kein Soll)`;
+      row.appendChild(lbl);
       const chips=document.createElement('div');chips.className='chips';
-      people.forEach(name=>{const m=mitarbeiter.find(x=>x.name===name);const chip=document.createElement('span');chip.className='chip '+SHIFT_CSS[s];chip.draggable=true;chip.dataset.key=key;chip.dataset.shift=s;chip.dataset.name=name;chip.style.borderLeft='2px solid '+(m?m.color:'#64748b');chip.textContent=(m?.icon?m.icon+' ':'')+name.split(' ')[0];chip.title=name+' · '+SHIFT_LABEL[s];chips.appendChild(chip);});
+      people.forEach(name=>{const m=mitarbeiter.find(x=>x.name===name);const chip=document.createElement('span');chip.className='chip '+SHIFT_CSS[s];chip.draggable=true;chip.dataset.key=key;chip.dataset.shift=s;chip.dataset.name=name;chip.title=name+' · '+SHIFT_LABEL[s];chip.style.borderLeft='2px solid '+(m?m.color:'#64748b');chip.textContent=(m?.icon?m.icon+' ':'')+name.split(' ')[0];chips.appendChild(chip);});
+      if(!people.length){const leer=document.createElement('span');leer.className='chip-leer';leer.textContent='–';chips.appendChild(leer);}
       row.appendChild(chips);ca.appendChild(row);
     });
     el.appendChild(ca);
@@ -2365,16 +2426,28 @@ document.addEventListener('mouseover',e=>{if(!rangeMode||!rangeStart||frozenRang
 // CONFLICTS & UNDERSTAFFED
 // ══════════════════════════════════════════════════════════════
 function getConflicts(slot,key){
-  const absents=new Set(ALL_SHIFTS.filter(s=>ABSENCE.has(s)).flatMap(s=>slot[s]||[]));
-  const schichtC=[];ALL_SHIFTS.filter(s=>WORK_SHIFTS.has(s)).forEach(s=>(slot[s]||[]).forEach(n=>{if(absents.has(n)&&!schichtC.includes(n))schichtC.push(n);}));
+  // Ohne Abwesenheiten bleibt ein Konflikt: jemand steht an einem Tag
+  // gleichzeitig in Früh und Spät. Rufbereitschaft laeuft daneben mit.
+  const zaehler={};
+  ['frueh','spaet'].forEach(s=>(slot[s]||[]).forEach(n=>{zaehler[n]=(zaehler[n]||0)+1;}));
+  const schichtC=Object.keys(zaehler).filter(n=>zaehler[n]>1);
   const holC=[];const hol=key?holidays[key]:null;
   if(hol&&hol.country!=='DE+IN'){ALL_SHIFTS.filter(s=>WORK_SHIFTS.has(s)).forEach(s=>{(slot[s]||[]).forEach(n=>{const m=mitarbeiter.find(x=>x.name===n);if(m&&m.team===hol.country&&!holC.includes(n))holC.push(n);});});}
   return{schichtC,holC,hasAny:schichtC.length>0||holC.length>0};
 }
+// Soll einer Schicht an einem bestimmten Tag. Am Wochenende wird nur
+// Rufbereitschaft besetzt - dieselbe Regel gilt fuer die Zaehler in den
+// Tageszellen, in der Monatsuebersicht und fuer die Unterbesetzung.
+function sollFor(shift,key){
+  if(key&&shift!=='rufbereitschaft'){
+    const dow=new Date(key+'T00:00:00').getDay();
+    if(dow===0||dow===6) return 0;
+  }
+  return soll[shift]||1;
+}
 function isUnderstaffed(slot,key){
   if(!slot)return false;
-  if(key){const dow=new Date(key+'T00:00:00').getDay();if(dow===0||dow===6)return(slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1);}
-  return(slot.frueh||[]).length<(soll.frueh||1)||(slot.spaet||[]).length<(soll.spaet||1)||(slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1);
+  return ALL_SHIFTS.some(s=>(slot[s]||[]).length<sollFor(s,key));
 }
 // Kalenderansicht aktivieren - von jumpToDate und vom Autoplan genutzt.
 function showCalendarView(){
@@ -2425,7 +2498,7 @@ function showUnderstaffedReport(){
 function openDayModal(key){
   activeDayKey=key;const d=new Date(key+'T00:00:00');
   document.getElementById('dm-title').textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const slot=getSlot(key),absents=new Set(ALL_SHIFTS.filter(s=>ABSENCE.has(s)).flatMap(s=>slot[s]||[]));
+  const slot=getSlot(key),absents=new Set(getConflicts(slot,key).schichtC);
   document.getElementById('dm-slots').innerHTML=ALL_SHIFTS.map(s=>{
     const color=`var(${SHIFT_VAR[s]})`,people=slot[s]||[];
     const ph=people.length?people.map(name=>{const m=mitarbeiter.find(x=>x.name===name),av=m?m.color:'#64748b';const conf=WORK_SHIFTS.has(s)&&absents.has(name);const avC=m?.icon?`<span style="font-size:12px">${m.icon}</span>`:`<span>${initials(name)}</span>`;return `<div class="dm-chip" style="background:color-mix(in srgb,${color} 15%,transparent);color:${color}${conf?';outline:2px solid #f87171':''}"><div class="dm-av" style="background:${av}">${avC}</div>${esc(name)}${conf?' ⚠':''}</div>`;}).join(''):'<div class="dm-empty">Niemand</div>';
@@ -2719,6 +2792,96 @@ function renderCoverageNote(){
     `Bitte mit dem Datum des jeweiligen Jahres oben als eigenen Feiertag mit Land <strong>IN</strong> eintragen – `+
     `er wirkt dann genau wie ein gesetzlicher Feiertag.`;
   el.style.display='block';
+}
+
+// ══════════════════════════════════════════════════════════════
+// MONATSÜBERSICHT
+// ══════════════════════════════════════════════════════════════
+// Eine Zeile je Person, eine Spalte je Tag. Zeigt auf einen Blick, wer wann
+// arbeitet, wo Luecken sind und wer an einem Tag doppelt eingeteilt ist.
+function renderMatrix(){
+  const tbl=document.getElementById('mx-table');
+  if(!tbl) return;
+  const tage=daysOfMonth(curYear,curMonth);
+  const leute=visibleMembers();
+
+  const lg=document.getElementById('mx-legend');
+  lg.innerHTML=ALL_SHIFTS.map(s=>
+    `<span><i class="mx-cell ${s}" style="display:inline-block;min-width:18px">${SHIFT_SHORT[s][0]}</i>${esc(SHIFT_LABEL[s])}</span>`).join('')
+    +`<span><i class="mx-cell doppelt" style="display:inline-block;min-width:18px">!</i>doppelt eingeteilt</span>`
+    +`<span style="color:var(--text3)">Klick auf eine Zelle wechselt die gewählte Schicht</span>`;
+
+  if(!leute.length){ tbl.innerHTML='<tbody><tr><td class="mx-name">Keine Mitarbeiter</td></tr></tbody>'; return; }
+
+  const kopf=['<thead><tr><th class="mx-name">Mitarbeiter</th>'];
+  tage.forEach(t=>{
+    const cls=[t.we?'we':'', holidays[t.key]&&!holidays[t.key].bridge?'hol':''].filter(Boolean).join(' ');
+    const titel=holidays[t.key]?esc(holidays[t.key].name):t.lang;
+    kopf.push(`<th class="${cls}" title="${titel}">${t.tag}<br>${t.kurz}</th>`);
+  });
+  kopf.push('<th class="mx-sum">F/S/R</th></tr></thead>');
+
+  const zeilen=leute.map(m=>{
+    const zellen=[], zaehl={frueh:0,spaet:0,rufbereitschaft:0};
+    tage.forEach(t=>{
+      const slot=schichten[t.key]||{};
+      const seine=ALL_SHIFTS.filter(s=>(slot[s]||[]).includes(m.name));
+      seine.forEach(s=>zaehl[s]++);
+      const doppelt=seine.filter(s=>s!=='rufbereitschaft').length>1;
+      const cls=doppelt?'doppelt':(seine[0]||(t.we?'we':''));
+      const txt=doppelt?'!':seine.map(s=>SHIFT_SHORT[s][0]).join('');
+      zellen.push(`<td class="mx-cell ${cls}" data-key="${t.key}" data-name="${esc(m.name)}"`+
+        ` title="${esc(m.name)} · ${t.lang}${seine.length?' · '+seine.map(s=>SHIFT_LABEL[s]).join(' + '):''}">${txt||''}</td>`);
+    });
+    const av=`<span class="avatar" style="background:${m.color};width:15px;height:15px;font-size:8px;display:inline-flex;vertical-align:-3px;margin-right:6px">${m.icon||initials(m.name)}</span>`;
+    return `<tr><td class="mx-name">${av}${esc(m.name)}<span class="mx-team">${esc(m.team||'')}</span></td>`+
+      zellen.join('')+
+      `<td class="mx-sum">${zaehl.frueh}/${zaehl.spaet}/${zaehl.rufbereitschaft}</td></tr>`;
+  });
+
+  // Fusszeile: Besetzung je Tag, rot wenn unter Soll
+  const fuss=['<tr class="mx-foot"><td class="mx-name">Besetzung F/S/R</td>'];
+  tage.forEach(t=>{
+    const slot=schichten[t.key]||{};
+    const zahlen=ALL_SHIFTS.map(s=>(slot[s]||[]).length);
+    const unter=ALL_SHIFTS.some((s,i)=>zahlen[i]<sollFor(s,t.key));
+    fuss.push(`<td class="${unter?'unter':''}" title="${t.lang}">${zahlen.join('/')}</td>`);
+  });
+  fuss.push('<td class="mx-sum"></td></tr>');
+
+  tbl.innerHTML=kopf.join('')+'<tbody>'+zeilen.join('')+fuss.join('')+'</tbody>';
+
+  tbl.querySelectorAll('.mx-cell[data-key]').forEach(td=>{
+    td.addEventListener('click',async()=>{
+      const name=td.dataset.name;
+      pushUndo();
+      const res=await postSchicht([td.dataset.key],'toggle',selectedShift,name);
+      const r=res?.results?.[td.dataset.key];
+      if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
+        undoStack.pop();updateUndoBtns();
+        const replace=r.error==='needs_confirm';
+        const ok=replace?await confirmReplaceShift(name,r.blocking):await confirmHolidayEntry(name,[[td.dataset.key,r]]);
+        if(!ok) return;
+        pushUndo();
+        const r2=await postSchicht([td.dataset.key],'add',selectedShift,name,true,replace);
+        applyResults(r2.results);showHolWarnings(r2.hol_warnings);
+      }else if(r?.error){ undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich'); }
+      else { applyResults(res.results);showHolWarnings(res.hol_warnings); }
+      renderMatrix();
+    });
+  });
+}
+
+// Tage des Monats mit Kurzform fuer die Spaltenkoepfe
+function daysOfMonth(jahr,monat){
+  const out=[], letzter=new Date(jahr,monat,0).getDate();
+  for(let d=1;d<=letzter;d++){
+    const dt=new Date(jahr,monat-1,d), wd=dt.getDay();
+    out.push({key:dk(jahr,monat,d), tag:d, kurz:['So','Mo','Di','Mi','Do','Fr','Sa'][wd],
+      we:wd===0||wd===6,
+      lang:dt.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})});
+  }
+  return out;
 }
 
 // ══════════════════════════════════════════════════════════════
