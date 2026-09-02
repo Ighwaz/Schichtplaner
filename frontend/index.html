@@ -319,10 +319,20 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .mx-legend span{display:inline-flex;align-items:center;gap:5px}
 .mx-legend i{font-style:normal;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;
   padding:1px 5px;border-radius:4px}
-.ruf-split{display:grid;grid-template-columns:minmax(360px,42%) 1fr;gap:14px;align-items:start}
-@media(max-width:1100px){.ruf-split{grid-template-columns:1fr}}
-.ruf-col{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:11px 12px;min-width:0}
 .ruf-col-hdr{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.ruf-filter{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap}
+.ruf-filter input{accent-color:var(--blue);cursor:pointer}
+/* Abgleich Plan gegen Kalender */
+.rufkw-ist{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px}
+.ist-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:6px;font-size:11.5px;
+  background:var(--ruf-bg);color:var(--ruf-text);border:1px solid color-mix(in srgb,var(--ruf) 30%,transparent)}
+.ist-chip b{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;opacity:.8}
+.rufkw-status{font-size:11px;font-weight:700;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+.st-ok{color:var(--frueh)}
+.st-offen{color:var(--spaet)}
+.st-abw{color:var(--krank)}
+tr.zeile-abw td{background:color-mix(in srgb,var(--krank) 7%,transparent)}
+tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 .ruf-col-hdr h3{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;margin-right:auto;white-space:nowrap}
 .ruf-col-hdr select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:5px 8px;border-radius:7px;font-size:12px}
 .ruf-col-body{max-height:calc(100vh - 230px);overflow-y:auto}
@@ -334,9 +344,9 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .ruf-sum-card{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:150px}
 .ruf-sum-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
 .ruf-sum-name{font-weight:600;font-size:13px}
+.ruf-sum-sub{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace}
 .ruf-sum-count{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--ruf);margin-left:auto}
 .ruf-sum-label{font-size:10px;color:var(--text3)}
-.ruf-table-wrap{background:var(--surface);border:2px solid var(--border);border-radius:12px;overflow:hidden}
 .ruf-table{width:100%;border-collapse:collapse;font-size:13px}
 .ruf-table th{background:var(--surface2);padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);font-family:'JetBrains Mono',monospace;border-bottom:2px solid var(--border)}
 .ruf-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -778,39 +788,24 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
     </div>
   </div>
 
-  <!-- RUFBEREITSCHAFT: Wochenplan und eingetragene Tage in einer Ansicht -->
+  <!-- RUFBEREITSCHAFT: Plan und Kalender in einer Tabelle -->
   <div class="view-panel" data-panel="ruf">
     <div class="ruf-wrap" id="ruf-wrap">
-      <div class="ruf-split">
-
-        <section class="ruf-col">
-          <div class="ruf-col-hdr">
-            <h3>Wochenplan</h3>
-            <select id="rufkw-year"></select>
-            <button class="btn-p" onclick="saveRufKW()">Speichern</button>
-            <button class="btn-s" onclick="syncRufKWFromCalendar()" title="Bestehende Rufbereitschafts-Einträge aus dem Kalender in diesen Plan einlesen">↙ Aus Kalender</button>
-            <button class="btn-p" onclick="openApplyRufKW()" style="background:var(--frueh);color:#000">▶ Anwenden</button>
-            <button class="btn-s" onclick="exportRufKWCSV()">↓ CSV</button>
-          </div>
-          <p class="ruf-hint">Je Kalenderwoche eine oder mehrere Personen zuweisen – Klick auf eine Zelle öffnet die Auswahl.
-            <strong>▶ Anwenden</strong> überträgt den Plan in den Kalender.</p>
-          <div id="rufkw-table-wrap" class="ruf-col-body"></div>
-        </section>
-
-        <section class="ruf-col">
-          <div class="ruf-col-hdr">
-            <h3>Eingetragene Tage</h3>
-            <select id="ruf-year"></select>
-            <select id="ruf-month"><option value="">Alle Monate</option></select>
-            <button class="btn-p" onclick="renderRufView()">Anzeigen</button>
-            <button class="btn-s" onclick="exportRufCSV()">↓ CSV</button>
-            <button class="btn-s" onclick="window.print()">🖨 Drucken</button>
-          </div>
-          <div id="ruf-summary" class="ruf-summary"></div>
-          <div id="ruf-table-wrap" class="ruf-table-wrap ruf-col-body"><div class="ruf-empty">Monat wählen und „Anzeigen" klicken</div></div>
-        </section>
-
+      <div class="ruf-col-hdr">
+        <h3>Rufbereitschaft</h3>
+        <select id="rufkw-year"></select>
+        <button class="btn-p" onclick="saveRufKW()">Speichern</button>
+        <button class="btn-p" onclick="openApplyRufKW()" style="background:var(--frueh);color:#000">▶ In den Kalender übertragen</button>
+        <button class="btn-s" onclick="syncRufKWFromCalendar()" title="Bestehende Rufbereitschafts-Einträge aus dem Kalender in den Plan einlesen">↙ Aus Kalender</button>
+        <button class="btn-s" onclick="exportRufKWCSV()" title="Wochenplan als CSV">↓ Wochen</button>
+        <button class="btn-s" onclick="exportRufCSV()" title="Eingetragene Tage als CSV">↓ Tage</button>
+        <label class="ruf-filter"><input type="checkbox" id="ruf-nur-abw"> nur Abweichungen</label>
       </div>
+      <p class="ruf-hint">Je Kalenderwoche eine oder mehrere Personen zuweisen – Klick auf eine Zelle öffnet die Auswahl.
+        Die Spalte <strong>Im Kalender</strong> zeigt, was davon tatsächlich in den Tagen steht;
+        <strong>▶ In den Kalender übertragen</strong> gleicht beides an.</p>
+      <div id="ruf-summary" class="ruf-summary"></div>
+      <div id="rufkw-table-wrap"></div>
     </div>
   </div>
 
@@ -1256,9 +1251,15 @@ function renderRufKWTable(){
     <table class="rufkw-table"><thead><tr>
       <th class="rufkw-kw-col">KW</th>
       <th class="rufkw-date-col">Mo – So</th>
-      <th>Rufbereitschaft</th>
+      <th>Geplant</th>
+      <th>Im Kalender</th>
+      <th style="width:110px">Abgleich</th>
     </tr></thead><tbody id="rufkw-tbody"></tbody></table></div>`;
+  renderRufSummary();
+  const filter=document.getElementById('ruf-nur-abw');
+  if(filter&&!filter._wired){ filter.addEventListener('change',renderRufKWTable); filter._wired=true; }
   const tbody=document.getElementById('rufkw-tbody');
+  const nurAbweichungen=filter?.checked;
   weeks.forEach(w=>{
     const rawKW=rufKW[w.kwKey]; const names=rawKW?(Array.isArray(rawKW)?rawKW:[rawKW]):[];
     const isCur=w.kwKey===todayKW;
@@ -1288,8 +1289,58 @@ function renderRufKWTable(){
       if(rm){e.stopPropagation();removeRufKWPerson(rm.dataset.rmKw,rm.dataset.rmName);return;}
       openRufKWPicker(w.kwKey,addBtn);
     });
-    tdP.appendChild(cell); tr.appendChild(tdP); tbody.appendChild(tr);
+    tdP.appendChild(cell); tr.appendChild(tdP);
+
+    // Was steht tatsaechlich im Kalender? Und deckt es sich mit dem Plan?
+    const ist=kwImKalender(w);
+    const istNamen=Object.keys(ist).sort();
+    const planNamen=[...names].sort();
+    const tdIst=document.createElement('td');
+    const istBox=document.createElement('div'); istBox.className='rufkw-ist';
+    if(!istNamen.length){
+      const em=document.createElement('span'); em.className='rufkw-empty'; em.textContent='– nichts –';
+      istBox.appendChild(em);
+    } else istNamen.forEach(n=>{
+      const c=document.createElement('span'); c.className='ist-chip';
+      c.innerHTML=`${esc(n)} <b>${ist[n]}/7</b>`;
+      c.title=`${n}: ${ist[n]} von 7 Tagen dieser Woche`;
+      istBox.appendChild(c);
+    });
+    tdIst.appendChild(istBox); tr.appendChild(tdIst);
+
+    const gleich=planNamen.length===istNamen.length&&planNamen.every((n,k)=>n===istNamen[k]);
+    const voll=istNamen.length&&istNamen.every(n=>ist[n]===7);
+    let stand='leer', text='';
+    if(planNamen.length||istNamen.length){
+      if(gleich&&voll){ stand='ok'; text='✓ übertragen'; }
+      else if(!istNamen.length){ stand='offen'; text='nicht übertragen'; }
+      else { stand='abw'; text=gleich?'nur teilweise':'weicht ab'; }
+    }
+    const tdSt=document.createElement('td');
+    tdSt.innerHTML=text?`<span class="rufkw-status st-${stand}">${text}</span>`:'';
+    tr.appendChild(tdSt);
+    if(stand==='abw') tr.classList.add('zeile-abw');
+    if(stand==='offen') tr.classList.add('zeile-offen');
+    tr.dataset.stand=stand;
+
+    if(nurAbweichungen&&(stand==='ok'||stand==='leer')) return;
+    tbody.appendChild(tr);
   });
+  if(!tbody.children.length){
+    tbody.innerHTML='<tr><td colspan="5" style="padding:14px;color:var(--text3);font-size:12.5px">'+
+      (nurAbweichungen?'Alle Wochen sind übertragen.':'Keine Wochen.')+'</td></tr>';
+  }
+}
+
+// Rufbereitschaft, die fuer die Tage dieser Woche wirklich im Kalender steht.
+function kwImKalender(w){
+  const zaehler={};
+  for(let i=0;i<7;i++){
+    const d=new Date(w.start); d.setDate(w.start.getDate()+i);
+    const slot=schichten[dk(d.getFullYear(),d.getMonth()+1,d.getDate())];
+    (slot?.rufbereitschaft||[]).forEach(n=>{zaehler[n]=(zaehler[n]||0)+1;});
+  }
+  return zaehler;
 }
 
 let _rufkwPickerKey=null;
@@ -1398,7 +1449,6 @@ function renderAll(){
   renderStats();
   renderCustomHolidays();
   renderTemplateTable();
-  initRufSelects();
   refreshFolderBar();
 }
 
@@ -1505,8 +1555,7 @@ function switchSubTab(view, subId){
   document.querySelectorAll('.sub-panel').forEach(p=>{
     p.classList.toggle('active', p.id==='sub-'+subId);
   });
-  if(subId==='ruf-overview') renderRufView();
-  if(subId==='ruf-kw') renderRufKWTable();
+  if(subId==='ruf-overview'||subId==='ruf-kw') renderRufKWTable();
 }
 
   document.querySelectorAll('.vtab').forEach(tab=>{
@@ -1518,7 +1567,7 @@ function switchSubTab(view, subId){
       document.querySelector('[data-panel="'+view+'"]').classList.add('active');
       updateContextBar();
       if(view==='matrix') renderMatrix();
-      if(view==='ruf'){ renderRufKWTable(); renderRufView(); }
+      if(view==='ruf') renderRufKWTable();
       if(view==='tmpl') renderTemplateTable();
       if(view==='hol') renderCustomHolidays();
       updatePrintHead();
@@ -1656,10 +1705,7 @@ function updatePrintHead(){
     meta=`Soll je Tag: Früh ${soll.frueh??1} · Spät ${soll.spaet??1} · Rufbereitschaft ${soll.rufbereitschaft??1}`+
       ` — ${gedruckt}`;
   }else if(activeView==='ruf'){
-    const j=document.getElementById('ruf-year')?.value||curYear;
-    const m=document.getElementById('ruf-month');
-    const mn=m&&m.value?` ${m.options[m.selectedIndex].textContent}`:'';
-    text=`Rufbereitschaft${mn} ${j}`;
+    text=`Rufbereitschaft ${document.getElementById('rufkw-year')?.value||curYear}`;
   }else if(activeView==='matrix'){
     text=`Monatsübersicht ${monat}`;
   }else if(activeView==='tmpl'){
@@ -2737,75 +2783,27 @@ async function deleteTemplate(name){
 // ══════════════════════════════════════════════════════════════
 // RUFBEREITSCHAFT OVERVIEW
 // ══════════════════════════════════════════════════════════════
-function initRufSelects(){
-  const years=new Set(Object.keys(schichten).map(k=>k.slice(0,4)));years.add(String(curYear));
-  const ySel=document.getElementById('ruf-year');
-  ySel.innerHTML=[...years].sort().reverse().map(y=>`<option value="${y}"${y==curYear?' selected':''}>${y}</option>`).join('');
-  const mSel=document.getElementById('ruf-month');
-  mSel.innerHTML='<option value="">Alle Monate</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
-}
-
-function renderRufView(){
-  const year=parseInt(document.getElementById('ruf-year').value);
-  const month=document.getElementById('ruf-month').value;
-  const pre=month?year+'-'+String(month).padStart(2,'0'):String(year);
-
-  // Collect ruf entries
-  const entries=[];
-  Object.entries(schichten).forEach(([key,slot])=>{
-    if(!key.startsWith(pre))return;
-    (slot.rufbereitschaft||[]).forEach(name=>entries.push({key,name}));
-  });
-  entries.sort((a,b)=>a.key.localeCompare(b.key));
-
-  // Summary per person
-  const perPerson={};
-  mitarbeiter.forEach(m=>{perPerson[m.name]=0;});
-  entries.forEach(e=>{if(perPerson[e.name]!==undefined)perPerson[e.name]++;else perPerson[e.name]=1;});
-
-  // Summary cards
+// Zaehler je Person aus den tatsaechlichen Kalendereintraegen des Jahres.
+function renderRufSummary(){
   const sumWrap=document.getElementById('ruf-summary');
-  const sorted=Object.entries(perPerson).filter(([,c])=>c>0).sort((a,b)=>b[1]-a[1]);
-  sumWrap.innerHTML=sorted.map(([name,count])=>{
-    const m=mitarbeiter.find(x=>x.name===name);const color=m?m.color:'#64748b';
-    return `<div class="ruf-sum-card">
-      <div class="ruf-sum-av" style="background:${color}">${m?.icon||initials(name)}</div>
-      <div><div class="ruf-sum-name">${esc(name)}</div><div class="ruf-sum-label">Rufbereitschaften</div></div>
-      <div class="ruf-sum-count">${count}</div>
-    </div>`;
-  }).join('')||'<div style="color:var(--text3);font-size:13px">Keine Einträge</div>';
-
-  // Table
-  const twrap=document.getElementById('ruf-table-wrap');
-  if(!entries.length){twrap.innerHTML='<div class="ruf-empty">Keine Rufbereitschaftseinträge für diesen Zeitraum</div>';return;}
-
-  const dayNames=['So','Mo','Di','Mi','Do','Fr','Sa'];
-  // Group by date
-  const byDate={};
-  entries.forEach(e=>{if(!byDate[e.key])byDate[e.key]=[];byDate[e.key].push(e.name);});
-
-  twrap.innerHTML=`<table class="ruf-table">
-    <thead><tr>
-      <th>KW</th><th>Datum</th><th>Tag</th><th>Rufbereitschaft</th>
-    </tr></thead>
-    <tbody>${Object.entries(byDate).map(([key,names])=>{
-      const d=new Date(key+'T00:00:00');
-      const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-      const dayName=dayNames[d.getDay()];
-      const isWE=d.getDay()===0||d.getDay()===6;
-      const chips=names.map(name=>{const m=mitarbeiter.find(x=>x.name===name);const color=m?m.color:'#64748b';
-        return `<span class="ruf-person-chip"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${color};font-size:${m?.icon?'11px':'8px'};color:#fff;font-weight:700;flex-shrink:0">${m?.icon||initials(name)}</span>${esc(name)}</span>`;
-      }).join('');
-      const kwNum=getISOWeek(d);
-      return `<tr><td class="ruf-date-col" style="color:var(--ruf);font-size:10px">KW ${kwNum}</td><td class="ruf-date-col">${dateStr}</td><td class="ruf-day-col" style="${isWE?'color:var(--text3)':''}">${dayName}</td><td>${chips}</td></tr>`;
-    }).join('')}</tbody>
-  </table>`;
+  if(!sumWrap) return;
+  const jahr=document.getElementById('rufkw-year')?.value||String(curYear);
+  const proPerson={};
+  Object.entries(schichten).forEach(([key,slot])=>{
+    if(!key.startsWith(jahr)) return;
+    (slot.rufbereitschaft||[]).forEach(n=>{proPerson[n]=(proPerson[n]||0)+1;});
+  });
+  const namen=Object.keys(proPerson).sort((a,b)=>proPerson[b]-proPerson[a]);
+  sumWrap.innerHTML=namen.length?namen.map(n=>{
+    const m=mitarbeiter.find(x=>x.name===n);
+    return `<div class="ruf-sum-card"><span class="avatar" style="background:${m?m.color:'#64748b'};width:26px;height:26px;font-size:11px">${m?.icon||initials(n)}</span>`+
+      `<div><div class="ruf-sum-name">${esc(n)}</div><div class="ruf-sum-sub">Tage ${jahr}</div></div>`+
+      `<div class="ruf-sum-count">${proPerson[n]}</div></div>`;
+  }).join(''):'<span style="font-size:12px;color:var(--text3)">Noch keine Rufbereitschaft im Kalender.</span>';
 }
 
 function exportRufCSV(){
-  const year=parseInt(document.getElementById('ruf-year').value);
-  const month=document.getElementById('ruf-month').value;
-  const pre=month?year+'-'+String(month).padStart(2,'0'):String(year);
+  const pre=document.getElementById('rufkw-year')?.value||String(curYear);
   const entries=[];
   Object.entries(schichten).forEach(([key,slot])=>{
     if(!key.startsWith(pre))return;
