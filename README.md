@@ -17,6 +17,8 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   Jahr übertragen werden kann
 - **Massenanlage** für Mitarbeiter und eigene Feiertage: Liste einfügen
   (auch aus Excel), Vorschau prüfen, anlegen
+- **Druckansicht** im Querformat: nur die offene Ansicht, mit Kopfzeile,
+  Legende und ausgeschriebenen Notizen – unabhängig vom Theme immer auf Weiß
 - **Import/Export** als ICS (Kalender) und JSON (vollständiges Backup)
 - **Datenordner frei wählbar**
 

@@ -456,16 +456,75 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 
 #toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:2px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;z-index:999;max-width:340px;transition:opacity .2s}
 #toast.show{opacity:1;animation:toastIn .22s cubic-bezier(.34,1.56,.64,1) both}
+/* Nur im Ausdruck sichtbar */
+.print-only{display:none}
+.note-print{display:none;font-size:9px;line-height:1.35;color:#26292f;
+  border-top:1px dashed #b8bcc6;margin-top:3px;padding-top:2px;white-space:normal}
+.print-head{align-items:baseline;justify-content:space-between;gap:12px;
+  border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:7px}
+.print-head h2{font-size:15px;font-weight:800;letter-spacing:-.2px}
+.print-head .ph-meta{font-size:10px;color:#26292f;text-align:right;white-space:nowrap}
+.print-legend{margin-top:8px;padding-top:5px;border-top:1px solid #9aa0ad;
+  font-size:9.5px;color:#26292f;flex-wrap:wrap;gap:12px}
+.print-legend b{font-family:'JetBrains Mono',monospace;margin-right:3px}
+
+@page{size:A4 landscape;margin:9mm}
+
 @media print{
-  header,.folder-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,.day-actions,.ruf-export-row,.tmpl-footer{display:none!important}
+  /* Auf Papier immer helle, kontraststarke Farben - unabhaengig davon, ob im
+     Fenster gerade das dunkle Theme laeuft. Sonst kaeme heller Text auf weissem
+     Papier heraus, weil Drucker Hintergruende standardmaessig weglassen. */
+  :root,:root[data-theme=dark],:root[data-theme=light]{
+    --bg:#fff;--surface:#fff;--surface2:#fff;--surface3:#f2f2f2;
+    --border:#9aa0ad;--border2:#6b7280;
+    --text:#000;--text2:#26292f;--text3:#4b5060;
+    --frueh-text:#15803d;--spaet-text:#a45309;--ruf-text:#6d28d9;
+    --urlaub-text:#a3164f;--krank-text:#b91c1c;--eltern-text:#0e7490;--sonder-text:#8a4308;
+    --frueh-bg:#eaf7ee;--spaet-bg:#fdf1e0;--ruf-bg:#f1ebfd;
+    --urlaub-bg:#fdebf3;--krank-bg:#fdecec;--eltern-bg:#e6f6fa;--sonder-bg:#fbf0e3;
+    --today:transparent;--shadow:transparent;--day-other:1;
+  }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;
+    box-shadow:none!important;animation:none!important;transition:none!important}
+  html,body{height:auto!important;overflow:visible!important;background:#fff!important;font-size:11px}
+
+  /* Alles, was nur zum Bedienen da ist */
+  header,.folder-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
+  .day-actions,.ruf-export-row,.tmpl-footer,.hol-add-form,#hol-coverage-note,
+  .ruf-toolbar,.tmpl-toolbar{display:none!important}
+
   .main{display:block!important;height:auto!important;grid-template-columns:1fr!important}
   /* Nur die offene Ansicht drucken - sonst landen Rufbereitschaft,
      KW-Plan, Template und Feiertage als Extraseiten mit im Ausdruck. */
   .view-panel{display:none!important}
   .view-panel.active{display:block!important}
-  .cal-wrap,.ruf-wrap{overflow:visible!important;padding:0!important}
-  .day-cell{break-inside:avoid;min-height:80px!important}
-  body{overflow:visible!important}
+  .cal-wrap,.ruf-wrap{overflow:visible!important;padding:0!important;background:#fff!important}
+
+  /* Kopfzeile und Legende erscheinen nur auf dem Papier */
+  .print-head.print-only{display:flex!important}
+  .print-legend.print-only{display:flex!important}
+  .note-print{display:block!important}
+
+  .cal-grid{gap:3px}
+  .day-cell{break-inside:avoid;min-height:0!important;padding:4px;border:1px solid var(--border)!important;
+    border-radius:4px;background:#fff!important}
+  .day-cell.today{border:2px solid #000!important}
+  .day-cell.other{background:#fff!important;border-color:#e2e4ea!important}
+  .day-cell.other .day-number{color:#b6bac4}
+  .day-number{font-size:11px}
+  .chip{max-width:none!important;font-size:9.5px;padding:1px 5px;
+    border:1px solid var(--border)!important;white-space:normal;overflow:visible;text-overflow:clip}
+  .chips-label{opacity:1;font-size:8.5px}
+  /* Tabellen der uebrigen Ansichten sauber ueber Seiten verteilen */
+  tr{break-inside:avoid}
+  thead{display:table-header-group}
+  .soll-ist{display:none}
+  .understaffed-badge{background:#fff!important;border:1px solid var(--spaet-text);font-size:8px}
+  /* Im Fenster ein 7px-Punkt mit Tooltip - auf Papier gibt es keinen Tooltip,
+     also als lesbare Zeile ausgeben statt als Punkt mit ueberlaufendem Text. */
+  .conflict-badge{position:static!important;width:auto!important;height:auto!important;
+    border-radius:3px!important;background:#fff!important;border:1px solid var(--krank-text)!important;
+    color:var(--krank-text)!important;font-size:8px;font-weight:700;padding:1px 3px;margin-bottom:2px}
 }
 
 .chips-row{animation:slideDown .15s ease both}
@@ -560,6 +619,10 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 <button class="sidebar-toggle" id="sidebar-toggle">◀</button>
 
 <div class="main" id="main">
+  <div class="print-only print-head" id="print-head">
+    <h2 id="print-title">Schichtplan</h2>
+    <div class="ph-meta" id="print-meta"></div>
+  </div>
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sb-sec">
@@ -626,6 +689,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
         <div class="day-hdr">Do</div><div class="day-hdr">Fr</div>
         <div class="day-hdr we">Sa</div><div class="day-hdr we">So</div>
       </div>
+      <div class="print-only print-legend" id="print-legend"></div>
     </div>
   </div>
 
@@ -1370,6 +1434,7 @@ function switchSubTab(view, subId){
       if(view==='tmpl') renderTemplateTable();
       if(view==='hol') renderCustomHolidays();
       if(view==='rufkw') renderRufKWTable();
+      updatePrintHead();
     });
   });
 
@@ -1492,8 +1557,39 @@ async function nextMonth(){
   clearAll();renderCalendar();updateLabel();
 }
 function goToday(){const n=new Date();curYear=n.getFullYear();curMonth=n.getMonth()+1;clearSelection();renderCalendar();updateLabel();}
+// Kopfzeile und Legende des Ausdrucks mitpflegen - beide sind im Fenster
+// unsichtbar und tauchen nur auf dem Papier auf.
+function updatePrintHead(){
+  const titel=document.getElementById('print-title');
+  if(!titel) return;
+  const gedruckt=`gedruckt am ${new Date().toLocaleDateString('de-DE')}`;
+  const monat=`${MONTHS[curMonth-1]} ${curYear}`;
+  let text=`Schichtplan ${monat}`, meta=gedruckt;
+  if(activeView==='cal'){
+    meta=`Soll je Tag: Früh ${soll.frueh??1} · Spät ${soll.spaet??1} · Rufbereitschaft ${soll.rufbereitschaft??1}`+
+      ` — ${gedruckt}`;
+  }else if(activeView==='ruf'){
+    const j=document.getElementById('ruf-year')?.value||curYear;
+    const m=document.getElementById('ruf-month');
+    const mn=m&&m.value?` ${m.options[m.selectedIndex].textContent}`:'';
+    text=`Rufbereitschaft${mn} ${j}`;
+  }else if(activeView==='rufkw'){
+    text=`Rufbereitschaft KW-Plan ${document.getElementById('rufkw-year')?.value||curYear}`;
+  }else if(activeView==='tmpl'){
+    text='Autoplan-Template';
+  }else if(activeView==='hol'){
+    text=`Eigene Feiertage ${curYear}`;
+  }
+  titel.textContent=text;
+  document.getElementById('print-meta').textContent=meta;
+  const legende=document.getElementById('print-legend');
+  if(legende) legende.innerHTML=ALL_SHIFTS.map(s=>
+    `<span><b style="color:${SHIFT_SHORT[s][1]}">${SHIFT_SHORT[s][0]}</b>${esc(SHIFT_LABEL[s])}</span>`).join('');
+}
+
 function updateLabel(){
   renderCoverageNote();
+  updatePrintHead();
   // Sync month dropdown
   const mSel=document.getElementById('nav-month');
   if(mSel){
@@ -2007,6 +2103,9 @@ function makeCell(key,dayNum,other){
       row.appendChild(chips);ca.appendChild(row);
     });
     el.appendChild(ca);
+    // Die Notiz ist im Fenster nur ein Punkt neben der Tageszahl; auf dem
+    // Papier gibt es keinen Tooltip, also steht sie dort ausgeschrieben.
+    if(note){const np=document.createElement('div');np.className='note-print';np.textContent=note;el.appendChild(np);}
     el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drag-over');});
     el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
     el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drag-over');handleDrop(key);});
@@ -2284,6 +2383,7 @@ function showCalendarView(){
   document.querySelector('[data-view="cal"]').classList.add('active');
   document.querySelector('[data-panel="cal"]').classList.add('active');
   activeView='cal';
+  updatePrintHead();
 }
 
 function jumpToDate(key){
