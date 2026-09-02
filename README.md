@@ -25,7 +25,9 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 - **Templates** pro Wochentag und Person, per Autoplan auf einen Monat anwendbar
 - **Rufbereitschaft** in einer Tabelle: je Kalenderwoche der geplante Name und
   daneben, wer tatsächlich im Kalender steht. Noch nicht übertragene Wochen und
-  Abweichungen sind markiert und lassen sich einzeln herausfiltern
+  Abweichungen sind markiert und lassen sich einzeln herausfiltern. Eine Woche
+  lässt sich zu ihren sieben Tagen aufklappen – dort trägt man eine Vertretung
+  für einen einzelnen Tag ein, ohne den Wochenplan zu ändern
 - **Massenanlage** für Mitarbeiter und eigene Feiertage: Liste einfügen
   (auch aus Excel), Vorschau prüfen, anlegen
 - **Wochenenden** brauchen nur Rufbereitschaft – Früh und Spät werden dort

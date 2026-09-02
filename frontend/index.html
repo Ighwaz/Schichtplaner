@@ -328,6 +328,14 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
   background:var(--ruf-bg);color:var(--ruf-text);border:1px solid color-mix(in srgb,var(--ruf) 30%,transparent)}
 .ist-chip b{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;opacity:.8}
 .rufkw-status{font-size:11px;font-weight:700;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+.kw-pfeil{display:inline-block;width:12px;color:var(--text3);transition:transform .12s;font-size:10px}
+.kw-pfeil.auf{transform:rotate(90deg);color:var(--blue)}
+.rufkw-kw-col:hover .kw-pfeil{color:var(--text)}
+tr.tag-zeile td{background:var(--surface2);border-bottom:1px solid var(--border);padding-top:3px;padding-bottom:3px}
+tr.tag-zeile .rufkw-date-col{padding-left:22px;color:var(--text2)}
+.tag-kurz{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);margin-right:5px}
+.tag-plan-hinweis{font-size:10.5px;color:var(--text3);font-style:italic}
+tr.tag-abw td{background:color-mix(in srgb,var(--krank) 8%,var(--surface2))}
 .st-ok{color:var(--frueh)}
 .st-offen{color:var(--spaet)}
 .st-abw{color:var(--krank)}
@@ -1265,8 +1273,16 @@ function renderRufKWTable(){
     const isCur=w.kwKey===todayKW;
     const tr=document.createElement('tr');
     if(isCur) tr.className='rufkw-cur-row';
+    const offen=offeneWochen.has(w.kwKey);
     const tdKW=document.createElement('td'); tdKW.className='rufkw-kw-col';
-    tdKW.innerHTML=`<strong>KW&nbsp;${w.kw}</strong>${isCur?'<br><span style="color:var(--blue);font-size:9px">◀ jetzt</span>':''}`;
+    tdKW.innerHTML=`<span class="kw-pfeil${offen?' auf':''}">▸</span><strong>KW&nbsp;${w.kw}</strong>`+
+      `${isCur?'<br><span style="color:var(--blue);font-size:9px;margin-left:14px">◀ jetzt</span>':''}`;
+    tdKW.title=offen?'Tage zuklappen':'Tage der Woche zeigen – dort einzelne Vertretungen eintragen';
+    tdKW.style.cursor='pointer';
+    tdKW.onclick=()=>{
+      if(offeneWochen.has(w.kwKey)) offeneWochen.delete(w.kwKey); else offeneWochen.add(w.kwKey);
+      renderRufKWTable();
+    };
     tr.appendChild(tdKW);
     const tdDate=document.createElement('td'); tdDate.className='rufkw-date-col';
     tdDate.textContent=`${fmtDateShort(w.start)} – ${fmtDateShort(w.end)}`;
@@ -1325,11 +1341,111 @@ function renderRufKWTable(){
 
     if(nurAbweichungen&&(stand==='ok'||stand==='leer')) return;
     tbody.appendChild(tr);
+    if(offen) tageZeilen(w,names).forEach(z=>tbody.appendChild(z));
   });
   if(!tbody.children.length){
     tbody.innerHTML='<tr><td colspan="5" style="padding:14px;color:var(--text3);font-size:12.5px">'+
       (nurAbweichungen?'Alle Wochen sind übertragen.':'Keine Wochen.')+'</td></tr>';
   }
+}
+
+// Welche Wochen gerade aufgeklappt sind - bleibt ueber das Neuzeichnen hinweg.
+const offeneWochen=new Set();
+
+// Die sieben Tage einer Woche als eigene Zeilen. Die Wochenzeile darueber ist
+// der Plan; hier steht, was wirklich im Kalender eingetragen ist, und hier
+// traegt man eine Vertretung fuer einen einzelnen Tag ein.
+function tageZeilen(w,geplant){
+  const zeilen=[];
+  const wochentage=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  for(let i=0;i<7;i++){
+    const d=new Date(w.start); d.setDate(w.start.getDate()+i);
+    const key=dk(d.getFullYear(),d.getMonth()+1,d.getDate());
+    const namen=(schichten[key]?.rufbereitschaft)||[];
+    const abweichend=namen.length
+      ? !(namen.length===geplant.length&&namen.every(n=>geplant.includes(n)))
+      : geplant.length>0;
+
+    const tr=document.createElement('tr'); tr.className='tag-zeile'+(abweichend?' tag-abw':'');
+    tr.innerHTML=`<td class="rufkw-kw-col"></td>`;
+    const tdTag=document.createElement('td'); tdTag.className='rufkw-date-col';
+    tdTag.innerHTML=`<span class="tag-kurz">${wochentage[i]}</span> ${fmtDateShort(d)}`;
+    tr.appendChild(tdTag);
+
+    const tdLeer=document.createElement('td'); tdLeer.className='tag-plan';
+    tdLeer.innerHTML=geplant.length?`<span class="tag-plan-hinweis">↑ ${esc(geplant.join(', '))}</span>`:'';
+    tr.appendChild(tdLeer);
+
+    const tdTagP=document.createElement('td');
+    const zelle=document.createElement('div'); zelle.className='rufkw-person-cell';
+    namen.forEach(name=>{
+      const m=mitarbeiter.find(x=>x.name===name);
+      const chip=document.createElement('span'); chip.className='rufkw-person-chip';
+      const av=`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:8px;color:#fff;font-weight:700">${m?.icon||initials(name)}</span>`;
+      chip.innerHTML=`${av}<span>${esc(name)}</span><span data-rm-tag="${key}" data-rm-name="${esc(name)}" style="margin-left:3px;cursor:pointer;opacity:.6;font-size:10px;padding:0 2px">✕</span>`;
+      zelle.appendChild(chip);
+    });
+    const plus=document.createElement('span'); plus.className='rufkw-add'; plus.textContent='＋';
+    plus.title='Person für diesen Tag eintragen';
+    if(!namen.length){const em=document.createElement('span');em.className='rufkw-empty';em.textContent='– nichts –';zelle.appendChild(em);}
+    zelle.appendChild(plus);
+    zelle.addEventListener('click',async e=>{
+      const rm=e.target.closest('[data-rm-tag]');
+      if(rm){ e.stopPropagation(); await setzeTagRuf(rm.dataset.rmTag,rm.dataset.rmName,false); return; }
+      openRufTagPicker(key,plus);
+    });
+    tdTagP.appendChild(zelle); tr.appendChild(tdTagP);
+
+    const tdSt=document.createElement('td');
+    if(abweichend) tdSt.innerHTML='<span class="rufkw-status st-abw">Vertretung</span>';
+    tr.appendChild(tdSt);
+    zeilen.push(tr);
+  }
+  return zeilen;
+}
+
+// Rufbereitschaft eines einzelnen Tages im Kalender setzen oder entfernen.
+async function setzeTagRuf(key,name,eintragen){
+  pushUndo();
+  const res=await postSchicht([key],eintragen?'add':'remove','rufbereitschaft',name,true);
+  applyResults(res.results);
+  await reloadSchichten();
+  renderRufKWTable();
+  toast(`${name}: ${fmtDateShort(new Date(key+'T00:00:00'))} ${eintragen?'eingetragen':'entfernt'}`);
+}
+
+// Personenauswahl fuer einen einzelnen Tag.
+let _rufTagKey=null;
+function openRufTagPicker(key,anchor){
+  _rufTagKey=key;
+  let picker=document.getElementById('ruftag-picker');
+  if(!picker){
+    picker=document.createElement('div'); picker.id='ruftag-picker'; picker.className='rufkw-picker hidden';
+    document.body.appendChild(picker);
+    document.addEventListener('click',e=>{
+      if(!e.target.closest('#ruftag-picker')&&!e.target.closest('.rufkw-person-cell'))
+        picker.classList.add('hidden');
+    });
+  }
+  const drin=new Set((schichten[key]?.rufbereitschaft)||[]);
+  picker.innerHTML='<div style="padding:6px 10px;font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--text3);font-family:\'JetBrains Mono\',monospace">'+
+    fmtDateShort(new Date(key+'T00:00:00'))+'</div>'+
+    (mitarbeiter.length?mitarbeiter.map(m=>`<div class="rufkw-picker-item${drin.has(m.name)?' selected':''}" data-pname="${esc(m.name)}">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m.color};font-size:9px;color:#fff;font-weight:700">${m.icon||initials(m.name)}</span>
+      <span>${esc(m.name)}</span></div>`).join('')
+      :'<div style="padding:8px 12px;font-size:12px;color:var(--text3)">Keine Mitarbeiter</div>');
+  picker.querySelectorAll('[data-pname]').forEach(el=>{
+    el.onclick=async ev=>{
+      ev.stopPropagation();
+      const name=el.dataset.pname;
+      picker.classList.add('hidden');
+      await setzeTagRuf(_rufTagKey,name,!drin.has(name));
+    };
+  });
+  const r=anchor.getBoundingClientRect();
+  picker.classList.remove('hidden');
+  picker.style.left=Math.min(r.left,window.innerWidth-235)+'px';
+  picker.style.top=(r.bottom+4+240>window.innerHeight?r.top-244:r.bottom+4)+'px';
 }
 
 // Rufbereitschaft, die fuer die Tage dieser Woche wirklich im Kalender steht.
