@@ -50,11 +50,27 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'Inter',sans-serif;font-size:15px;background:var(--bg);color:var(--text);overflow:hidden}
+/* Leisten duerfen umbrechen; der Inhalt nimmt sich den Rest, statt auf eine
+   fest gerechnete Hoehe angewiesen zu sein. */
+body{display:flex;flex-direction:column}
+header,.context-bar{flex-shrink:0;flex-wrap:wrap}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
 /* HEADER */
-header{background:var(--surface);border-bottom:2px solid var(--border);padding:5px 10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px var(--shadow)}
-h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:7px 14px;display:flex;
+  align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+.hdr-right{display:flex;align-items:center;gap:6px;margin-left:auto}
+.folder-chip{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:3px 4px 3px 9px;font-size:11px;color:var(--text3);max-width:34vw}
+@media(max-width:1250px){
+  .folder-chip .folder-label{display:none}
+  .vtab{padding:6px 9px;font-size:12px}
+}
+@media(max-width:1000px){
+  h1{display:none}
+  .ctx-lbl{display:none}
+}
+h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-shrink:0}
 .h1-de{color:var(--blue)}.h1-in{color:var(--orange)}
 .hdr-group{display:flex;align-items:center;gap:3px}
 .hdr-lbl{display:none}
@@ -69,7 +85,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 .pill.active{border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
 .pill.active[data-shift=frueh]{color:var(--frueh)}.pill.active[data-shift=spaet]{color:var(--spaet)}
 .pill.active[data-shift=rufbereitschaft]{color:var(--ruf)}
-.sep{width:1px;height:32px;background:var(--border);flex-shrink:0;align-self:center}
+.sep{width:1px;height:22px;background:var(--border);flex-shrink:0;align-self:center}
 .hbtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:2px solid var(--border);
   background:var(--surface2);cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;white-space:nowrap;flex-shrink:0}
 .hbtn:hover{border-color:var(--border2);color:var(--text);background:var(--surface3)}
@@ -85,17 +101,29 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 .theme-btn{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:5px 9px;border-radius:8px;cursor:pointer;font-size:14px;transition:all .15s}
 
 /* FOLDER BAR */
-.folder-bar{display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);position:sticky;top:55px;z-index:90}
+/* Zweite Leiste: was hier steht, haengt an der offenen Ansicht. */
+.context-bar{display:flex;align-items:center;gap:7px;padding:7px 14px;background:var(--surface2);
+  border-bottom:1px solid var(--border);position:sticky;top:47px;z-index:90;min-height:44px}
+.context-bar.hide-plan .ctx-plan{display:none}
+.context-bar.hide-month .ctx-month{display:none}
+.ctx-shift{display:flex;align-items:center;gap:7px}
+.ctx-lbl{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text3);
+  font-family:'JetBrains Mono',monospace}
+.context-bar select{background:var(--surface);border:1px solid var(--border);color:var(--text);
+  padding:5px 8px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
 .folder-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40vw;min-width:40px}
-.fbtn{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap}
+.fbtn{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:4px 9px;
+  border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap}
+.fbtn.ic{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:26px;font-size:13px;padding:0}
 .fbtn:hover{border-color:var(--blue);color:var(--blue)}
 
 /* VIEW TABS */
-.view-tabs{display:flex;gap:3px;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:82px;z-index:89}
-.vtab{padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);border:2px solid transparent;transition:background .12s,border-color .12s,color .12s,transform .1s}
-.vtab:hover{background:var(--surface2);color:var(--text)}
-.vtab:active{transform:scale(.97)}
-.vtab.active{background:var(--surface2);border-color:var(--blue);color:var(--blue)}
+.view-tabs{display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:2px}
+.vtab{padding:6px 13px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text2);
+  white-space:nowrap;transition:background .12s,color .12s}
+.vtab:hover{color:var(--text);background:var(--surface3)}
+.vtab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px var(--shadow);font-weight:700}
 .sub-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px}
 .sub-tab{padding:4px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);border:2px solid transparent;transition:all .15s}
 .sub-tab:hover{background:var(--surface2);color:var(--text)}
@@ -103,7 +131,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 .sub-panel{display:none}.sub-panel.active{display:block}
 
 /* LAYOUT */
-.main{display:grid;grid-template-columns:274px 1fr;height:calc(100vh - 120px);overflow:hidden;transition:grid-template-columns .2s}
+.main{display:grid;grid-template-columns:274px 1fr;flex:1;min-height:0;overflow:hidden;transition:grid-template-columns .2s}
 .main.collapsed{grid-template-columns:0px 1fr}
 .sidebar-toggle{position:fixed;left:274px;top:50%;transform:translateY(-50%);z-index:95;
   background:var(--surface);border:2px solid var(--border);border-radius:0 8px 8px 0;
@@ -527,7 +555,7 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
   html,body{height:auto!important;overflow:visible!important;background:#fff!important;font-size:11px}
 
   /* Alles, was nur zum Bedienen da ist */
-  header,.folder-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
+  header,.context-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
   .day-actions,.ruf-export-row,.tmpl-footer,.hol-add-form,#hol-coverage-note,
   .ruf-toolbar,.tmpl-toolbar{display:none!important}
 
@@ -606,56 +634,63 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
 </head>
 <body>
 
+<!-- Leiste 1: gilt immer - Marke, Ansichten, Daten und Werkzeuge -->
 <header>
   <h1>⚙ <span class="h1-de">DE</span>/<span class="h1-in">IN</span></h1>
-  <div class="sep"></div>
-  <!-- Shift pills: compact, letter only with tooltip -->
-  <div class="hdr-pills" id="modebar">
-    <div class="pill active" role="button" tabindex="0" data-shift="frueh"    title="Frühschicht"><span class="dot dot-f"></span>F</div>
-    <div class="pill"        role="button" tabindex="0" data-shift="spaet"    title="Spätschicht"><span class="dot dot-s"></span>S</div>
-    <div class="pill"        role="button" tabindex="0" data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
-  </div>
-  <div class="sep"></div>
 
-  <div class="sep"></div>
-  <div style="display:flex;gap:3px;align-items:center">
-    <div class="hbtn" id="btn-range" title="Zeitraum auswählen">⇿ Zeitraum</div>
-    <div class="hbtn" id="btn-ics"   title="ICS Export / Import">ICS</div>
-    <div class="hbtn" id="btn-print" title="Drucken">🖨</div>
-    <div class="hbtn" id="btn-check" title="Unterbesetzung prüfen">⚠</div>
+  <nav class="view-tabs" id="view-tabs">
+    <div class="vtab active" data-view="cal">📅 Kalender</div>
+    <div class="vtab" data-view="matrix">▦ Monatsübersicht</div>
+    <div class="vtab" data-view="ruf">🔔 Rufbereitschaft</div>
+    <div class="vtab" data-view="tmpl">⚙ Template</div>
+    <div class="vtab" data-view="hol">🎉 Feiertage</div>
+  </nav>
+
+  <div class="hdr-right">
+    <div class="folder-chip" title="Datenordner">
+      <span>📁</span>
+      <span class="folder-label" id="folder-label">Lade…</span>
+      <button class="fbtn" id="btn-folder">Wechseln</button>
+    </div>
+    <div class="sep"></div>
+    <button class="fbtn ic" id="btn-export-data" onclick="exportAllData()" title="Alle Daten als JSON sichern">↓</button>
+    <label class="fbtn ic" title="Sicherung einlesen">↑<input type="file" id="backup-import-file" accept=".json" style="display:none" onchange="handleBackupImport(this)"></label>
+    <button class="fbtn ic" id="btn-refresh" onclick="refreshData()" title="Neu laden">↻</button>
     <div class="sep"></div>
     <button class="ur-btn" id="btn-undo" disabled title="Rückgängig (Strg+Z)">↩</button>
     <button class="ur-btn" id="btn-redo" disabled title="Wiederholen (Strg+Y)">↪</button>
     <button class="theme-btn" id="btn-theme" title="Hell/Dunkel">🌙</button>
   </div>
-  <div style="flex:1"></div>
-  <div class="nav">
-    <button class="nbtn" id="btn-prev">←</button>
-    <select id="nav-month" style="background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:4px 6px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;min-width:100px"></select>
-    <select id="nav-year"  style="background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:4px 6px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;min-width:68px"></select>
-    <button class="nbtn" id="btn-next">→</button>
-    <button class="nbtn" id="btn-today">Heute</button>
-  </div>
 </header>
 
-<div class="folder-bar">
-  <span style="font-size:11px">📁</span>
-  <span class="folder-label" id="folder-label" style="font-size:11px">Lade…</span>
-  <button class="fbtn" id="btn-folder" style="font-size:10px;padding:2px 7px">Wechseln</button>
-  <div style="flex:1"></div>
-  <button class="fbtn" id="btn-export-data" onclick="exportAllData()" title="Alle Daten als JSON exportieren" style="color:var(--blue);font-size:10px;padding:2px 7px">↓ Export</button>
-  <label  class="fbtn" title="Backup importieren" style="color:var(--sonder);font-size:10px;padding:2px 7px;cursor:pointer">
-    ↑ Import<input type="file" id="backup-import-file" accept=".json" style="display:none" onchange="handleBackupImport(this)">
-  </label>
-  <button class="fbtn" id="btn-refresh" onclick="refreshData()" style="color:var(--frueh);font-size:10px;padding:2px 7px">↻</button>
-</div>
+<!-- Leiste 2: haengt an der offenen Ansicht -->
+<div class="context-bar" id="context-bar">
+  <div class="nav ctx-month">
+    <button class="nbtn" id="btn-prev" title="Voriger Monat">←</button>
+    <select id="nav-month"></select>
+    <select id="nav-year"></select>
+    <button class="nbtn" id="btn-next" title="Nächster Monat">→</button>
+    <button class="nbtn" id="btn-today">Heute</button>
+  </div>
 
-<div class="view-tabs">
-  <div class="vtab active" data-view="cal">📅 Kalender</div>
-  <div class="vtab" data-view="matrix">▦ Monatsübersicht</div>
-  <div class="vtab" data-view="ruf">🔔 Rufbereitschaft</div>
-  <div class="vtab" data-view="tmpl">⚙ Autoplan-Template</div>
-  <div class="vtab" data-view="hol">🎉 Eigene Feiertage</div>
+  <div class="sep ctx-plan"></div>
+
+  <div class="ctx-plan ctx-shift">
+    <span class="ctx-lbl">Schicht</span>
+    <div class="hdr-pills" id="modebar">
+      <div class="pill active" role="button" tabindex="0" data-shift="frueh" title="Frühschicht"><span class="dot dot-f"></span>F</div>
+      <div class="pill" role="button" tabindex="0" data-shift="spaet" title="Spätschicht"><span class="dot dot-s"></span>S</div>
+      <div class="pill" role="button" tabindex="0" data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
+    </div>
+  </div>
+
+  <div class="hbtn ctx-plan" id="btn-range" title="Zwei Klicks spannen einen Zeitraum auf">⇿ Zeitraum</div>
+
+  <div style="flex:1"></div>
+
+  <div class="hbtn ctx-plan" id="btn-check" title="Tage unter Soll auflisten">⚠ Prüfen</div>
+  <div class="hbtn" id="btn-ics" title="ICS Export / Import">ICS</div>
+  <div class="hbtn" id="btn-print" title="Drucken">🖨 Drucken</div>
 </div>
 
 <button class="sidebar-toggle" id="sidebar-toggle">◀</button>
@@ -1481,6 +1516,7 @@ function switchSubTab(view, subId){
       tab.classList.add('active');
       const view=tab.dataset.view; activeView=view;
       document.querySelector('[data-panel="'+view+'"]').classList.add('active');
+      updateContextBar();
       if(view==='matrix') renderMatrix();
       if(view==='ruf'){ renderRufKWTable(); renderRufView(); }
       if(view==='tmpl') renderTemplateTable();
@@ -1640,6 +1676,7 @@ function updatePrintHead(){
 
 function updateLabel(){
   renderCoverageNote();
+  updateContextBar();
   updatePrintHead();
   // Sync month dropdown
   const mSel=document.getElementById('nav-month');
@@ -2081,6 +2118,9 @@ function renderCalendar(){
     grid.appendChild(makeCell(c.key, c.num, c.other));
   });
   renderStats();
+  // Die Monatsuebersicht zeigt dieselben Daten; sie muss bei jedem Monats-
+  // wechsel und nach jeder Aenderung mitgezogen werden.
+  if(activeView==='matrix') renderMatrix();
 }
 
 function makeCell(key,dayNum,other){
@@ -2450,12 +2490,24 @@ function isUnderstaffed(slot,key){
   return ALL_SHIFTS.some(s=>(slot[s]||[]).length<sollFor(s,key));
 }
 // Kalenderansicht aktivieren - von jumpToDate und vom Autoplan genutzt.
+// Monatsnavigation und Schichtauswahl gehoeren nur zu den Ansichten, die auch
+// einen Monat zeigen. Die uebrigen bringen ihre eigenen Bedienelemente mit.
+function updateContextBar(){
+  const bar=document.getElementById('context-bar');
+  if(!bar) return;
+  // Die Feiertagsansicht haengt am Jahr (Hinweis auf fehlende bewegliche
+  // Feiertage), darum bleibt die Navigation dort stehen.
+  bar.classList.toggle('hide-month',!['cal','matrix','hol'].includes(activeView));
+  bar.classList.toggle('hide-plan',!['cal','matrix'].includes(activeView));
+}
+
 function showCalendarView(){
   document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
   document.querySelector('[data-view="cal"]').classList.add('active');
   document.querySelector('[data-panel="cal"]').classList.add('active');
   activeView='cal';
+  updateContextBar();
   updatePrintHead();
 }
 

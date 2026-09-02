@@ -29,6 +29,9 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   (auch aus Excel), Vorschau prüfen, anlegen
 - **Wochenenden** brauchen nur Rufbereitschaft – Früh und Spät werden dort
   nicht als fehlend angemahnt
+- **Zwei Leisten statt drei**: oben Ansichten und Werkzeuge, darunter eine
+  Leiste, die sich nach der offenen Ansicht richtet – Monatsnavigation und
+  Schichtauswahl erscheinen dort, wo sie gebraucht werden
 - **Druckansicht** im Querformat: nur die offene Ansicht, mit Kopfzeile,
   Legende und ausgeschriebenen Notizen – unabhängig vom Theme immer auf Weiß
 - **Import/Export** als ICS (Kalender) und JSON (vollständiges Backup)
