@@ -1155,14 +1155,236 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 <div class="tooltip" id="tooltip"></div>
 <div id="toast"></div>
 
+<script id="regelkern">
+/* ══════════════════════════════════════════════════════════════
+   REGELKERN
+   Die Planungsregeln - ohne DOM, ohne globalen Zustand, ohne Netz.
+   Jede Funktion bekommt als Argument, was sie braucht. Damit laeuft
+   derselbe Code im Fenster und in tests/regelkern.test.mjs, der diesen
+   Block aus der Datei schneidet und einzeln prueft.
+   Die Oberflaeche darunter ruft nur noch auf - wer eine Regel aendert,
+   aendert sie hier an genau einer Stelle.
+   ══════════════════════════════════════════════════════════════ */
+(function(global){
+'use strict';
+
+const SCHICHTEN = ['frueh','normal','spaet','rufbereitschaft'];
+// Fuer den Feiertagskonflikt zaehlen nur diese drei - der Normaldienst ist
+// Gleitzeit und wurde nie mitgeprueft. Verhalten unveraendert uebernommen,
+// siehe tests/regelkern.test.mjs ("Normaldienst am Feiertag").
+const ARBEIT_FUER_FEIERTAG = ['frueh','spaet','rufbereitschaft'];
+// Ein Zeitraum ueber mehr als zehn Jahre ist immer ein Vertipper. Ohne
+// Deckel baut ein Fehlklick Millionen Datumsschluessel und friert das
+// Fenster ein.
+const MAX_TAGE = 3660;
+
+const istGanzzahl = w => typeof w === 'number' && Number.isFinite(w) && Math.floor(w) === w;
+const KEY_MUSTER  = /^\d{4}-\d{2}-\d{2}$/;
+
+// Tagesschluessel "JJJJ-MM-TT". Bewusst ohne Date: der Schluessel ist eine
+// Zeichenkette, keine Zeitangabe - sonst zoege eine Zeitzone daran.
+function tagKey(jahr, monat, tag){
+  if(!istGanzzahl(jahr) || !istGanzzahl(monat) || !istGanzzahl(tag))
+    throw new RangeError('tagKey: Jahr, Monat und Tag muessen ganze Zahlen sein');
+  return jahr + '-' + String(monat).padStart(2,'0') + '-' + String(tag).padStart(2,'0');
+}
+
+// Schluessel -> lokales Date. 'T00:00:00' ohne Z ist Absicht: der Kalender
+// rechnet durchweg in Ortszeit, sonst laege ein Tag oestlich von UTC im
+// falschen Feld.
+function alsDatum(wert){
+  if(wert instanceof Date){
+    if(Number.isNaN(wert.getTime())) throw new RangeError('alsDatum: ungueltiges Date');
+    return wert;
+  }
+  if(typeof wert === 'string' && KEY_MUSTER.test(wert)){
+    const d = new Date(wert + 'T00:00:00');
+    if(Number.isNaN(d.getTime())) throw new RangeError('alsDatum: ungueltiger Tag ' + wert);
+    // '2026-02-31' parst der Browser still auf den 3. Maerz - das ist kein
+    // Tag, den jemand gemeint hat.
+    if(tagKey(d.getFullYear(), d.getMonth()+1, d.getDate()) !== wert)
+      throw new RangeError('alsDatum: den Tag gibt es nicht: ' + wert);
+    return d;
+  }
+  throw new RangeError('alsDatum: erwartet "JJJJ-MM-TT" oder Date, bekommen: ' + String(wert));
+}
+
+// ISO-8601-Kalenderwoche: die Woche mit dem ersten Donnerstag des Jahres
+// ist Woche 1. Rechnung in UTC, damit keine Sommerzeitumstellung
+// dazwischenfaehrt; die Tagesbestandteile kommen aus der Ortszeit.
+function isoWoche(wert){
+  const d = alsDatum(wert);
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const wochentag = tmp.getUTCDay() || 7;          // Mo=1 … So=7
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - wochentag); // auf den Donnerstag
+  const jahresStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  return Math.ceil((((tmp - jahresStart) / 86400000) + 1) / 7);
+}
+
+// Alle Tage zwischen zwei Schluesseln, einschliesslich beider Enden und in
+// beliebiger Reihenfolge uebergeben.
+function tageImZeitraum(a, b){
+  const von = alsDatum(a), bis = alsDatum(b);
+  const [lo, hi] = von <= bis ? [von, bis] : [bis, von];
+  const tage = Math.round((hi - lo) / 86400000) + 1;
+  if(tage > MAX_TAGE)
+    throw new RangeError('tageImZeitraum: ' + tage + ' Tage sind mehr als die erlaubten ' + MAX_TAGE);
+  const raus = [];
+  const lauf = new Date(lo.getFullYear(), lo.getMonth(), lo.getDate());
+  for(let i = 0; i < tage; i++){
+    raus.push(tagKey(lauf.getFullYear(), lauf.getMonth()+1, lauf.getDate()));
+    lauf.setDate(lauf.getDate() + 1);
+  }
+  return raus;
+}
+
+// Das Raster einer Monatsansicht: volle Wochen von Montag bis Sonntag, vorne
+// und hinten mit den Nachbarmonaten aufgefuellt.
+function monatsRaster(jahr, monat){
+  if(!istGanzzahl(jahr) || !istGanzzahl(monat) || monat < 1 || monat > 12)
+    throw new RangeError('monatsRaster: Monat 1-12 erwartet, bekommen: ' + monat);
+  const ersterWochentag = (new Date(jahr, monat-1, 1).getDay() + 6) % 7; // Mo=0
+  const tageImMonat     = new Date(jahr, monat, 0).getDate();
+  const tageVormonat    = new Date(jahr, monat-1, 0).getDate();
+  const vorJ = monat === 1  ? jahr-1 : jahr, vorM = monat === 1  ? 12 : monat-1;
+  const nachJ= monat === 12 ? jahr+1 : jahr, nachM= monat === 12 ? 1  : monat+1;
+
+  const zellen = [];
+  for(let i = 0; i < ersterWochentag; i++){
+    const t = tageVormonat - ersterWochentag + 1 + i;
+    zellen.push({ key: tagKey(vorJ, vorM, t), num: t, fremd: true });
+  }
+  for(let t = 1; t <= tageImMonat; t++)
+    zellen.push({ key: tagKey(jahr, monat, t), num: t, fremd: false });
+  const rest = Math.ceil((ersterWochentag + tageImMonat) / 7) * 7 - (ersterWochentag + tageImMonat);
+  for(let t = 1; t <= rest; t++)
+    zellen.push({ key: tagKey(nachJ, nachM, t), num: t, fremd: true });
+
+  const wochen = [];
+  for(let i = 0; i < zellen.length; i += 7)
+    wochen.push({ kw: isoWoche(zellen[i].key), keys: zellen.slice(i, i+7).map(z => z.key) });
+  return { zellen, wochen };
+}
+
+// Soll einer Schicht an einem Tag. Am Wochenende wird nur Rufbereitschaft
+// besetzt; Frueh, Normaldienst und Spaet werden dort nicht angemahnt.
+// Ein ausdrueckliches Soll von 0 bleibt 0 - nur ein fehlender Eintrag gilt
+// als 1.
+function sollAmTag(soll, schicht, key){
+  if(key != null && schicht !== 'rufbereitschaft'){
+    const wt = alsDatum(key).getDay();
+    if(wt === 0 || wt === 6) return 0;
+  }
+  const wert = soll ? soll[schicht] : undefined;
+  return wert == null ? 1 : wert;
+}
+
+// Was an einem Tag zum Soll fehlt - je Schicht ein Eintrag oder gar keiner.
+function fehlbesetzung(slot, key, soll){
+  const tag = slot || {};
+  const raus = [];
+  for(const schicht of SCHICHTEN){
+    const ziel = sollAmTag(soll, schicht, key);
+    const ist  = (tag[schicht] || []).length;
+    if(ziel > 0 && ist < ziel) raus.push({ schicht, ist, soll: ziel });
+  }
+  return raus;
+}
+
+function unterSoll(slot, key, soll){
+  if(!slot) return false;
+  return fehlbesetzung(slot, key, soll).length > 0;
+}
+
+// Alle Tage eines Monats, an denen etwas fehlt. Speist die Zahl in der
+// Kopfleiste und die Liste dahinter.
+function tageUnterSoll(jahr, monat, schichten, soll){
+  const plan = schichten || {};
+  const tage = new Date(jahr, monat, 0).getDate();
+  const raus = [];
+  for(let t = 1; t <= tage; t++){
+    const key = tagKey(jahr, monat, t);
+    const fehlt = fehlbesetzung(plan[key], key, soll);
+    if(fehlt.length) raus.push({ key, missing: fehlt });
+  }
+  return raus;
+}
+
+// Zwei Arten von Konflikt an einem Tag:
+// doppelt eingeteilt (Frueh und Spaet zugleich) und am eigenen Feiertag
+// eingeteilt. teamVon(name) liefert 'DE' oder 'IN' - injiziert, damit der
+// Kern die Mitarbeiterliste nicht kennen muss.
+function konflikte(slot, key, feiertag, teamVon){
+  const tag = slot || {};
+  // Map statt Objekt: ein Name wie "constructor" oder "__proto__" wuerde in
+  // einem Objekt auf Object.prototype treffen und nie als doppelt auffallen.
+  const zaehler = new Map();
+  for(const s of ['frueh','spaet'])
+    for(const n of (tag[s] || [])) zaehler.set(n, (zaehler.get(n) || 0) + 1);
+  const doppelt = [...zaehler.keys()].filter(n => zaehler.get(n) > 1);
+
+  const amFeiertag = [];
+  if(feiertag && feiertag.country && feiertag.country !== 'DE+IN' && typeof teamVon === 'function'){
+    for(const s of ARBEIT_FUER_FEIERTAG)
+      for(const n of (tag[s] || []))
+        if(teamVon(n) === feiertag.country && !amFeiertag.includes(n)) amFeiertag.push(n);
+  }
+  return { doppelt, amFeiertag, hatKonflikt: doppelt.length > 0 || amFeiertag.length > 0 };
+}
+
+// Die eine Regel hinter jedem Klick: stehen alle Genannten bereits an allen
+// Zieltagen in der Schicht, traegt der Klick aus - sonst ein. Ein Klick
+// bedeutet damit dasselbe, ob er einen Tag trifft oder dreissig.
+// null heisst: nichts zu tun.
+function naechsteAktion(tage, namen, schichten, schicht){
+  if(!Array.isArray(tage) || !Array.isArray(namen) || !tage.length || !namen.length) return null;
+  const plan = schichten || {};
+  const alleDrin = tage.every(k => {
+    const drin = (plan[k] && plan[k][schicht]) || [];
+    return namen.every(n => drin.includes(n));
+  });
+  return alleDrin ? 'remove' : 'add';
+}
+
+// Markierung einer Tageszelle innerhalb der aufgespannten Strecke.
+function zeitraumKlasse(key, von, bis){
+  if(!von) return '';
+  const ende = bis || von;
+  const lo = von < ende ? von : ende, hi = von < ende ? ende : von;
+  if(key === lo && lo === hi) return 'range-start';
+  if(key === lo) return 'in-range range-start';
+  if(key === hi) return 'in-range range-end';
+  if(key > lo && key < hi) return 'in-range';
+  return '';
+}
+
+// Anzeigename auf dem Chip: das erste Wort, ohne haengendes Komma -
+// "Bauer, Martin" wird zu "Bauer".
+function kurzName(name){
+  if(name == null) return '';
+  const erstes = String(name).trim().split(/\s+/)[0] || '';
+  return erstes.replace(/[,;]+$/, '');
+}
+
+global.Regelkern = {
+  SCHICHTEN, MAX_TAGE,
+  tagKey, alsDatum, isoWoche, tageImZeitraum, monatsRaster,
+  sollAmTag, fehlbesetzung, unterSoll, tageUnterSoll,
+  konflikte, naechsteAktion, zeitraumKlasse, kurzName,
+};
+})(globalThis);
+</script>
+
 <script>
 'use strict';
+// Die Planungsregeln stehen im Block <script id="regelkern"> darueber.
+// Alles hier drunter ist Oberflaeche: Zustand, DOM und Netz.
+const RK = globalThis.Regelkern;
 // ══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════
 // Diese Fassung plant nur Schichten - keine Abwesenheiten.
 const ALL_SHIFTS  = ['frueh','normal','spaet','rufbereitschaft'];
-const EXCLUSIVE   = new Set(['frueh','normal','spaet']);
 const WORK_SHIFTS = new Set(['frueh','spaet','rufbereitschaft']);
 const SHIFT_LABEL = {frueh:'Frühschicht',normal:'Normaldienst',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft'};
 // Frischer, leerer Tag - jeder Aufruf liefert eigene Arrays.
@@ -2421,20 +2643,9 @@ async function saveProfile(){
 // ══════════════════════════════════════════════════════════════
 // CALENDAR
 // ══════════════════════════════════════════════════════════════
-function dk(y,m,d){return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
-// isoWeek() used instead (see below)
-
-// Alias for compatibility
-function getISOWeek(d){ return isoWeek(d); }
-
-function isoWeek(d){
-  // Returns ISO week number for date d
-  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = tmp.getUTCDay() || 7;
-  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
-  return Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
-}
+const dk       = RK.tagKey;
+const isoWeek  = RK.isoWoche;
+const getISOWeek = RK.isoWoche;
 
 // Schichtwahl an einer Stelle - Maus, Tastatur und Kuerzel laufen hier zusammen.
 function waehleSchicht(shift){
@@ -2510,29 +2721,12 @@ function renderCalendar(){
   // Remove all but the 8 headers (KW + Mo..So)
   while(grid.children.length > 8) grid.removeChild(grid.lastChild);
 
-  const today = new Date();
-  const firstDow = (new Date(curYear, curMonth-1, 1).getDay() + 6) % 7;
-  const dim      = new Date(curYear, curMonth, 0).getDate();
-  const prevDim  = new Date(curYear, curMonth-1, 0).getDate();
-  const prevY = curMonth===1 ? curYear-1 : curYear;
-  const prevM = curMonth===1 ? 12 : curMonth-1;
-  const nextY = curMonth===12 ? curYear+1 : curYear;
-  const nextM = curMonth===12 ? 1 : curMonth+1;
-
-  const allCells = [];
-  for(let i=0; i<firstDow; i++)
-    allCells.push({key:dk(prevY,prevM,prevDim-firstDow+1+i), num:prevDim-firstDow+1+i, other:true});
-  for(let d=1; d<=dim; d++)
-    allCells.push({key:dk(curYear,curMonth,d), num:d, other:false});
-  const needed = Math.ceil((firstDow+dim)/7)*7 - (firstDow+dim);
-  for(let d=1; d<=needed; d++)
-    allCells.push({key:dk(nextY,nextM,d), num:d, other:true});
+  const {zellen:allCells, wochen} = RK.monatsRaster(curYear, curMonth);
 
   allCells.forEach((c, i) => {
     if(i % 7 === 0){
       const kwDiv = document.createElement('div');
-      const kwDate = new Date(c.key + 'T00:00:00');
-      const kw = isoWeek(kwDate);
+      const kw = wochen[i/7].kw;
       kwDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;' +
         'font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;' +
         'color:var(--text3);background:var(--surface);border-radius:6px;' +
@@ -2541,11 +2735,11 @@ function renderCalendar(){
       kwDiv.textContent = kw;
       kwDiv.addEventListener('mouseenter', () => { kwDiv.style.background='var(--surface3)'; kwDiv.style.color='var(--ruf)'; });
       kwDiv.addEventListener('mouseleave', () => { kwDiv.style.background='var(--surface)';  kwDiv.style.color='var(--text3)'; });
-      const weekDates = allCells.slice(i, i+7).map(x => x.key);
+      const weekDates = wochen[i/7].keys;
       kwDiv.addEventListener('click', e => { e.stopPropagation(); showKwRufDialog(kw, weekDates); });
       grid.appendChild(kwDiv);
     }
-    grid.appendChild(makeCell(c.key, c.num, c.other));
+    grid.appendChild(makeCell(c.key, c.num, c.fremd));
   });
   renderStats();
   updateCheckChip();
@@ -2566,7 +2760,7 @@ function zeigeVorschau(el){
   if(!offen.length) return;
   const chip=document.createElement('span');
   chip.className='chip vorschau '+SHIFT_CSS[selectedShift];
-  chip.textContent='+ '+(offen.length>1?offen.length+' Pers.':offen[0].split(' ')[0]);
+  chip.textContent='+ '+(offen.length>1?offen.length+' Pers.':RK.kurzName(offen[0]));
   row.appendChild(chip);
   row.parentElement.classList.remove('leer');   // Vorschau nicht ausgrauen
 }
@@ -2647,7 +2841,7 @@ function makeCell(key,dayNum,other){
                   :`${SHIFT_LABEL[s]}: ${people.length} (am Wochenende kein Soll)`;
       row.appendChild(lbl);
       const chips=document.createElement('div');chips.className='chips';
-      people.forEach(name=>{const m=mitarbeiter.find(x=>x.name===name);const chip=document.createElement('span');chip.className='chip '+SHIFT_CSS[s];chip.draggable=true;chip.dataset.key=key;chip.dataset.shift=s;chip.dataset.name=name;chip.title=name+' · '+SHIFT_LABEL[s];chip.style.borderLeft='2px solid '+(m?m.color:'#64748b');chip.textContent=(m?.icon?m.icon+' ':'')+name.split(' ')[0];chips.appendChild(chip);});
+      people.forEach(name=>{const m=mitarbeiter.find(x=>x.name===name);const chip=document.createElement('span');chip.className='chip '+SHIFT_CSS[s];chip.draggable=true;chip.dataset.key=key;chip.dataset.shift=s;chip.dataset.name=name;chip.title=name+' · '+SHIFT_LABEL[s];chip.style.borderLeft='2px solid '+(m?m.color:'#64748b');chip.textContent=(m?.icon?m.icon+' ':'')+RK.kurzName(name);chips.appendChild(chip);});
       if(!people.length){const leer=document.createElement('span');leer.className='chip-leer';leer.textContent='–';chips.appendChild(leer);}
       row.appendChild(chips);ca.appendChild(row);
     });
@@ -2699,7 +2893,9 @@ async function handleCellClick(e,key){
     // Der vorherige Klick hat die Absicht gesetzt - eintragen oder austragen.
     // Shift zieht sie bis hierher durch, sonst liesse sich ein Zeitraum nie
     // wieder leeren: der Ankertag waere ja schon ausgetragen.
-    const dates=datesInRange(letzterKlick,key);
+    let dates;
+    try{ dates=datesInRange(letzterKlick,key); }
+    catch(e){ toast('Zeitraum zu groß – bitte enger wählen'); letzterKlick=key; return; }
     letzterKlick=key; multiDays.clear();
     rangeStart=null; previewEnd=null; frozenRangeEnd=null;
     await schichtAufTagen(dates,namen,letzterModus);
@@ -2732,11 +2928,8 @@ async function handleDayClick(key,ctrl,namen){
 // Tagen in der gewaehlten Schicht stehen. Ein einzelner Klick verhaelt sich
 // damit genauso wie einer auf eine Mehrfachauswahl oder einen Zeitraum.
 async function schichtAufTagen(tage,namen,modus){
-  const alleDrin=tage.every(k=>{
-    const drin=(schichten[k]?.[selectedShift])||[];
-    return namen.every(n=>drin.includes(n));
-  });
-  const aktion=modus||(alleDrin?'remove':'add');
+  const aktion=modus||RK.naechsteAktion(tage,namen,schichten,selectedShift);
+  if(!aktion) return;
   if(aktion==='add'){ await applyToDateList(tage,namen,'add'); return 'add'; }
   pushUndo();
   for(const name of namen){
@@ -2858,12 +3051,7 @@ function clearAll(){
   rangeStart=null;previewEnd=null;frozenRangeEnd=null;letzterKlick=null;multiDays.clear();
   renderCalendar();updateSelInfo();
 }
-function rangeClass(key){
-  if(!rangeStart)return '';const end=previewEnd||rangeStart;
-  const lo=rangeStart<end?rangeStart:end,hi=rangeStart<end?end:rangeStart;
-  if(key===lo&&lo===hi)return 'range-start';if(key===lo)return 'in-range range-start';
-  if(key===hi)return 'in-range range-end';if(key>lo&&key<hi)return 'in-range';return '';
-}
+function rangeClass(key){ return RK.zeitraumKlasse(key,rangeStart,previewEnd); }
 // Vorschau des Zeitraums: nur die Klassen der Tageszellen anpassen. Ein
 // kompletter renderCalendar() bei jeder Mausbewegung tauscht das DOM aus und
 // kann den naechsten Klick verschlucken.
@@ -2875,7 +3063,7 @@ function updateRangePreview(){
     if(rc)cell.classList.add(...rc.split(' '));
   });
 }
-function datesInRange(a,b){const lo=a<b?a:b,hi=a<b?b:a,out=[];let cur=new Date(lo+'T00:00:00'),end=new Date(hi+'T00:00:00');while(cur<=end){out.push(dk(cur.getFullYear(),cur.getMonth()+1,cur.getDate()));cur.setDate(cur.getDate()+1);}return out;}
+const datesInRange = RK.tageImZeitraum;
 // Vorschau der Strecke, solange Shift gedrueckt ist: der Zeiger zeigt, was
 // der naechste Klick fassen wuerde, ohne dass ein Modus dafuer noetig waere.
 document.addEventListener('mouseover',e=>{
@@ -2898,29 +3086,14 @@ document.addEventListener('keyup',e=>{
 // CONFLICTS & UNDERSTAFFED
 // ══════════════════════════════════════════════════════════════
 function getConflicts(slot,key){
-  // Ohne Abwesenheiten bleibt ein Konflikt: jemand steht an einem Tag
-  // gleichzeitig in Früh und Spät. Rufbereitschaft laeuft daneben mit.
-  const zaehler={};
-  ['frueh','spaet'].forEach(s=>(slot[s]||[]).forEach(n=>{zaehler[n]=(zaehler[n]||0)+1;}));
-  const schichtC=Object.keys(zaehler).filter(n=>zaehler[n]>1);
-  const holC=[];const hol=key?holidays[key]:null;
-  if(hol&&hol.country!=='DE+IN'){ALL_SHIFTS.filter(s=>WORK_SHIFTS.has(s)).forEach(s=>{(slot[s]||[]).forEach(n=>{const m=mitarbeiter.find(x=>x.name===n);if(m&&m.team===hol.country&&!holC.includes(n))holC.push(n);});});}
-  return{schichtC,holC,hasAny:schichtC.length>0||holC.length>0};
+  const k=RK.konflikte(slot,key,key?holidays[key]:null,n=>mitarbeiter.find(x=>x.name===n)?.team);
+  return {schichtC:k.doppelt, holC:k.amFeiertag, hasAny:k.hatKonflikt};
 }
 // Soll einer Schicht an einem bestimmten Tag. Am Wochenende wird nur
 // Rufbereitschaft besetzt - dieselbe Regel gilt fuer die Zaehler in den
 // Tageszellen, in der Monatsuebersicht und fuer die Unterbesetzung.
-function sollFor(shift,key){
-  if(key&&shift!=='rufbereitschaft'){
-    const dow=new Date(key+'T00:00:00').getDay();
-    if(dow===0||dow===6) return 0;
-  }
-  return soll[shift]??1;
-}
-function isUnderstaffed(slot,key){
-  if(!slot)return false;
-  return ALL_SHIFTS.some(s=>(slot[s]||[]).length<sollFor(s,key));
-}
+function sollFor(shift,key){ return RK.sollAmTag(soll,shift,key); }
+function isUnderstaffed(slot,key){ return RK.unterSoll(slot,key,soll); }
 // Kalenderansicht aktivieren - von jumpToDate und vom Autoplan genutzt.
 // Monatsnavigation und Schichtauswahl gehoeren nur zu den Ansichten, die auch
 // einen Monat zeigen. Die uebrigen bringen ihre eigenen Bedienelemente mit.
@@ -2935,17 +3108,8 @@ function updateContextBar(){
 // Tage des offenen Monats, an denen das Soll nicht erreicht ist.
 // Wochenenden brauchen nur Rufbereitschaft.
 function understaffedDays(){
-  const dim=new Date(curYear,curMonth,0).getDate(), issues=[];
-  for(let d=1;d<=dim;d++){
-    const key=dk(curYear,curMonth,d), slot=getSlot(key);
-    const missing=[];
-    ALL_SHIFTS.forEach(sh=>{
-      const tgt=sollFor(sh,key);
-      if(tgt>0&&(slot[sh]||[]).length<tgt) missing.push({s:sh,ist:(slot[sh]||[]).length,soll:tgt});
-    });
-    if(missing.length) issues.push({key,missing});
-  }
-  return issues;
+  return RK.tageUnterSoll(curYear,curMonth,schichten,soll)
+    .map(t=>({key:t.key,missing:t.missing.map(m=>({s:m.schicht,ist:m.ist,soll:m.soll}))}));
 }
 
 // Ein Chip statt Pruef-Knopf: die Zahl steht in der Leiste, der Klick fuehrt
