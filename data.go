@@ -59,7 +59,10 @@ type Config struct {
 	DataFolder string `json:"data_folder"`
 }
 
-func configPath() string {
+// configPath liefert den Ort der Konfigurationsdatei. Als Variable, damit die
+// Tests sie in ein Wegwerfverzeichnis umlenken koennen - sonst schriebe jeder
+// Test ueber den Ordnerwechsel in das echte Benutzerprofil.
+var configPath = func() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".schichtplaner_config.json")
 }

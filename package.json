@@ -1,0 +1,14 @@
+{
+  "name": "schichtplaner-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Testwerkzeug fuer die Oberflaeche von frontend/index.html. Die Anwendung selbst braucht kein Node - dies hier ist reine Entwicklungsausstattung.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\"",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-exclude=tests/lade-*.mjs \"tests/*.test.mjs\""
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  }
+}

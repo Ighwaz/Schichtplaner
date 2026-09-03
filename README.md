@@ -57,6 +57,24 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   Mitarbeiterleiste lässt sich ausklappen – beides wird gemerkt
 - **Datenordner frei wählbar**
 
+## Tests
+
+```
+go test ./...       # API, Speicher, Feiertage, ICS, Nebenläufigkeit
+npm install         # einmalig, holt jsdom
+npm test            # Planungsregeln und Oberfläche
+npm run coverage    # dasselbe mit Deckungsgrad
+```
+
+Die Planungsregeln stehen in `frontend/index.html` im Block
+`<script id="regelkern">` – ohne DOM, ohne globalen Zustand, jede Funktion
+bekommt ihre Eingaben als Argument. `tests/lade-regelkern.mjs` schneidet den
+Block heraus und macht ihn einzeln prüfbar; `tests/lade-oberflaeche.mjs`
+startet stattdessen die ganze Seite in jsdom und hängt eine erfundene API
+davor, sodass Klickwege wie im Fenster laufen. Die Oberfläche bleibt dabei
+eine einzige Datei ohne Laufzeitabhängigkeiten – jsdom ist reine
+Entwicklungsausstattung und landet nicht in der EXE.
+
 ## Datenhaltung
 
 Der Plan liegt als **SQLite-Datenbank** `schichtplan.db` im gewählten
