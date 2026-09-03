@@ -39,13 +39,21 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   (auch aus Excel), Vorschau prüfen, anlegen
 - **Wochenenden** brauchen nur Rufbereitschaft – Früh und Spät werden dort
   nicht als fehlend angemahnt
-- **Zwei Leisten statt drei**: oben Ansichten und Werkzeuge, darunter eine
-  Leiste, die sich nach der offenen Ansicht richtet – Monatsnavigation und
-  Schichtauswahl erscheinen dort, wo sie gebraucht werden
+- **Eine Leiste**: Ansichten, Monat und der Hinweis auf Unterbesetzung stehen
+  nebeneinander im Kopf. Ansichten ohne Monatsbezug grauen die Datumssteuerung
+  nur aus, statt sie verschwinden zu lassen; alles Seltene – ICS, Drucken,
+  Sicherung, Ordner, Anzeigegröße, Theme – liegt im Menü ⋯ rechts
+- **Ein Werkzeug**: Person(en) und Schicht stehen zusammen oben in der
+  Seitenleiste. Klick trägt ein oder aus, Shift+Klick zieht die gleiche
+  Absicht über einen Zeitraum, Strg+Klick sammelt einzelne Tage. Tasten 1–4
+  wählen die Schicht, ← → blättern den Monat, T springt auf heute
+- **Ein Tagesmenü**: Notiz, Kopieren, Einfügen und Leeren stecken hinter ⋯ in
+  der Tageskarte oder hinter dem Rechtsklick
 - **Druckansicht** im Querformat: nur die offene Ansicht, mit Kopfzeile,
-  Legende und ausgeschriebenen Notizen – unabhängig vom Theme immer auf Weiß
+  ausgeschriebenen Notizen und derselben Legende wie im Fenster – unabhängig
+  vom Theme immer auf Weiß
 - **Import/Export** als ICS (Kalender) und JSON (vollständiges Backup)
-- **Anzeigegröße** über A− / A+ in der Kopfzeile (90 % bis 160 %), die
+- **Anzeigegröße** über A− / A+ im Menü ⋯ (90 % bis 160 %), die
   Mitarbeiterleiste lässt sich ausklappen – beides wird gemerkt
 - **Datenordner frei wählbar**
 

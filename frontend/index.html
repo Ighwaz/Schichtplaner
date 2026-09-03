@@ -12,115 +12,128 @@
 @keyframes scaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
 @keyframes chipPop{0%{transform:scale(0.7);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
 @keyframes toastIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes pulseUnder{0%,100%{border-color:var(--krank)}50%{border-color:transparent}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
-[data-theme="dark"]{
-  --bg:#0c0e14;--surface:#13161f;--surface2:#181c28;--surface3:#1e2233;
-  --border:#232840;--border2:#2e3555;
-  --text:#e4e8f4;--text2:#8892b0;--text3:#5a6480;
-  --shadow:rgba(0,0,0,.6);--chip-alpha:.2;--day-other:.35;
-  --frueh-text:#4ade80;--spaet-text:#fcd34d;--ruf-text:#c4b5fd;
-  --urlaub-text:#f9a8d4;--krank-text:#fca5a5;--eltern-text:#67e8f9;--sonder-text:#fde68a;
-  --normal-text:#67e8f9;
-}
-[data-theme="light"]{
-  --bg:#f1f3f9;--surface:#fff;--surface2:#f6f8fd;--surface3:#eef0f8;
-  --border:#dde1f0;--border2:#c5cae0;
-  --text:#1a1d2e;--text2:#4a526b;--text3:#868fa8;
-  --shadow:rgba(50,60,110,.1);--chip-alpha:.1;--day-other:.3;
-  --frueh-text:#15803d;--spaet-text:#b45309;--ruf-text:#6d28d9;
-  --urlaub-text:#9d174d;--krank-text:#b91c1c;--eltern-text:#0e7490;--sonder-text:#92400e;
-  --normal-text:#0e7490;
-}
+/* Farbtoene. Reihenfolge zaehlt: :root und [data-theme=...] sind gleich
+   spezifisch, also gewinnt der spaetere Block. Darum stehen hier zuerst die
+   hellen Grundwerte und danach die dunkle Fassung.
+   Schichten: Frueh gruen, Normaldienst blau, Spaet orange, Ruf violett -
+   sie sind die einzige Saettigung auf dem Schirm, alles andere ist neutral. */
 :root{
-  /* Shift colors — more saturated, better dark-mode contrast */
-  --frueh:#16a34a;--frueh-bg:rgba(22,163,74,.13);--frueh-text:#4ade80;
-  --normal:#0891b2;--normal-bg:rgba(8,145,178,.13);--normal-text:#22d3ee;
-  --spaet:#d97706;--spaet-bg:rgba(217,119,6,.13);--spaet-text:#fbbf24;
-  --ruf:#7c3aed;--ruf-bg:rgba(124,58,237,.13);--ruf-text:#a78bfa;
-  --urlaub:#be185d;--urlaub-bg:rgba(190,24,93,.13);--urlaub-text:#f472b6;
-  --krank:#dc2626;--krank-bg:rgba(220,38,38,.13);--krank-text:#f87171;
-  --eltern:#0891b2;--eltern-bg:rgba(8,145,178,.13);--eltern-text:#22d3ee;
-  --sonder:#b45309;--sonder-bg:rgba(180,83,9,.13);--sonder-text:#fbbf24;
-  /* UI colors */
-  --blue:#3b82f6;--blue-soft:rgba(59,130,246,.12);
-  --orange:#f97316;
-  --today:rgba(59,130,246,.15);--today-border:#3b82f6;
+  /* Schicht: Grundton, Chipflaeche, Schrift auf der Chipflaeche */
+  --frueh:#16a34a;--frueh-bg:#e5f6ec;--frueh-text:#106b37;
+  --normal:#2563eb;--normal-bg:#e7edfd;--normal-text:#1c47ad;
+  --spaet:#ea580c;--spaet-bg:#fdeee3;--spaet-text:#a5430c;
+  --ruf:#7c3aed;--ruf-bg:#f0e9fd;--ruf-text:#5a29ae;
+  /* Abwesenheiten gibt es in dieser Fassung nicht mehr - die Toene bleiben
+     nur stehen, damit Altdaten und der ICS-Import nicht farblos werden. */
+  --urlaub:#be185d;--urlaub-bg:rgba(190,24,93,.12);--urlaub-text:#9d174d;
+  --krank:#dc2626;--krank-bg:rgba(220,38,38,.12);--krank-text:#b91c1c;
+  --eltern:#0891b2;--eltern-bg:rgba(8,145,178,.12);--eltern-text:#0e7490;
+  --sonder:#b45309;--sonder-bg:rgba(180,83,9,.12);--sonder-text:#92400e;
+  /* Oberflaeche: neutrales Hellgrau mit einem Hauch Blau */
+  --bg:#eef0f5;--surface:#ffffff;--surface2:#f5f6fa;--surface3:#e9ecf4;
+  --border:#dde1ec;--border2:#c3cadc;
+  --text:#15171f;--text2:#4c5468;--text3:#828b9f;
+  --shadow:rgba(40,50,90,.1);--chip-alpha:.1;--day-other:.3;
+  --blue:#2563eb;--blue-soft:rgba(37,99,235,.1);
+  --orange:#ea580c;
+  --today:rgba(37,99,235,.08);--today-border:#2563eb;
   --radius-cell:11px;--radius-chip:5px;
+}
+[data-theme="dark"]{
+  --bg:#0f1117;--surface:#191d27;--surface2:#1e2330;--surface3:#262c3b;
+  --border:#2a3140;--border2:#3a4256;
+  --text:#e7eaf3;--text2:#a6aec2;--text3:#737d93;
+  --shadow:rgba(0,0,0,.6);--chip-alpha:.2;--day-other:.35;
+  --frueh:#22c55e;--frueh-bg:rgba(34,197,94,.15);--frueh-text:#7ee9ab;
+  --normal:#3b82f6;--normal-bg:rgba(59,130,246,.16);--normal-text:#92b8fb;
+  --spaet:#f97316;--spaet-bg:rgba(249,115,22,.15);--spaet-text:#fcbe7d;
+  --ruf:#8b5cf6;--ruf-bg:rgba(139,92,246,.18);--ruf-text:#c7b6fd;
+  --urlaub-text:#f9a8d4;--krank-text:#fca5a5;--eltern-text:#67e8f9;--sonder-text:#fde68a;
+  --blue:#3b82f6;--blue-soft:rgba(59,130,246,.14);
+  --orange:#fb923c;
+  --today:rgba(59,130,246,.13);--today-border:#3b82f6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'Inter',sans-serif;font-size:15px;background:var(--bg);color:var(--text);overflow:hidden}
-/* Leisten duerfen umbrechen; der Inhalt nimmt sich den Rest, statt auf eine
-   fest gerechnete Hoehe angewiesen zu sein. */
+/* Kopf- und Fussleiste behalten ihre Hoehe, der Inhalt dazwischen nimmt sich
+   den Rest - keine gerechneten Hoehen. */
 body{display:flex;flex-direction:column}
-header,.context-bar{flex-shrink:0;flex-wrap:wrap}
+header,.statusbar{flex-shrink:0}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-/* HEADER */
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:7px 14px;display:flex;
-  align-items:center;gap:14px;position:sticky;top:0;z-index:100}
-.hdr-right{display:flex;align-items:center;gap:6px;margin-left:auto}
-.folder-chip{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);
-  border-radius:8px;padding:3px 4px 3px 9px;font-size:11px;color:var(--text3);max-width:34vw}
-@media(max-width:1250px){
-  .folder-chip .folder-label{display:none}
-  .vtab{padding:6px 9px;font-size:12px}
-}
-@media(max-width:1000px){
-  h1{display:none}
-  .ctx-lbl{display:none}
-}
+/* KOPFLEISTE
+   Eine Leiste fuer alles: Marke, Ansichten, Monat, Status. Was frueher in
+   einer zweiten Leiste darunter stand, sitzt jetzt hier - die Schichtwahl
+   ist in die Seitenleiste zum Werkzeug gewandert, die selten gebrauchten
+   Knoepfe stecken im Mehr-Menue rechts. */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;
+  align-items:center;gap:13px;min-height:56px;position:sticky;top:0;z-index:100}
 h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-shrink:0}
 .h1-de{color:var(--blue)}.h1-in{color:var(--orange)}
-.hdr-group{display:flex;align-items:center;gap:3px}
-.hdr-lbl{display:none}
-.hdr-pills{display:flex;gap:3px;flex-wrap:wrap}
-.pill{display:flex;align-items:center;gap:3px;padding:4px 8px;border-radius:20px;border:2px solid transparent;
-  background:var(--surface2);cursor:pointer;font-size:12px;font-weight:700;color:var(--text2);transition:background .12s,border-color .12s,color .12s,transform .1s;white-space:nowrap}
-.pill:hover{background:var(--surface3);color:var(--text)}
-.pill:active{transform:scale(.94)}
-.pill .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.dot-f{width:5px;height:5px;border-radius:50%;background:var(--frueh);flex-shrink:0}.dot-n{width:5px;height:5px;border-radius:50%;background:var(--normal);flex-shrink:0}
-.dot-s{width:5px;height:5px;border-radius:50%;background:var(--spaet);flex-shrink:0}.dot-r{width:5px;height:5px;border-radius:50%;background:var(--ruf);flex-shrink:0}
-.dot-u{width:5px;height:5px;border-radius:50%;background:var(--urlaub);flex-shrink:0}.dot-k{width:5px;height:5px;border-radius:50%;background:var(--krank);flex-shrink:0}.dot-e{width:5px;height:5px;border-radius:50%;background:var(--eltern);flex-shrink:0}.dot-so{width:5px;height:5px;border-radius:50%;background:var(--sonder);flex-shrink:0}
-.pill.active{border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
-.pill.active[data-shift=frueh]{color:var(--frueh)}.pill.active[data-shift=normal]{color:var(--normal)}
-.pill.active[data-shift=spaet]{color:var(--spaet)}
-.pill.active[data-shift=rufbereitschaft]{color:var(--ruf)}
-.sep{width:1px;height:22px;background:var(--border);flex-shrink:0;align-self:center}
-.hbtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:2px solid var(--border);
-  background:var(--surface2);cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;white-space:nowrap;flex-shrink:0}
-.hbtn:hover{border-color:var(--border2);color:var(--text);background:var(--surface3)}
-.hbtn.on{border-color:var(--blue);color:var(--blue);background:rgba(59,130,246,.1)}
-.nav{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0}
-.nbtn{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:4px 9px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s,transform .1s}
+@media(max-width:1150px){
+  h1{display:none}
+  .vtab{padding:6px 9px;font-size:12px}
+}
+@media(max-width:900px){
+  .status-chip .sc-text{display:none}
+}
+/* Datumssteuerung - gleiche Leiste, nur durch eine Linie abgesetzt. Ansichten
+   ohne Monatsbezug graut sie aus, statt sie verschwinden zu lassen: die
+   Leiste behaelt so ihre Ordnung. */
+.dnav{display:flex;align-items:center;gap:4px;padding-left:13px;border-left:1px solid var(--border);
+  flex-shrink:0}
+.dnav.off{opacity:.3;pointer-events:none}
+.dnav select{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:5px 7px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
+.nbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 9px;
+  border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;
+  transition:background .12s,border-color .12s,transform .1s;white-space:nowrap}
 .nbtn:active{transform:scale(.95)}
 .nbtn:hover{background:var(--surface3);border-color:var(--border2)}
-#month-label{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;min-width:145px;text-align:center}
-.ur-btn{background:var(--surface2);border:2px solid var(--border);color:var(--text2);padding:5px 9px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s}
+.tb-right{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0}
+/* Ein Chip statt Pruef-Knopf, roter Zellen und Statistik: die Zahl steht da,
+   der Klick fuehrt zur Liste. Vollstaendig besetzt = kein Chip. */
+.status-chip{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;
+  color:var(--sonder-text);background:var(--sonder-bg);border:1px solid var(--sonder);
+  border-radius:20px;padding:5px 11px;cursor:pointer;white-space:nowrap;transition:filter .15s}
+.status-chip:hover{filter:brightness(1.08)}
+.status-chip.hidden{display:none}
+.ur-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:5px 9px;
+  border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
 .ur-btn:hover:not(:disabled){background:var(--surface3);color:var(--text)}
 .ur-btn:disabled{opacity:.3;cursor:default}
-.theme-btn{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:5px 9px;border-radius:8px;cursor:pointer;font-size:14px;transition:all .15s}
-
-/* FOLDER BAR */
-/* Zweite Leiste: was hier steht, haengt an der offenen Ansicht. */
-.context-bar{display:flex;align-items:center;gap:7px;padding:7px 14px;background:var(--surface2);
-  border-bottom:1px solid var(--border);position:sticky;top:47px;z-index:90;min-height:44px}
-.context-bar.hide-plan .ctx-plan{display:none}
-.context-bar.hide-month .ctx-month{display:none}
-.ctx-shift{display:flex;align-items:center;gap:7px}
-.ctx-lbl{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text3);
-  font-family:'JetBrains Mono',monospace}
-.context-bar select{background:var(--surface);border:1px solid var(--border);color:var(--text);
-  padding:5px 8px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
-.folder-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40vw;min-width:40px}
-.fbtn{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:4px 9px;
-  border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap}
-.fbtn.ic{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:26px;font-size:13px;padding:0}
+.ur-btn.on{border-color:var(--blue);color:var(--blue)}
+/* Mehr-Menue: Ordner, Sicherung, ICS, Drucken, Anzeigegroesse, Theme */
+.more-menu{position:fixed;top:52px;right:12px;z-index:300;background:var(--surface);
+  border:1px solid var(--border2);border-radius:11px;padding:6px;min-width:232px;
+  box-shadow:0 12px 34px var(--shadow);display:flex;flex-direction:column;gap:1px;
+  animation:slideDown .12s ease}
+.more-menu.hidden{display:none}
+.mm-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;border:none;
+  background:none;color:var(--text);font-size:12.5px;font-weight:600;font-family:inherit;
+  cursor:pointer;text-align:left;width:100%}
+.mm-item:hover{background:var(--surface2)}
+.mm-item .mm-ic{width:18px;text-align:center;color:var(--text3);flex-shrink:0}
+.mm-sep{height:1px;background:var(--border);margin:4px 2px}
+.mm-lbl{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);
+  font-family:'JetBrains Mono',monospace;padding:6px 9px 3px}
+.mm-row{display:flex;align-items:center;gap:6px;padding:2px 9px 6px}
+.fbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:5px 9px;
+  border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;white-space:nowrap}
+.fbtn.ic{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:28px;font-size:13px;padding:0}
 .fbtn:hover{border-color:var(--blue);color:var(--blue)}
+/* Fussleiste: die einzige Legende der Anwendung, im Ausdruck die Fusszeile */
+.statusbar{display:flex;align-items:center;gap:14px;padding:6px 14px;background:var(--surface);
+  border-top:1px solid var(--border);font-size:11.5px;color:var(--text3);flex-shrink:0;flex-wrap:wrap}
+.lg{display:flex;align-items:center;gap:5px;font-weight:600}
+.lg i{width:8px;height:8px;border-radius:2px;display:inline-block;font-style:normal;flex-shrink:0}
+.sb-folder{margin-left:auto;display:flex;align-items:center;gap:7px;min-width:0}
+.folder-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;max-width:34vw}
 
 /* VIEW TABS */
 .view-tabs{display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border);
@@ -183,7 +196,34 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .soll-row label{color:var(--text2);width:85px;flex-shrink:0;font-weight:500}
 .soll-row input{width:42px;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:3px 5px;border-radius:6px;font-size:12px;text-align:center}
 .soll-row input:focus{outline:none;border-color:var(--blue)}
-.sel-info{padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);text-align:center;line-height:1.6;flex-shrink:0;background:var(--surface2)}
+/* WERKZEUG
+   Person(en) und Schicht stehen zusammen an einem Ort - vorher war die eine
+   Haelfte oben in der Leiste und die andere hier unten. */
+.tool-box{padding:10px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface2)}
+.tool-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);
+  font-family:'JetBrains Mono',monospace;margin-bottom:6px}
+.sel-info{font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:8px;min-height:20px}
+.sel-info .sel-name{font-weight:700;font-size:13px}
+.hdr-pills{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.pill{display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 0;border-radius:8px;
+  border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:12px;font-weight:700;
+  color:var(--text3);transition:background .12s,border-color .12s,color .12s,transform .1s}
+.pill:hover{background:var(--surface3);color:var(--text)}
+.pill:active{transform:scale(.94)}
+.pill .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-f{background:var(--frueh)}.dot-n{background:var(--normal)}
+.dot-s{background:var(--spaet)}.dot-r{background:var(--ruf)}
+.pill.active{border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
+.pill.active[data-shift=frueh]{color:var(--frueh)}.pill.active[data-shift=normal]{color:var(--normal)}
+.pill.active[data-shift=spaet]{color:var(--spaet)}
+.pill.active[data-shift=rufbereitschaft]{color:var(--ruf)}
+.tool-hint{font-size:10.5px;color:var(--text3);line-height:1.45;margin-top:7px}
+.tool-hint kbd{font-family:'JetBrains Mono',monospace;font-size:9.5px;background:var(--surface3);
+  border:1px solid var(--border);border-radius:4px;padding:0 3px}
+/* Soll ist eine Einstellung, keine Tagesarbeit - darum ganz nach unten */
+.soll-foot{margin-top:auto;border-top:1px solid var(--border);padding:8px 10px;flex-shrink:0;
+  background:var(--surface)}
+.soll-foot .tool-lbl{margin-bottom:5px}
 .sb-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
 .sb-tab{flex:1;padding:7px;text-align:center;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;color:var(--text3);border-bottom:3px solid transparent;transition:all .15s}
 .sb-tab.active{color:var(--text);border-bottom-color:var(--blue)}
@@ -241,24 +281,11 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .day-cell.hol-in{background:color-mix(in srgb,var(--orange) 6%,var(--surface))}
 .day-cell.hol-both{background:rgba(167,139,250,.09)}
 .day-cell.bridge{background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.3)}
-.range-panel{background:var(--surface);border:2px solid var(--border2);border-radius:12px;
-  padding:12px 14px;margin-top:8px;box-shadow:0 4px 16px var(--shadow)}
-.range-panel h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
-  color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
-.range-panel-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
-.rp-label{font-size:10px;color:var(--text3);width:100%;margin-bottom:2px;font-weight:600}
-.rpbtn{padding:5px 10px;border-radius:7px;border:2px solid var(--border);background:var(--surface2);
-  color:var(--text2);cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;white-space:nowrap}
-.rpbtn:hover{border-color:var(--border2);color:var(--text);background:var(--surface3)}
-.rpbtn.red{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.07);color:#f87171}
-.rpbtn.red:hover{background:rgba(248,113,113,.18);border-color:#f87171}
-.rpbtn.orange{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.07);color:var(--spaet)}
-.rpbtn.orange:hover{background:rgba(245,158,11,.18);border-color:var(--spaet)}
-.rpbtn.blue{border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.07);color:var(--blue)}
-.rpbtn.blue:hover{background:rgba(59,130,246,.18);border-color:var(--blue)}
 .bridge-tag{font-size:10px;color:var(--sonder);font-weight:600;flex-shrink:0;line-height:1.3}
 .day-cell.conflict{outline:2px solid rgba(239,68,68,.45);outline-offset:-2px}
-.day-cell.understaffed{outline:2px solid rgba(245,158,11,.5);outline-offset:-2px;animation:pulseUnder 2.8s ease-in-out infinite}
+/* Unterbesetzung faerbt nur die betroffene Zeile (.chips-label.unter), nicht
+   die ganze Zelle - sonst ist im leeren Monat jeder Tag rot umrandet und die
+   Markierung sagt nichts mehr. Die Zahl in der Kopfleiste zaehlt sie. */
 .day-cell.has-note{border-bottom:3px solid var(--spaet)}
 .day-cell.in-range{background:rgba(59,130,246,.07)!important;border-color:rgba(59,130,246,.35)!important}
 .day-cell.range-end,.day-cell.in-range{animation:fadeIn .12s ease}.day-cell.range-start{border-color:var(--blue)!important;background:rgba(59,130,246,.14)!important}
@@ -268,16 +295,24 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .day-num{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:20px}
 .day-number{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}
 .day-number.is-today{color:var(--blue)}
-.day-actions{display:flex;gap:2px;opacity:0;transition:opacity .15s}
-.day-cell:hover .day-actions{opacity:1}
-.dab{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 3px;border-radius:4px;transition:color .1s,background .1s;line-height:1}
+/* Ein Knopf je Tag statt vier: Notiz, Kopieren, Einfuegen und Leeren stehen
+   im selben Menue, das auch der Rechtsklick oeffnet. */
+.dab{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 3px;
+  border-radius:5px;line-height:1;opacity:0;transition:opacity .15s,color .1s,background .1s}
+.day-cell:hover .dab,.dab:focus-visible{opacity:1}
 .dab:hover{color:var(--text);background:var(--surface3)}
-.dab.red:hover{color:#f87171;background:rgba(248,113,113,.1)}
+.daymenu{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border2);
+  border-radius:10px;padding:5px;min-width:190px;box-shadow:0 12px 34px var(--shadow);
+  display:flex;flex-direction:column;gap:1px;animation:scaleIn .1s ease}
+.daymenu .mm-item:disabled{opacity:.35;cursor:default}
+.daymenu .mm-item:disabled:hover{background:none}
+.daymenu .mm-item.red{color:var(--krank-text)}
+.daymenu .dm-head{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  color:var(--text3);padding:5px 9px 6px}
 .hol-tag{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;line-height:1.3;font-weight:500}
 .hol-de-tag{color:var(--blue)}.hol-in-tag{color:var(--orange)}.hol-custom-tag{color:var(--sonder)}
 .conflict-badge{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--krank);
   border:2px solid var(--surface);overflow:hidden;text-indent:-999px;white-space:nowrap}
-.understaffed-badge{font-size:9px;background:rgba(245,158,11,.12);color:var(--spaet);border-radius:4px;padding:1px 4px;font-weight:700;flex-shrink:0;font-family:'JetBrains Mono',monospace}
 .soll-ist{display:flex;gap:2px;flex-shrink:0;margin-top:1px}
 .si-bar{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
 .si-fill{height:100%;border-radius:2px;transition:width .2s}
@@ -293,6 +328,8 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .chips{display:flex;flex-wrap:wrap;gap:2px;flex:1}
 .chip{font-size:10px;padding:2px 7px 2px 5px;border-radius:var(--radius-chip);font-weight:600;cursor:grab;white-space:nowrap;max-width:82px;transition:opacity .15s,transform .12s;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;line-height:1.4}
 .chip:hover{opacity:.65}
+/* Vorschau: was der naechste Klick eintragen wuerde */
+.chip.vorschau{background:none;border-style:dashed;opacity:.75;cursor:default}
 .chip.frueh{background:var(--frueh-bg);color:var(--frueh-text);border:1px solid color-mix(in srgb,var(--frueh) 35%,transparent)}
 .chip.normal{background:var(--normal-bg);color:var(--normal-text);border:1px solid color-mix(in srgb,var(--normal) 35%,transparent)}
 .chip.spaet{background:var(--spaet-bg);color:var(--spaet-text);border:1px solid color-mix(in srgb,var(--spaet) 35%,transparent)}
@@ -571,9 +608,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:7px}
 .print-head h2{font-size:15px;font-weight:800;letter-spacing:-.2px}
 .print-head .ph-meta{font-size:10px;color:#26292f;text-align:right;white-space:nowrap}
-.print-legend{margin-top:8px;padding-top:5px;border-top:1px solid #9aa0ad;
-  font-size:9.5px;color:#26292f;flex-wrap:wrap;gap:12px}
-.print-legend b{font-family:'JetBrains Mono',monospace;margin-right:3px}
 
 @page{size:A4 landscape;margin:9mm}
 
@@ -596,8 +630,8 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   html,body{height:auto!important;overflow:visible!important;background:#fff!important;font-size:11px;zoom:1!important}
 
   /* Alles, was nur zum Bedienen da ist */
-  header,.context-bar,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
-  .day-actions,.ruf-export-row,.tmpl-footer,.hol-add-form,#hol-coverage-note,
+  header,.more-menu,.daymenu,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
+  .dab,.ruf-export-row,.tmpl-footer,.hol-add-form,#hol-coverage-note,
   .ruf-toolbar,.tmpl-toolbar{display:none!important}
 
   .main{display:block!important;height:auto!important;grid-template-columns:1fr!important}
@@ -615,10 +649,13 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   .ruf-split{display:block!important}
   .ruf-col{border:none!important;padding:0!important;margin-bottom:14px}
 
-  /* Kopfzeile und Legende erscheinen nur auf dem Papier */
+  /* Kopfzeile nur auf dem Papier; die Legende ist dieselbe Fussleiste wie
+     im Fenster - eine Legende, zwei Ausgaben. */
   .print-head.print-only{display:flex!important}
-  .print-legend.print-only{display:flex!important}
   .note-print{display:block!important}
+  .statusbar{border-top:1px solid var(--border)!important;padding:6px 0!important;
+    background:#fff!important;break-inside:avoid;font-size:9.5px}
+  .statusbar .sb-folder{margin-left:auto}
 
   .cal-grid{gap:3px}
   .day-cell{break-inside:avoid;min-height:0!important;padding:4px;border:1px solid var(--border)!important;
@@ -634,7 +671,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   tr{break-inside:avoid}
   thead{display:table-header-group}
   .soll-ist{display:none}
-  .understaffed-badge{background:#fff!important;border:1px solid var(--spaet-text);font-size:8px}
   /* Im Fenster ein 7px-Punkt mit Tooltip - auf Papier gibt es keinen Tooltip,
      also als lesbare Zeile ausgeben statt als Punkt mit ueberlaufendem Text. */
   .conflict-badge{position:static!important;width:auto!important;height:auto!important;
@@ -658,7 +694,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 /* ── Design System Additions ── */
 #tooltip{position:fixed;z-index:500;background:var(--surface3);border:1.5px solid var(--border2);border-radius:9px;padding:9px 12px;font-size:12px;color:var(--text);pointer-events:none;max-width:260px;box-shadow:0 4px 16px var(--shadow);line-height:1.5;display:none}
 .hol-label{font-size:9px;font-weight:600;color:var(--krank-text);display:flex;align-items:center;gap:2px;letter-spacing:.1px;opacity:.85;margin-top:1px}
-.under-badge{position:absolute;top:5px;right:5px;font-size:9px;font-weight:700;color:var(--spaet-text);background:var(--spaet-bg);border:1px solid var(--spaet);border-radius:4px;padding:1px 5px}
 .day-cell.selected{border-color:var(--blue) !important;background:color-mix(in srgb,var(--blue) 7%,var(--surface));box-shadow:0 0 0 3px var(--blue-soft)}
 .range-start,.range-end{border-color:var(--blue) !important;background:color-mix(in srgb,var(--blue) 10%,var(--surface))}
 .in-range{background:color-mix(in srgb,var(--blue) 5%,var(--surface));border-color:color-mix(in srgb,var(--blue) 30%,var(--border))}
@@ -675,7 +710,7 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 </head>
 <body>
 
-<!-- Leiste 1: gilt immer - Marke, Ansichten, Daten und Werkzeuge -->
+<!-- Eine Leiste: Marke, Ansichten, Monat, Status. Alles Seltene im Mehr-Menue. -->
 <header>
   <h1>⚙ <span class="h1-de">DE</span>/<span class="h1-in">IN</span></h1>
 
@@ -687,54 +722,38 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     <div class="vtab" data-view="hol">🎉 Feiertage</div>
   </nav>
 
-  <div class="hdr-right">
-    <div class="folder-chip" title="Datenordner">
-      <span>📁</span>
-      <span class="folder-label" id="folder-label">Lade…</span>
-      <button class="fbtn" id="btn-folder">Wechseln</button>
-    </div>
-    <div class="sep"></div>
-    <button class="fbtn ic" id="btn-export-data" onclick="exportAllData()" title="Alle Daten als JSON sichern">↓</button>
-    <label class="fbtn ic" title="Sicherung einlesen">↑<input type="file" id="backup-import-file" accept=".json" style="display:none" onchange="handleBackupImport(this)"></label>
-    <button class="fbtn ic" id="btn-refresh" onclick="refreshData()" title="Neu laden">↻</button>
-    <div class="sep"></div>
+  <div class="dnav" id="dnav">
+    <button class="nbtn" id="btn-prev" title="Voriger Monat (←)">←</button>
+    <select id="nav-month"></select>
+    <select id="nav-year"></select>
+    <button class="nbtn" id="btn-next" title="Nächster Monat (→)">→</button>
+    <button class="nbtn" id="btn-today" title="Zum heutigen Monat (T)">Heute</button>
+  </div>
+
+  <div class="tb-right">
+    <button class="status-chip hidden" id="btn-check" title="Tage unter Soll auflisten">
+      ⚠ <span class="sc-text" id="check-text"></span></button>
     <button class="ur-btn" id="btn-undo" disabled title="Rückgängig (Strg+Z)">↩</button>
     <button class="ur-btn" id="btn-redo" disabled title="Wiederholen (Strg+Y)">↪</button>
-    <button class="fbtn ic" id="btn-zoom-out" title="Kleiner darstellen">A−</button>
-    <button class="fbtn ic" id="btn-zoom-in" title="Größer darstellen">A+</button>
-    <button class="theme-btn" id="btn-theme" title="Hell/Dunkel">🌙</button>
+    <button class="ur-btn" id="btn-more" title="Mehr">⋯</button>
   </div>
 </header>
 
-<!-- Leiste 2: haengt an der offenen Ansicht -->
-<div class="context-bar" id="context-bar">
-  <div class="nav ctx-month">
-    <button class="nbtn" id="btn-prev" title="Voriger Monat">←</button>
-    <select id="nav-month"></select>
-    <select id="nav-year"></select>
-    <button class="nbtn" id="btn-next" title="Nächster Monat">→</button>
-    <button class="nbtn" id="btn-today">Heute</button>
+<!-- Mehr-Menue: alles, was man nicht bei jedem Eintrag braucht -->
+<div class="more-menu hidden" id="more-menu">
+  <button class="mm-item" id="btn-ics"><span class="mm-ic">📆</span>ICS-Export / -Import</button>
+  <button class="mm-item" id="btn-print"><span class="mm-ic">🖨</span>Drucken<span style="margin-left:auto;font-size:10px;color:var(--text3)">Strg+P</span></button>
+  <div class="mm-sep"></div>
+  <button class="mm-item" id="btn-export-data"><span class="mm-ic">💾</span>Sicherung speichern / einlesen</button>
+  <button class="mm-item" id="btn-refresh"><span class="mm-ic">↻</span>Neu laden</button>
+  <button class="mm-item" id="btn-folder"><span class="mm-ic">📁</span>Ordner wechseln</button>
+  <div class="mm-sep"></div>
+  <div class="mm-lbl">Ansicht</div>
+  <div class="mm-row">
+    <button class="fbtn ic" id="btn-zoom-out" title="Kleiner darstellen">A−</button>
+    <button class="fbtn ic" id="btn-zoom-in" title="Größer darstellen">A+</button>
+    <button class="fbtn" id="btn-theme" title="Hell/Dunkel" style="margin-left:auto">🌙 Theme</button>
   </div>
-
-  <div class="sep ctx-plan"></div>
-
-  <div class="ctx-plan ctx-shift">
-    <span class="ctx-lbl">Schicht</span>
-    <div class="hdr-pills" id="modebar">
-      <div class="pill active" role="button" tabindex="0" data-shift="frueh" title="Frühschicht"><span class="dot dot-f"></span>F</div>
-      <div class="pill" role="button" tabindex="0" data-shift="normal" title="Normaldienst (Gleitzeit)"><span class="dot dot-n"></span>N</div>
-    <div class="pill" role="button" tabindex="0" data-shift="spaet" title="Spätschicht"><span class="dot dot-s"></span>S</div>
-      <div class="pill" role="button" tabindex="0" data-shift="rufbereitschaft" title="Rufbereitschaft"><span class="dot dot-r"></span>R</div>
-    </div>
-  </div>
-
-  <div class="hbtn ctx-plan" id="btn-range" title="Zwei Klicks spannen einen Zeitraum auf">⇿ Zeitraum</div>
-
-  <div style="flex:1"></div>
-
-  <div class="hbtn ctx-plan" id="btn-check" title="Tage unter Soll auflisten">⚠ Prüfen</div>
-  <div class="hbtn" id="btn-ics" title="ICS Export / Import">ICS</div>
-  <div class="hbtn" id="btn-print" title="Drucken">🖨 Drucken</div>
 </div>
 
 <button class="sidebar-toggle" id="sidebar-toggle">◀</button>
@@ -744,8 +763,19 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     <h2 id="print-title">Schichtplan</h2>
     <div class="ph-meta" id="print-meta"></div>
   </div>
-  <!-- SIDEBAR -->
+  <!-- SEITENLEISTE: oben das Werkzeug, dann das Team, unten die Einstellung -->
   <div class="sidebar">
+    <div class="tool-box">
+      <div class="tool-lbl">Werkzeug</div>
+      <div class="sel-info" id="sel-info"></div>
+      <div class="hdr-pills" id="modebar">
+        <div class="pill active" role="button" tabindex="0" data-shift="frueh" title="Frühschicht 06–14 (Taste 1)"><span class="dot dot-f"></span>F</div>
+        <div class="pill" role="button" tabindex="0" data-shift="normal" title="Normaldienst, Gleitzeit (Taste 2)"><span class="dot dot-n"></span>N</div>
+        <div class="pill" role="button" tabindex="0" data-shift="spaet" title="Spätschicht 14–22 (Taste 3)"><span class="dot dot-s"></span>S</div>
+        <div class="pill" role="button" tabindex="0" data-shift="rufbereitschaft" title="Rufbereitschaft 22–06 (Taste 4)"><span class="dot dot-r"></span>R</div>
+      </div>
+      <div class="tool-hint" id="tool-hint"></div>
+    </div>
     <div class="sb-sec">
       <div class="add-toggle" id="add-toggle" onclick="toggleAddForm()">
         <span class="add-toggle-label">+ Mitarbeiter hinzufügen</span>
@@ -763,39 +793,13 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
         </div>
       </div>
     </div>
-    <div class="sb-sec" style="padding:7px 10px">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:6px">Soll / Tag</div>
-      <div class="soll-compact">
-        <div class="soll-pill" style="border-color:rgba(34,197,94,.3)">
-          <span style="color:var(--frueh);font-size:10px">F</span>
-          <input type="number" id="soll-f" min="0" max="20" value="1" onchange="saveSoll()">
-          <span style="color:var(--text3);font-size:9px">P</span>
-        </div>
-        <div class="soll-pill" style="border-color:rgba(8,145,178,.3)">
-          <span style="color:var(--normal);font-size:10px">N</span>
-          <input type="number" id="soll-n" min="0" max="20" value="0" onchange="saveSoll()">
-          <span style="color:var(--text3);font-size:9px">P</span>
-        </div>
-        <div class="soll-pill" style="border-color:rgba(245,158,11,.3)">
-          <span style="color:var(--spaet);font-size:10px">S</span>
-          <input type="number" id="soll-s" min="0" max="20" value="1" onchange="saveSoll()">
-          <span style="color:var(--text3);font-size:9px">P</span>
-        </div>
-        <div class="soll-pill" style="border-color:rgba(167,139,250,.3)">
-          <span style="color:var(--ruf);font-size:10px">R</span>
-          <input type="number" id="soll-r" min="0" max="20" value="1" onchange="saveSoll()">
-          <span style="color:var(--text3);font-size:9px">P</span>
-        </div>
-      </div>
-    </div>
-    <div class="sel-info" id="sel-info"><div>Kein Mitarbeiter gewählt</div><div style="font-size:11px;color:var(--text3)">← Klicken</div></div>
     <div class="sb-tabs">
       <div class="sb-tab active" data-tab="team">Team</div>
       <div class="sb-tab" data-tab="stats">Statistik</div>
     </div>
     <div class="sb-panel active" data-panel="team">
       <div class="sb-filter">
-        <input id="sb-search" placeholder="Suchen…" oninput="renderMembers()">
+        <input id="sb-search" placeholder="Suchen… (/)" oninput="renderMembers()">
         <select id="sb-team-filter" onchange="renderMembers()">
           <option value="">Alle</option>
           <option value="DE">🇩🇪 DE</option>
@@ -805,6 +809,27 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
       <div class="member-list" id="member-list"></div>
     </div>
     <div class="sb-panel" data-panel="stats"><div class="stats-wrap" id="stats-wrap"></div></div>
+    <div class="soll-foot">
+      <div class="tool-lbl">Soll / Tag</div>
+      <div class="soll-compact">
+        <div class="soll-pill" style="border-color:color-mix(in srgb,var(--frueh) 35%,transparent)">
+          <span style="color:var(--frueh);font-size:10px">F</span>
+          <input type="number" id="soll-f" min="0" max="20" value="1" onchange="saveSoll()">
+        </div>
+        <div class="soll-pill" style="border-color:color-mix(in srgb,var(--normal) 35%,transparent)">
+          <span style="color:var(--normal);font-size:10px">N</span>
+          <input type="number" id="soll-n" min="0" max="20" value="0" onchange="saveSoll()">
+        </div>
+        <div class="soll-pill" style="border-color:color-mix(in srgb,var(--spaet) 35%,transparent)">
+          <span style="color:var(--spaet);font-size:10px">S</span>
+          <input type="number" id="soll-s" min="0" max="20" value="1" onchange="saveSoll()">
+        </div>
+        <div class="soll-pill" style="border-color:color-mix(in srgb,var(--ruf) 35%,transparent)">
+          <span style="color:var(--ruf);font-size:10px">R</span>
+          <input type="number" id="soll-r" min="0" max="20" value="1" onchange="saveSoll()">
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- VIEW PANELS -->
@@ -815,7 +840,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
         <div class="day-hdr">Do</div><div class="day-hdr">Fr</div>
         <div class="day-hdr we">Sa</div><div class="day-hdr we">So</div>
       </div>
-      <div class="print-only print-legend" id="print-legend"></div>
     </div>
   </div>
 
@@ -907,7 +931,16 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
       </div>
     </div>
   </div>
+</div><!-- /main -->
 
+<!-- Fussleiste: die einzige Legende - im Fenster wie im Ausdruck -->
+<div class="statusbar" id="statusbar">
+  <span class="lg"><i style="background:var(--frueh)"></i>Früh 06–14</span>
+  <span class="lg"><i style="background:var(--normal)"></i>Normaldienst</span>
+  <span class="lg"><i style="background:var(--spaet)"></i>Spät 14–22</span>
+  <span class="lg"><i style="background:var(--ruf)"></i>Rufbereitschaft 22–06</span>
+  <span class="sb-folder"><span class="folder-label" id="folder-label">Lade…</span></span>
+</div>
 
   <!-- RUFBEREITSCHAFT REIHUM -->
   <div class="modal-bg hidden" id="reihum-modal">
@@ -1151,7 +1184,10 @@ let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
 let mitarbeiter=[], schichten={}, holidays={}, notizen={}, customHolidays=[], templates={};
 let soll={frueh:1,spaet:1,rufbereitschaft:1};
 let selectedPerson=null, selectedShift='frueh', selectedPersons=new Set();
-let rangeMode=false, rangeStart=null, previewEnd=null, frozenRangeEnd=null, multiDays=new Set();
+// Zeitraum ist kein Modus mehr: Shift+Klick spannt vom zuletzt geklickten Tag
+// bis hierher auf. rangeStart/previewEnd beschreiben nur noch die Strecke,
+// die gerade markiert ist.
+let letzterKlick=null, letzterModus='add', rangeStart=null, previewEnd=null, frozenRangeEnd=null, multiDays=new Set();
 let copiedDay=null, activeDayKey=null;
 let deletedBackups={}, pendingRestore=null, dragState=null, newColor=null;
 let undoStack=[], redoStack=[];
@@ -1718,6 +1754,7 @@ function applyData(d){
 function renderAll(){
   updateLabel();
   renderMembers();
+  updateSelInfo();
   renderCalendar();
   renderStats();
   renderCustomHolidays();
@@ -1729,7 +1766,7 @@ async function init(){
   // Theme
   const theme=localStorage.getItem('sp-theme')||'dark';
   document.documentElement.dataset.theme=theme;
-  document.getElementById('btn-theme').textContent=theme==='dark'?'🌙':'☀️';
+  document.getElementById('btn-theme').textContent=(theme==='dark'?'🌙':'☀️')+' Theme';
 
   // Color init
   newColor=randColor();
@@ -1811,7 +1848,7 @@ function bindEvents(){
   document.getElementById('btn-theme').addEventListener('click',()=>{
     const t=document.documentElement.dataset.theme==='dark'?'light':'dark';
     document.documentElement.dataset.theme=t;
-    document.getElementById('btn-theme').textContent=t==='dark'?'🌙':'☀️';
+    document.getElementById('btn-theme').textContent=(t==='dark'?'🌙':'☀️')+' Theme';
     localStorage.setItem('sp-theme',t);
   });
 
@@ -1848,28 +1885,25 @@ function switchSubTab(view, subId){
     });
   });
 
-  // Shift pills - per Maus und per Tastatur bedienbar
-  const pickShift=p=>{
-    selectedShift=p.dataset.shift;
-    document.querySelectorAll('.pill').forEach(x=>x.classList.toggle('active',x===p));
-    updateSelInfo();
-  };
-  ['modebar'].forEach(id=>{
-    const bar=document.getElementById(id);
-    bar.addEventListener('click',e=>{
-      const p=e.target.closest('[data-shift]'); if(p) pickShift(p);
-    });
-    bar.addEventListener('keydown',e=>{
-      if(e.key!=='Enter'&&e.key!==' ')return;
-      const p=e.target.closest('[data-shift]'); if(!p) return;
-      e.preventDefault(); pickShift(p);
-    });
+  // Schichtwahl - per Maus und per Tastatur bedienbar
+  const bar=document.getElementById('modebar');
+  bar.addEventListener('click',e=>{
+    const p=e.target.closest('[data-shift]'); if(p) waehleSchicht(p.dataset.shift);
+  });
+  bar.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'&&e.key!==' ')return;
+    const p=e.target.closest('[data-shift]'); if(!p) return;
+    e.preventDefault(); waehleSchicht(p.dataset.shift);
   });
 
-  document.getElementById('btn-range').addEventListener('click',()=>{
-    setRangeMode(!rangeMode);
-    if(rangeMode) multiDays.clear();   // sonst waere unklar, was gilt
-    renderCalendar();updateSelInfo();
+  // Mehr-Menue oeffnen und schliessen
+  const more=document.getElementById('more-menu');
+  document.getElementById('btn-more').addEventListener('click',e=>{
+    e.stopPropagation(); more.classList.toggle('hidden');
+  });
+  more.addEventListener('click',e=>{ if(e.target.closest('.mm-item')) more.classList.add('hidden'); });
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('#more-menu')&&!e.target.closest('#btn-more')) more.classList.add('hidden');
   });
 
   document.getElementById('btn-ics').addEventListener('click',openIcsModal);
@@ -1882,14 +1916,11 @@ function switchSubTab(view, subId){
     document.getElementById('backup-drop-label').textContent='📂 .json Backup hier ablegen oder klicken';
     document.getElementById('backup-modal').classList.remove('hidden');
   });
-  // Import via folder-bar label onchange (see HTML)
   document.getElementById('backup-file').addEventListener('change',e=>{
     if(e.target.files[0]) document.getElementById('backup-drop-label').textContent='📂 '+e.target.files[0].name;
   });
   document.getElementById('btn-refresh').addEventListener('click',refreshData);
   // Template apply via onclick on btn-run-tmpl
-
-  ['f','s','r'].forEach(k=>document.getElementById('soll-'+k).addEventListener('change',saveSoll));
 
   document.querySelectorAll('.sb-tab').forEach(tab=>{
     tab.addEventListener('click',()=>{
@@ -1907,7 +1938,18 @@ function switchSubTab(view, subId){
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();doUndo();}
     if((e.ctrlKey||e.metaKey)&&(e.shiftKey&&e.key==='Z'||e.key==='y')){e.preventDefault();doRedo();}
-    if(e.key==='Escape'){closeAllModals();clearAll();copiedDay=null;renderCalendar();}
+    if(e.key==='Escape'){closeAllModals();closeDayMenu();document.getElementById('more-menu').classList.add('hidden');clearAll();copiedDay=null;renderCalendar();}
+    // Kuerzel nur, wenn gerade nicht getippt wird
+    if(e.ctrlKey||e.metaKey||e.altKey) return;
+    const ziel=e.target instanceof Element?e.target:null;
+    if(ziel&&ziel.closest('input,select,textarea,[contenteditable]')) return;
+    const nachSchicht={'1':'frueh','2':'normal','3':'spaet','4':'rufbereitschaft'}[e.key];
+    if(nachSchicht){ e.preventDefault(); waehleSchicht(nachSchicht); return; }
+    if(e.key==='ArrowLeft'){ e.preventDefault(); prevMonth(); return; }
+    if(e.key==='ArrowRight'){ e.preventDefault(); nextMonth(); return; }
+    if(e.key==='t'||e.key==='T'){ e.preventDefault(); goToday(); return; }
+    if(e.key==='/'){ e.preventDefault(); document.getElementById('sb-search')?.focus(); return; }
+    if(e.key==='Delete'&&multiDays.size>0){ e.preventDefault(); leereTage([...multiDays]); }
   });
 
   document.querySelectorAll('.modal-bg').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)closeAllModals();});});
@@ -1988,9 +2030,6 @@ function updatePrintHead(){
   }
   titel.textContent=text;
   document.getElementById('print-meta').textContent=meta;
-  const legende=document.getElementById('print-legend');
-  if(legende) legende.innerHTML=ALL_SHIFTS.map(s=>
-    `<span><b style="color:${SHIFT_SHORT[s][1]}">${SHIFT_SHORT[s][0]}</b>${esc(SHIFT_LABEL[s])}</span>`).join('');
 }
 
 function updateLabel(){
@@ -2054,18 +2093,18 @@ async function refreshFolderBar(){
   }
 }
 async function changeFolder(){
-  const btn=document.getElementById('btn-folder');btn.textContent='Wähle…';btn.disabled=true;
+  const btn=document.getElementById('btn-folder');btn.disabled=true;
   try{const d=await api('/api/pick_folder',{method:'POST'});if(d.ok){await refreshFolderBar();await refreshData();toast('Ordner gewechselt');}}
-  finally{btn.textContent='Ordner wechseln';btn.disabled=false;}
+  finally{btn.disabled=false;}
 }
 async function refreshData(){
-  const btn=document.getElementById('btn-refresh');btn.textContent='↻…';btn.disabled=true;
+  const btn=document.getElementById('btn-refresh');btn.disabled=true;
   try{
     const d=await api('/api/data');
     applyData(d);
     renderAll();
     toast('Daten aktualisiert');
-  }finally{btn.textContent='↻';btn.disabled=false;}
+  }finally{btn.disabled=false;}
 }
 
 
@@ -2176,56 +2215,58 @@ function selectPerson(name){
   multiDays.clear();renderMembers();updateSelInfo();
 }
 
+// Der Werkzeug-Block sagt in einem Satz, wer eingetragen wird und was der
+// naechste Klick tut. Ohne Werkzeug und mit aufgespanntem Zeitraum steht hier
+// stattdessen, was sich loeschen laesst.
 function updateSelInfo(){
   const el=document.getElementById('sel-info');
+  const hintEl=document.getElementById('tool-hint');
+  const setHint=t=>{ if(hintEl) hintEl.innerHTML=t; };
+  const basisHinweis='<kbd>Klick</kbd> ein-/austragen &middot; <kbd>Shift</kbd> Zeitraum &middot; <kbd>Strg</kbd> mehrere Tage';
+
   if(selectedPersons.size>0){
     const names=[...selectedPersons];
     const avs=names.map(n=>{const m=mitarbeiter.find(x=>x.name===n);
       return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'13px':'9px'};font-weight:700;color:#fff;margin-right:2px">${m?.icon||initials(n)}</span>`;
     }).join('');
-    const hint=rangeMode?(rangeStart?'2. Tag klicken zum Eintragen':'1. Tag klicken'):multiDays.size>0?multiDays.size+' Tage · Klick = Ein-/Austragen':'Tag anklicken = alle eintragen';
-    el.innerHTML=`<div style="margin-bottom:3px">${avs}</div><strong>${names.length} Mitarbeiter</strong> · <span style="font-size:11px">${SHIFT_LABEL[selectedShift]}</span><br><span style="font-size:10px;color:var(--text3)">${hint}</span>
-    <div style="margin-top:4px"><button onclick="selectedPersons.clear();renderMembers();updateSelInfo();" style="font-size:10px;background:none;border:1px solid var(--border2);color:var(--text3);padding:2px 7px;border-radius:5px;cursor:pointer">✕ Auswahl aufheben</button></div>`;
+    el.innerHTML=`<div style="margin-bottom:3px">${avs}</div>
+      <span class="sel-name">${names.length} Mitarbeiter</span>
+      <button onclick="selectedPersons.clear();renderMembers();updateSelInfo();" style="float:right;font-size:10px;background:none;border:1px solid var(--border2);color:var(--text3);padding:1px 6px;border-radius:5px;cursor:pointer">✕</button>`;
+    setHint(multiDays.size>0?`<strong>${multiDays.size} Tage</strong> gewählt – nächster Klick trägt alle ein`:basisHinweis);
     return;
   }
+
   if(!selectedPerson){
-    if(rangeMode&&rangeStart){
-      // Show delete options
+    if(rangeStart&&frozenRangeEnd){
+      // Ohne Werkzeug, aber mit Strecke: hier wird geloescht.
       const dates=getRangeDates();
-      const lo=dates[0],hi=dates[dates.length-1];
       const fmt=k=>new Date(k+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});
-      const lbl=lo===hi?fmt(lo):fmt(lo)+' – '+fmt(hi);
-      // Who is in this range?
+      const lbl=dates.length===1?fmt(dates[0]):fmt(dates[0])+' – '+fmt(dates[dates.length-1]);
       const allNames=new Set();
-      dates.forEach(d=>{ALL_SHIFTS.forEach(s=>(getSlot(d)[s]||[]).forEach(n=>allNames.add(n)));});
+      dates.forEach(d=>{ALL_SHIFTS.forEach(sh=>(getSlot(d)[sh]||[]).forEach(n=>allNames.add(n)));});
       const personBtns=[...allNames].map(n=>{
         const m=mitarbeiter.find(x=>x.name===n);
-        return `<button onclick="clearRangePerson('${n.replace(/'/g,"\\'")}') " style="padding:3px 8px;border-radius:6px;border:2px solid var(--border2);background:var(--surface3);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;border-left:3px solid ${m?m.color:'#64748b'}">${m?.icon?m.icon+' ':''}${esc(n)}</button>`;
+        return `<button onclick="clearRangePerson('${n.replace(/'/g,"\'")}')" style="padding:3px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--surface3);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;border-left:3px solid ${m?m.color:'#64748b'}">${m?.icon?m.icon+' ':''}${esc(n)}</button>`;
       }).join('');
-      const shiftBtns=ALL_SHIFTS.map(s=>
-        `<button onclick="clearRangeShift('${s}')" style="padding:3px 8px;border-radius:6px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);font-size:10px;font-weight:700;cursor:pointer">${SHIFT_SHORT[s][0]} ${SHIFT_LABEL[s]}</button>`
+      const shiftBtns=ALL_SHIFTS.map(sh=>
+        `<button onclick="clearRangeShift('${sh}')" style="padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:10px;font-weight:700;cursor:pointer">${SHIFT_SHORT[sh][0]} ${SHIFT_LABEL[sh]}</button>`
       ).join('');
-      el.innerHTML=`<div style="font-weight:700;margin-bottom:4px">🗑 ${lbl}</div>
-        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">2. Tag klicken um Zeitraum zu setzen</div>
-        <div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px">ALLES LÖSCHEN</div>
-        <div style="margin-bottom:5px"><button onclick="clearRangeAll()" style="padding:4px 10px;border-radius:7px;border:2px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;width:100%">✕ Alle Einträge (${dates.length} Tage)</button></div>
-        <div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px">NUR SCHICHT</div>
+      el.innerHTML=`<div class="sel-name">🗑 ${lbl} · ${dates.length} Tage</div>
+        <div style="margin:5px 0"><button onclick="clearRangeAll()" style="padding:4px 10px;border-radius:7px;border:1px solid color-mix(in srgb,var(--krank) 40%,transparent);background:var(--krank-bg);color:var(--krank-text);font-size:11px;font-weight:700;cursor:pointer;width:100%">✕ Alle Einträge löschen</button></div>
         <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${shiftBtns}</div>
-        ${allNames.size>0?`<div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px">NUR PERSON</div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${personBtns}</div>`:''}
+        ${allNames.size?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${personBtns}</div>`:''}
         <button onclick="clearSelection()" style="width:100%;padding:3px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text3);font-size:10px;cursor:pointer">← Abbrechen</button>`;
+      setHint('Nur löschen – zum Eintragen erst einen Mitarbeiter wählen');
       return;
     }
-    if(rangeMode) {
-      el.innerHTML='<div style="font-size:11px">Zeitraum-Lösch-Modus</div><div style="font-size:10px;color:var(--text3)">1. Tag klicken, dann 2. Tag</div>';
-      return;
-    }
-    el.innerHTML='<div>Kein Mitarbeiter gewählt</div><div style="font-size:11px;color:var(--text3)">← Klicken</div>';return;
+    el.innerHTML='<span style="color:var(--text3)">Kein Mitarbeiter gewählt</span>';
+    setHint('Mitarbeiter unten anklicken – dann trägt ein Klick auf einen Tag ein');
+    return;
   }
+
   const flag=selectedPerson.team==='DE'?'🇩🇪':'🇮🇳';
-  const hint=multiDays.size>0?multiDays.size+' Tage · Klick = Ein-/Austragen'
-    :rangeMode?(rangeStart?'2. Tag klicken zum Eintragen':'1. Tag klicken')
-    :'Klick = Ein-/Austragen · Strg+Klick = Mehrfach';
-  el.innerHTML=`<strong style="color:${selectedPerson.color}">${esc(selectedPerson.name)}</strong> ${flag}<br><span style="font-size:11px">${SHIFT_LABEL[selectedShift]}</span><br><span style="font-size:10px;color:var(--text3)">${hint}</span>`;
+  el.innerHTML=`<span class="sel-name" style="color:${selectedPerson.color}">${esc(selectedPerson.name)}</span> ${flag}`;
+  setHint(multiDays.size>0?`<strong>${multiDays.size} Tage</strong> gewählt – nächster Klick trägt alle ein`:basisHinweis);
 }
 
 async function addMitarbeiter(){
@@ -2395,6 +2436,75 @@ function isoWeek(d){
   return Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
 }
 
+// Schichtwahl an einer Stelle - Maus, Tastatur und Kuerzel laufen hier zusammen.
+function waehleSchicht(shift){
+  if(!ALL_SHIFTS.includes(shift)) return;
+  selectedShift=shift;
+  document.querySelectorAll('#modebar .pill').forEach(p=>p.classList.toggle('active',p.dataset.shift===shift));
+  updateSelInfo();
+}
+
+// ── TAGESMENUE ────────────────────────────────────────────────
+// Vier Knoepfe in jeder Zelle waren bis zu 168 Klickziele im Monat. Jetzt
+// oeffnet ein Knopf - oder der Rechtsklick - dieselbe kurze Liste.
+let dayMenuEl=null;
+function closeDayMenu(){ if(dayMenuEl){ dayMenuEl.remove(); dayMenuEl=null; } }
+function openDayMenu(key,anchor,x,y){
+  closeDayMenu();
+  const slot=getSlot(key);
+  const d=new Date(key+'T00:00:00');
+  const m=document.createElement('div');
+  m.className='daymenu';
+  const kopf=document.createElement('div');
+  kopf.className='dm-head';
+  kopf.textContent=d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'long'});
+  m.appendChild(kopf);
+  const item=(icon,text,fn,{aus=false,rot=false}={})=>{
+    const b=document.createElement('button');
+    b.className='mm-item'+(rot?' red':'');
+    b.disabled=aus;
+    b.innerHTML=`<span class="mm-ic">${icon}</span>${text}`;
+    b.addEventListener('click',async e=>{ e.stopPropagation(); closeDayMenu(); await fn(); });
+    m.appendChild(b);
+  };
+  item('📝','Notiz & Details',()=>openDayModal(key));
+  item('⧉','Tag kopieren',()=>{
+    copiedDay={key,slot:JSON.parse(JSON.stringify(slot))};
+    toast('Tag kopiert'); renderCalendar();
+  });
+  item('📋',copiedDay?'Einfügen':'Einfügen (nichts kopiert)',async()=>{
+    pushUndo(); await pasteDay([key],'replace'); copiedDay=null; renderCalendar();
+  },{aus:!copiedDay});
+  item('✕','Tag leeren',()=>clearDay(key),{rot:true});
+  document.body.appendChild(m);
+
+  const r=anchor?anchor.getBoundingClientRect():null;
+  let left=x!=null?x:(r?r.right-m.offsetWidth:0);
+  let top =y!=null?y:(r?r.bottom+4:0);
+  left=Math.max(6,Math.min(left,innerWidth -m.offsetWidth -6));
+  top =Math.max(6,Math.min(top ,innerHeight-m.offsetHeight-6));
+  m.style.left=left+'px'; m.style.top=top+'px';
+  dayMenuEl=m;
+  setTimeout(()=>document.addEventListener('click',closeDayMenu,{once:true}),0);
+}
+
+// Mehrere Tage auf einmal leeren - der Weg fuer Entf auf einer Auswahl.
+async function leereTage(tage){
+  if(!tage.length) return;
+  const ok=await confirmDialog('Tage leeren?',
+    `<strong>${tage.length} Tag(e)</strong> werden vollständig geleert – alle Schichten und Rufbereitschaft.`,'Ja, leeren');
+  if(!ok) return;
+  pushUndo();
+  const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({slot:emptyDay(),dates:tage,mode:'replace'})});
+  if(r.ok){
+    tage.forEach(k=>schichten[k]=emptyDay());
+    multiDays.clear();
+    renderCalendar(); updateSelInfo();
+    toast(tage.length+' Tag(e) geleert');
+  }
+}
+
 function renderCalendar(){
   const grid = document.getElementById('cal-grid');
   // Remove all but the 8 headers (KW + Mo..So)
@@ -2438,9 +2548,34 @@ function renderCalendar(){
     grid.appendChild(makeCell(c.key, c.num, c.other));
   });
   renderStats();
+  updateCheckChip();
   // Die Monatsuebersicht zeigt dieselben Daten; sie muss bei jedem Monats-
   // wechsel und nach jeder Aenderung mitgezogen werden.
   if(activeView==='matrix') renderMatrix();
+}
+
+// Vorschau: solange ein Werkzeug gewaehlt ist, zeigt die Zelle unter dem
+// Zeiger als gestrichelter Chip, was der naechste Klick eintragen wuerde.
+function zeigeVorschau(el){
+  const namen=selectedPersons.size>0?[...selectedPersons]:selectedPerson?[selectedPerson.name]:[];
+  if(!namen.length) return;
+  const row=el.querySelector(`.chips-row[data-shift="${selectedShift}"] .chips`);
+  if(!row) return;
+  const drin=(getSlot(el.dataset.key)[selectedShift]||[]);
+  const offen=namen.filter(n=>!drin.includes(n));
+  if(!offen.length) return;
+  const chip=document.createElement('span');
+  chip.className='chip vorschau '+SHIFT_CSS[selectedShift];
+  chip.textContent='+ '+(offen.length>1?offen.length+' Pers.':offen[0].split(' ')[0]);
+  row.appendChild(chip);
+  row.parentElement.classList.remove('leer');   // Vorschau nicht ausgrauen
+}
+function raeumeVorschau(el){
+  el.querySelectorAll('.chip.vorschau').forEach(c=>{
+    const row=c.closest('.chips-row');
+    c.remove();
+    if(row&&!row.querySelector('.chip')) row.classList.add('leer');
+  });
 }
 
 function makeCell(key,dayNum,other){
@@ -2448,7 +2583,6 @@ function makeCell(key,dayNum,other){
   const today=new Date(),isToday=d.toDateString()===today.toDateString();
   const hol=holidays[key],slot=getSlot(key);
   const {schichtC,holC,hasAny}=getConflicts(slot,key);
-  const isUnder=!other&&isUnderstaffed(slot,key);
   const note=notizen[key],isCopied=copiedDay?.key===key,isMulti=multiDays.has(key);
   const rc=other?'':rangeClass(key);
 
@@ -2460,7 +2594,6 @@ function makeCell(key,dayNum,other){
     else if(hol) cls+=hol.country==='DE'?' hol-de':hol.country==='IN'?' hol-in':' hol-both';
     if(isToday) cls+=' today';
     if(hasAny) cls+=' conflict';
-    else if(isUnder) cls+=' understaffed';
     if(note) cls+=' has-note';
     if(isCopied) cls+=' copied';
     if(isMulti) cls+=' multi-day';
@@ -2477,18 +2610,13 @@ function makeCell(key,dayNum,other){
   numRow.appendChild(numLeft);
 
   if(!other){
-    const acts=document.createElement('div');acts.className='day-actions';
-    const mkBtn=(title,icon,action,extra='')=>{const b=document.createElement('button');b.className='dab'+extra;b.title=title;b.textContent=icon;b.dataset.action=action;b.dataset.key=key;return b;};
-    acts.appendChild(mkBtn('Details/Notiz','📝','open'));
-    // Der Einfuegen-Knopf bleibt immer an derselben Stelle, nur unsichtbar,
-    // solange nichts kopiert ist - sonst rutschen Kopieren und Leeren beim
-    // Kopieren eine Position nach rechts und man trifft das falsche Symbol.
-    const paste=mkBtn('Einfügen','📋','paste');
-    if(!copiedDay){paste.style.visibility='hidden';paste.style.pointerEvents='none';paste.tabIndex=-1;}
-    acts.appendChild(paste);
-    acts.appendChild(mkBtn('Kopieren','⧉','copy'));
-    acts.appendChild(mkBtn('Leeren','✕','clear',' red'));
-    numRow.appendChild(acts);
+    // Ein Knopf statt vier: Notiz, Kopieren, Einfuegen und Leeren stehen im
+    // Menue, das auch der Rechtsklick auf die Zelle oeffnet.
+    const b=document.createElement('button');
+    b.className='dab'; b.textContent='⋯';
+    b.title='Notiz, kopieren, einfügen, leeren (auch per Rechtsklick)';
+    b.dataset.action='menu'; b.dataset.key=key;
+    numRow.appendChild(b);
   }
   el.appendChild(numRow);
 
@@ -2511,7 +2639,7 @@ function makeCell(key,dayNum,other){
     const ca=document.createElement('div');ca.className='chips-area';
     ALL_SHIFTS.forEach(s=>{
       const people=slot[s]||[], tgt=sollFor(s,key), fehlt=people.length<tgt;
-      const row=document.createElement('div');row.className='chips-row'+(people.length?'':' leer');
+      const row=document.createElement('div');row.className='chips-row'+(people.length?'':' leer');row.dataset.shift=s;
       const lbl=document.createElement('span');lbl.className='chips-label'+(fehlt?' unter':'');
       lbl.style.color=fehlt?'':SHIFT_SHORT[s][1];
       lbl.innerHTML=`${SHIFT_SHORT[s][0]}<i>${tgt?people.length+'/'+tgt:people.length||''}</i>`;
@@ -2530,9 +2658,10 @@ function makeCell(key,dayNum,other){
     el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drag-over');});
     el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
     el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drag-over');handleDrop(key);});
-    el.addEventListener('mouseenter',()=>showTooltip(el,key));
-    el.addEventListener('mouseleave',hideTooltip);
+    el.addEventListener('mouseenter',()=>{showTooltip(el,key);zeigeVorschau(el);});
+    el.addEventListener('mouseleave',()=>{hideTooltip();raeumeVorschau(el);});
     el.addEventListener('click',e=>handleCellClick(e,key));
+    el.addEventListener('contextmenu',e=>{e.preventDefault();openDayMenu(key,null,e.clientX,e.clientY);});
   }
   return el;
 }
@@ -2543,39 +2672,43 @@ function makeCell(key,dayNum,other){
 async function handleCellClick(e,key){
   const btn=e.target.closest('[data-action]');
   if(btn){
-    e.stopPropagation();const act=btn.dataset.action,k=btn.dataset.key,slot=getSlot(k);
-    if(act==='open') openDayModal(k);
-    else if(act==='copy'){copiedDay={key:k,slot:JSON.parse(JSON.stringify(slot))};toast('Tag kopiert');renderCalendar();}
-    else if(act==='paste'&&copiedDay){pushUndo();await pasteDay([k],'replace');copiedDay=null;renderCalendar();}
-    else if(act==='clear') await clearDay(k);
+    e.stopPropagation();
+    if(btn.dataset.action==='menu') openDayMenu(btn.dataset.key,btn);
     return;
   }
-  const chip=e.target.closest('.chip');
+  const chip=e.target.closest('.chip:not(.vorschau)');
   if(chip){pushUndo();await applySchicht([chip.dataset.key],'remove',chip.dataset.shift,chip.dataset.name);return;}
-  if(selectedPersons.size>0) await handleMultiPersonClick(key,e.ctrlKey||e.metaKey);
-  else if(selectedPerson) await handleSinglePersonClick(key,e.ctrlKey||e.metaKey);
-  else if(rangeMode){
-    // No person selected — range mode for delete
-    if(!rangeStart){rangeStart=key;previewEnd=key;updateSelInfo();renderCalendar();}
-    else{previewEnd=key;frozenRangeEnd=key;renderCalendar();updateSelInfo();}
-  } else toast('Bitte erst einen Mitarbeiter auswählen');
-}
 
-// Zwei Klicks spannen einen Bereich auf; liefert true, wenn der Klick
-// dazu gehoerte und schon verarbeitet wurde.
-async function handleRangeClick(key,names){
-  if(!rangeStart){
-    rangeStart=key; previewEnd=key;
-    updateSelInfo(); renderCalendar();
-    return true;
+  const namen=selectedPersons.size>0?[...selectedPersons]:selectedPerson?[selectedPerson.name]:[];
+  const shift=e.shiftKey, ctrl=e.ctrlKey||e.metaKey;
+
+  if(!namen.length){
+    // Ohne Werkzeug bleibt der Kalender lesend - bis auf Shift+Klick, der
+    // einen Zeitraum zum Loeschen aufspannt.
+    if(shift&&letzterKlick){
+      rangeStart=letzterKlick; previewEnd=key; frozenRangeEnd=key;
+      renderCalendar(); updateSelInfo(); return;
+    }
+    // Erst raeumen, dann den Ankerpunkt setzen - clearSelection() loescht ihn.
+    clearSelection(); letzterKlick=key;
+    toast('Erst einen Mitarbeiter wählen – dann Klick zum Eintragen');
+    return;
   }
-  const lo=rangeStart<key?rangeStart:key;
-  const hi=rangeStart<key?key:rangeStart;
-  const dates=datesInRange(lo,hi);
-  rangeStart=null; previewEnd=null;
-  renderCalendar(); updateSelInfo();
-  await schichtAufTagen(dates,names);
-  return true;
+
+  if(shift&&letzterKlick){
+    // Der vorherige Klick hat die Absicht gesetzt - eintragen oder austragen.
+    // Shift zieht sie bis hierher durch, sonst liesse sich ein Zeitraum nie
+    // wieder leeren: der Ankertag waere ja schon ausgetragen.
+    const dates=datesInRange(letzterKlick,key);
+    letzterKlick=key; multiDays.clear();
+    rangeStart=null; previewEnd=null; frozenRangeEnd=null;
+    await schichtAufTagen(dates,namen,letzterModus);
+    renderCalendar(); updateSelInfo();
+    return;
+  }
+  letzterKlick=key;
+  const modus=await handleDayClick(key,ctrl,namen);
+  if(modus) letzterModus=modus;
 }
 
 // Ein Klick auf einen Tag - fuer eine wie fuer mehrere Personen derselbe
@@ -2583,39 +2716,28 @@ async function handleRangeClick(key,names){
 async function handleDayClick(key,ctrl,namen){
   if(!namen.length) return;
   if(ctrl){
-    // Strg-Auswahl und Zeitraum sind zwei Wege, dieselbe Menge zu waehlen.
-    // Nebeneinander waere unklar, worauf der naechste Klick wirkt - also
-    // beendet eine Strg-Auswahl den Zeitraum-Modus.
-    if(rangeMode) setRangeMode(false);
     if(multiDays.has(key)) multiDays.delete(key); else multiDays.add(key);
     renderCalendar(); updateSelInfo(); return;
   }
   if(multiDays.size>0){
     const tage=[...multiDays];
     multiDays.clear();
-    await schichtAufTagen(tage,namen);
-    renderCalendar(); updateSelInfo(); return;
+    const modus=await schichtAufTagen(tage,namen);
+    renderCalendar(); updateSelInfo(); return modus;
   }
-  if(rangeMode){ await handleRangeClick(key,namen); return; }
-  await schichtAufTagen([key],namen);
-}
-
-async function handleSinglePersonClick(key,ctrl){
-  return handleDayClick(key,ctrl,[selectedPerson.name]);
-}
-async function handleMultiPersonClick(key,ctrl){
-  return handleDayClick(key,ctrl,[...selectedPersons]);
+  return schichtAufTagen([key],namen);
 }
 
 // Eintragen oder entfernen - je nachdem, ob schon alle Genannten an allen
 // Tagen in der gewaehlten Schicht stehen. Ein einzelner Klick verhaelt sich
 // damit genauso wie einer auf eine Mehrfachauswahl oder einen Zeitraum.
-async function schichtAufTagen(tage,namen){
+async function schichtAufTagen(tage,namen,modus){
   const alleDrin=tage.every(k=>{
     const drin=(schichten[k]?.[selectedShift])||[];
     return namen.every(n=>drin.includes(n));
   });
-  if(!alleDrin){ await applyToDateList(tage,namen,'add'); return; }
+  const aktion=modus||(alleDrin?'remove':'add');
+  if(aktion==='add'){ await applyToDateList(tage,namen,'add'); return 'add'; }
   pushUndo();
   for(const name of namen){
     const res=await postSchicht(tage,'remove',selectedShift,name);
@@ -2624,13 +2746,7 @@ async function schichtAufTagen(tage,namen){
   renderStats();
   const wer=namen.length>1?namen.length+' Mitarbeiter':namen[0];
   toast(`${wer} aus ${tage.length} Tag(en) entfernt`);
-}
-
-// Zeitraum-Modus an oder aus, samt Knopf und angefangener Auswahl.
-function setRangeMode(an){
-  rangeMode=an;
-  document.getElementById('btn-range')?.classList.toggle('on',an);
-  rangeStart=null; previewEnd=null; frozenRangeEnd=null;
+  return 'remove';
 }
 
 // Beide Konfliktdialoge - vom Einzelklick und vom Bereich gemeinsam genutzt.
@@ -2688,51 +2804,6 @@ function getRangeDates(){
   return datesInRange(rangeStart<end?rangeStart:end, rangeStart<end?end:rangeStart);
 }
 
-function buildRangePanel(person){
-  const dates=getRangeDates();
-  const lo=dates[0],hi=dates[dates.length-1];
-  const fmt=k=>new Date(k+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});
-  const rangeLabel=lo===hi?fmt(lo):fmt(lo)+' – '+fmt(hi);
-
-  // Person chips for "delete single person" section
-  const allNames=new Set();
-  dates.forEach(d=>{ALL_SHIFTS.forEach(s=>(getSlot(d)[s]||[]).forEach(n=>allNames.add(n)));});
-  const personChips=[...allNames].map(n=>{
-    const m=mitarbeiter.find(x=>x.name===n);const color=m?m.color:'#64748b';
-    return `<button class="rpbtn" onclick="clearRangePerson('${n.replace(/'/g,"\'")}')" style="border-left:3px solid ${color}">
-      ${m?.icon?m.icon+' ':''}${esc(n)}</button>`;
-  }).join('');
-
-  // Shift buttons
-  const shiftBtns=ALL_SHIFTS.map(s=>
-    `<button class="rpbtn orange" onclick="clearRangeShift('${s}')">${SHIFT_SHORT[s][0]} ${SHIFT_LABEL[s]}</button>`
-  ).join('');
-
-  return `<div class="range-panel">
-    <h4>📅 ${rangeLabel} · ${dates.length} Tag(e)</h4>
-    <div class="rp-label">Alles löschen</div>
-    <div class="range-panel-row">
-      <button class="rpbtn red" onclick="clearRangeAll()">✕ Alle Einträge löschen</button>
-    </div>
-    <div class="rp-label">Nur eine Schicht</div>
-    <div class="range-panel-row">${shiftBtns}</div>
-    ${allNames.size>0?`<div class="rp-label">Nur eine Person</div><div class="range-panel-row">${personChips}</div>`:''}
-    <div style="margin-top:7px;display:flex;gap:5px">
-      ${(selectedPerson||selectedPersons.size>0)?`<button class="rpbtn blue" onclick="applyRangeEntry()">✓ Eintragen (${SHIFT_LABEL[selectedShift]})</button>`:''}
-      <button class="rpbtn" onclick="clearSelection()">← Abbrechen</button>
-    </div>
-  </div>`;
-}
-
-async function applyRangeEntry(){
-  const dates=getRangeDates();
-  const names=selectedPersons.size>0?[...selectedPersons]:(selectedPerson?[selectedPerson.name]:[]);
-  if(!names.length){toast('Kein Mitarbeiter gewählt');return;}
-  rangeStart=null;previewEnd=null;
-  renderCalendar();updateSelInfo();
-  await applyToDateList(dates,names,'add');
-}
-
 async function clearRangeAll(){
   frozenRangeEnd=null;
   const dates=getRangeDates();
@@ -2778,17 +2849,13 @@ async function clearRangePerson(name){
   toast(name+' aus '+dates.length+' Tag(en) entfernt');
 }
 
-async function clearRangeAllShifts(){ await clearRangeAll(); }
-async function clearRangeOneShift(){ await clearRangeShift(selectedShift); }
-
 function clearSelection(){
   rangeStart=null;previewEnd=null;frozenRangeEnd=null;multiDays.clear();
+  letzterKlick=null;
   renderCalendar();updateSelInfo();
 }
 function clearAll(){
-  rangeMode=false;
-  document.getElementById('btn-range').classList.remove('on');
-  rangeStart=null;previewEnd=null;frozenRangeEnd=null;multiDays.clear();
+  rangeStart=null;previewEnd=null;frozenRangeEnd=null;letzterKlick=null;multiDays.clear();
   renderCalendar();updateSelInfo();
 }
 function rangeClass(key){
@@ -2809,7 +2876,23 @@ function updateRangePreview(){
   });
 }
 function datesInRange(a,b){const lo=a<b?a:b,hi=a<b?b:a,out=[];let cur=new Date(lo+'T00:00:00'),end=new Date(hi+'T00:00:00');while(cur<=end){out.push(dk(cur.getFullYear(),cur.getMonth()+1,cur.getDate()));cur.setDate(cur.getDate()+1);}return out;}
-document.addEventListener('mouseover',e=>{if(!rangeMode||!rangeStart||frozenRangeEnd)return;const cell=e.target.closest('.day-cell:not(.other)');if(cell&&cell.dataset.key!==previewEnd){previewEnd=cell.dataset.key;updateRangePreview();}});
+// Vorschau der Strecke, solange Shift gedrueckt ist: der Zeiger zeigt, was
+// der naechste Klick fassen wuerde, ohne dass ein Modus dafuer noetig waere.
+document.addEventListener('mouseover',e=>{
+  const cell=e.target.closest('.day-cell:not(.other)');
+  if(e.shiftKey&&letzterKlick&&!frozenRangeEnd){
+    if(!cell) return;
+    rangeStart=letzterKlick;
+    if(cell.dataset.key!==previewEnd){ previewEnd=cell.dataset.key; updateRangePreview(); }
+    return;
+  }
+  if(rangeStart&&!frozenRangeEnd){ rangeStart=null; previewEnd=null; updateRangePreview(); }
+});
+// Shift loslassen raeumt die Vorschau wieder ab.
+document.addEventListener('keyup',e=>{
+  if(e.key!=='Shift'||frozenRangeEnd) return;
+  if(rangeStart){ rangeStart=null; previewEnd=null; updateRangePreview(); }
+});
 
 // ══════════════════════════════════════════════════════════════
 // CONFLICTS & UNDERSTAFFED
@@ -2832,7 +2915,7 @@ function sollFor(shift,key){
     const dow=new Date(key+'T00:00:00').getDay();
     if(dow===0||dow===6) return 0;
   }
-  return soll[shift]||1;
+  return soll[shift]??1;
 }
 function isUnderstaffed(slot,key){
   if(!slot)return false;
@@ -2841,13 +2924,40 @@ function isUnderstaffed(slot,key){
 // Kalenderansicht aktivieren - von jumpToDate und vom Autoplan genutzt.
 // Monatsnavigation und Schichtauswahl gehoeren nur zu den Ansichten, die auch
 // einen Monat zeigen. Die uebrigen bringen ihre eigenen Bedienelemente mit.
+// Die Datumssteuerung bleibt stehen, wo sie ist, und graut nur aus, wenn die
+// offene Ansicht nicht am Monat haengt - so springt die Leiste nicht.
+// Die Feiertagsansicht haengt am Jahr und zaehlt darum mit.
 function updateContextBar(){
-  const bar=document.getElementById('context-bar');
-  if(!bar) return;
-  // Die Feiertagsansicht haengt am Jahr (Hinweis auf fehlende bewegliche
-  // Feiertage), darum bleibt die Navigation dort stehen.
-  bar.classList.toggle('hide-month',!['cal','matrix','hol'].includes(activeView));
-  bar.classList.toggle('hide-plan',!['cal','matrix'].includes(activeView));
+  document.getElementById('dnav')?.classList.toggle('off',!['cal','matrix','hol'].includes(activeView));
+  updateCheckChip();
+}
+
+// Tage des offenen Monats, an denen das Soll nicht erreicht ist.
+// Wochenenden brauchen nur Rufbereitschaft.
+function understaffedDays(){
+  const dim=new Date(curYear,curMonth,0).getDate(), issues=[];
+  for(let d=1;d<=dim;d++){
+    const key=dk(curYear,curMonth,d), slot=getSlot(key);
+    const missing=[];
+    ALL_SHIFTS.forEach(sh=>{
+      const tgt=sollFor(sh,key);
+      if(tgt>0&&(slot[sh]||[]).length<tgt) missing.push({s:sh,ist:(slot[sh]||[]).length,soll:tgt});
+    });
+    if(missing.length) issues.push({key,missing});
+  }
+  return issues;
+}
+
+// Ein Chip statt Pruef-Knopf: die Zahl steht in der Leiste, der Klick fuehrt
+// zur Liste. Ist alles besetzt, verschwindet er.
+function updateCheckChip(){
+  const chip=document.getElementById('btn-check');
+  if(!chip) return;
+  const n=['cal','matrix'].includes(activeView)?understaffedDays().length:0;
+  chip.classList.toggle('hidden',n===0);
+  const t=document.getElementById('check-text');
+  if(t) t.textContent=n===1?'1 Tag unter Soll':n+' Tage unter Soll';
+  chip.title=n+' Tag(e) im '+MONTHS[curMonth-1]+' unter Soll – zum Auflisten klicken';
 }
 
 function showCalendarView(){
@@ -2874,15 +2984,7 @@ function jumpToDate(key){
 }
 
 function showUnderstaffedReport(){
-  const dim=new Date(curYear,curMonth,0).getDate(),issues=[];
-  for(let d=1;d<=dim;d++){
-    const key=dk(curYear,curMonth,d),slot=getSlot(key),dow=new Date(key+'T00:00:00').getDay(),isWE=dow===0||dow===6;
-    const missing=[];
-    if(!isWE&&(slot.frueh||[]).length<(soll.frueh||1))missing.push({s:'frueh',ist:(slot.frueh||[]).length,soll:soll.frueh||1});
-    if(!isWE&&(slot.spaet||[]).length<(soll.spaet||1))missing.push({s:'spaet',ist:(slot.spaet||[]).length,soll:soll.spaet||1});
-    if((slot.rufbereitschaft||[]).length<(soll.rufbereitschaft||1))missing.push({s:'rufbereitschaft',ist:(slot.rufbereitschaft||[]).length,soll:soll.rufbereitschaft||1});
-    if(missing.length)issues.push({key,missing});
-  }
+  const issues=understaffedDays();
   document.getElementById('under-label').textContent=MONTHS[curMonth-1]+' '+curYear;
   const cont=document.getElementById('under-content');
   if(!issues.length){cont.innerHTML='<div style="padding:14px;color:var(--frueh);font-size:14px;text-align:center">✓ Alle Tage vollständig besetzt!</div>';}
