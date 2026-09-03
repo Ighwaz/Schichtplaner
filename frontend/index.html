@@ -857,7 +857,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
       <div class="ruf-col-hdr">
         <h3>Rufbereitschaft</h3>
         <select id="rufkw-year"></select>
-        <button class="btn-p" onclick="saveRufKW()">Speichern</button>
         <button class="btn-p" onclick="openApplyRufKW()" style="background:var(--frueh);color:#000">▶ In den Kalender übertragen</button>
         <button class="btn-s" onclick="openRufReihum()" title="Kalenderwochen reihum an mehrere Personen verteilen">⟳ Reihum</button>
         <button class="btn-s" onclick="syncRufKWFromCalendar()" title="Bestehende Rufbereitschafts-Einträge aus dem Kalender in den Plan einlesen">↙ Aus Kalender</button>
@@ -1478,8 +1477,12 @@ function initRufKWYear(){
     const current=sel.value&&sorted.includes(sel.value)?sel.value:String(todayYear);
     sel.innerHTML=sorted.map(y=>`<option value="${y}"${y===current?' selected':''}>${y}</option>`).join('');
   });
+  // Vorbelegt ist das ganze Jahr. Vorher stand hier der gerade angezeigte
+  // Kalendermonat - wer Wochen ueber das Jahr verteilt hatte und uebertrug,
+  // bekam stillschweigend nur diesen einen Monat.
   const apMon=document.getElementById('rufkw-apply-month');
-  if(apMon) apMon.innerHTML='<option value="">Ganzes Jahr</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
+  if(apMon) apMon.innerHTML='<option value="" selected>Ganzes Jahr</option>'+
+    MONTH_SHORT.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
 }
 
 function syncRufKWFromCalendar(){
@@ -1547,20 +1550,38 @@ function showKwRufDialog(kw, weekDates){
     'Fertig'
   ).then(()=>{ renderRufKWTable(); });
 }
-async function toggleKwPerson(name, weekDates){
-  const kwDate = new Date(weekDates[0]+'T00:00:00');
-  const kw = isoWeek(kwDate);
-  const isoYear = (() => {
-    const tmp=new Date(Date.UTC(kwDate.getFullYear(),kwDate.getMonth(),kwDate.getDate()));
-    const day=tmp.getUTCDay()||7; tmp.setUTCDate(tmp.getUTCDate()+4-day);
-    return tmp.getUTCFullYear();
-  })();
-  const kwKey=`${isoYear}-W${String(kw).padStart(2,'0')}`;
-  const raw=rufKW[kwKey]; const arr=raw?(Array.isArray(raw)?raw:[raw]):[];
-  if(arr.includes(name)) rufKW[kwKey]=arr.filter(n=>n!==name);
-  else rufKW[kwKey]=[...arr,name];
-  if(Array.isArray(rufKW[kwKey])&&rufKW[kwKey].length===0) delete rufKW[kwKey];
+// Namen einer Kalenderwoche - der Plan haelt entweder einen Namen oder eine
+// Liste, beides kommt vor.
+function kwNamen(kwKey){
+  const roh=rufKW[kwKey];
+  return roh?(Array.isArray(roh)?[...roh]:[roh]):[];
+}
+
+// Schluessel der Woche, in der ein Tag liegt - gleiche Schreibweise wie
+// isoWeekKey im Go-Teil.
+function kwSchluessel(datum){
+  const tmp=new Date(Date.UTC(datum.getFullYear(),datum.getMonth(),datum.getDate()));
+  const wt=tmp.getUTCDay()||7; tmp.setUTCDate(tmp.getUTCDate()+4-wt);
+  return `${tmp.getUTCFullYear()}-W${String(isoWeek(datum)).padStart(2,'0')}`;
+}
+
+// Jede Aenderung am KW-Plan wird sofort gespeichert. Der Server liest beim
+// Uebertragen den abgelegten Plan, nicht den Schirm - ohne das Speichern
+// trug "In den Kalender uebertragen" den vorherigen Stand ein.
+async function setzeKwPersonen(kwKey,namen){
+  if(namen&&namen.length) rufKW[kwKey]=namen; else delete rufKW[kwKey];
   renderRufKWTable();
+  await saveRufKW({still:true});
+}
+
+async function toggleKwPersonKey(kwKey,name){
+  const namen=kwNamen(kwKey), i=namen.indexOf(name);
+  if(i===-1) namen.push(name); else namen.splice(i,1);
+  await setzeKwPersonen(kwKey,namen);
+}
+
+async function toggleKwPerson(name, weekDates){
+  await toggleKwPersonKey(kwSchluessel(new Date(weekDates[0]+'T00:00:00')),name);
 }
 
 function renderRufKWTable(){
@@ -1892,13 +1913,10 @@ function openRufKWPicker(kwKey,anchor){
       <span>${esc(m.name)}</span>${current.has(m.name)?'<span style="margin-left:auto;color:var(--ruf)">✓</span>':''}
     </div>`).join('')||'<div style="padding:10px;color:var(--text3);font-size:12px">Keine Mitarbeiter</div>');
   picker.querySelectorAll('[data-pname]').forEach(el=>{
-    el.addEventListener('click',e=>{
-      e.stopPropagation(); const name=el.dataset.pname;
-      if(!rufKW[_rufkwPickerKey]) rufKW[_rufkwPickerKey]=[];
-      const i=rufKW[_rufkwPickerKey].indexOf(name);
-      if(i===-1) rufKW[_rufkwPickerKey].push(name); else rufKW[_rufkwPickerKey].splice(i,1);
-      if(!rufKW[_rufkwPickerKey].length) delete rufKW[_rufkwPickerKey];
-      picker.classList.add('hidden'); renderRufKWTable();
+    el.addEventListener('click',async e=>{
+      e.stopPropagation();
+      picker.classList.add('hidden');
+      await toggleKwPersonKey(_rufkwPickerKey,el.dataset.pname);
     });
   });
   picker.classList.remove('hidden');
@@ -1909,17 +1927,15 @@ function openRufKWPicker(kwKey,anchor){
   picker.style.left=left+'px'; picker.style.top=top+'px';
 }
 
-function removeRufKWPerson(kwKey,name){
-  if(!rufKW[kwKey]) return;
-  const arr=Array.isArray(rufKW[kwKey])?rufKW[kwKey]:[rufKW[kwKey]];
-  rufKW[kwKey]=arr.filter(n=>n!==name);
-  if(!rufKW[kwKey].length) delete rufKW[kwKey];
-  renderRufKWTable();
+async function removeRufKWPerson(kwKey,name){
+  await setzeKwPersonen(kwKey,kwNamen(kwKey).filter(n=>n!==name));
 }
 
-async function saveRufKW(){
+async function saveRufKW({still=false}={}){
   const r=await api('/api/ruf_kw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ruf_kw:rufKW})});
-  if(r.ok) toast('KW-Plan gespeichert'); else toast('Fehler beim Speichern');
+  if(!r.ok) toast('Fehler beim Speichern des KW-Plans');
+  else if(!still) toast('KW-Plan gespeichert');
+  return r.ok;
 }
 
 function openApplyRufKW(){
@@ -1935,8 +1951,16 @@ async function applyRufKW(){
   const d=await api('/api/ruf_kw/apply',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({year,month:month?parseInt(month):null})});
   if(d.error){resEl.style.cssText='display:block;background:rgba(239,68,68,.1);color:#f87171';resEl.textContent='Fehler: '+d.error;}
-  else{resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';resEl.textContent=d.applied+' Rufbereitschafts-Einträge übertragen.';
-    await reloadSchichten();renderCalendar();toast('Rufbereitschaft eingetragen');}
+  else{
+    const wo=month?MONTHS[parseInt(month)-1]+' '+year:'Jahr '+year;
+    const text=d.applied?`${d.applied} Rufbereitschafts-Einträge für ${wo} übertragen.`
+      :`Für ${wo} gab es nichts zu übertragen – im KW-Plan steht dort niemand, `+
+       `oder die Tage sind bereits eingetragen.`;
+    resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';
+    resEl.textContent=text;
+    await reloadSchichten();renderCalendar();renderRufKWTable();
+    toast(d.applied?'Rufbereitschaft eingetragen':'Nichts zu übertragen');
+  }
 }
 
 function exportRufKWCSV(){

@@ -801,15 +801,25 @@ func (a *App) handleApplyRufKW(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start := time.Date(body.Year, 1, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(body.Year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Ein Jahr meint seine Kalenderwochen, nicht seine Kalendertage: die KW 01
+	// beginnt oft schon im Dezember davor. Ohne die Woche vorne und hinten
+	// blieben diese Tage fuer immer leer - beim Uebertragen des Vorjahres
+	// zaehlen sie nicht mit, weil ihr Wochenschluessel schon zum neuen Jahr
+	// gehoert. Ein einzelner Monat meint dagegen den Kalendermonat.
+	start := time.Date(body.Year, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -7)
+	end := time.Date(body.Year+1, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, 7)
+	nurISOJahr := true
 	if body.Month > 0 {
 		start = time.Date(body.Year, time.Month(body.Month), 1, 0, 0, 0, 0, time.UTC)
 		end = start.AddDate(0, 1, 0)
+		nurISOJahr = false
 	}
 
 	var changes []ShiftChange
 	for cur := start; cur.Before(end); cur = cur.AddDate(0, 0, 1) {
+		if isoJahr, _ := cur.ISOWeek(); nurISOJahr && isoJahr != body.Year {
+			continue
+		}
 		for _, name := range kwNames(plan[isoWeekKey(cur)]) {
 			changes = append(changes, ShiftChange{
 				Date: cur.Format("2006-01-02"), Shift: "rufbereitschaft", Name: name,
