@@ -17,7 +17,7 @@ type Employee struct {
 	Prefs map[string]string `json:"prefs"`
 }
 
-// DaySlot holds the entries of one day. Diese Fassung plant nur Schichten:
+// DaySlot hält die Einträge eines Tages. Diese Fassung plant nur Schichten:
 // Abwesenheiten (Urlaub, Krank, Elternzeit, Sonderurlaub) kommen nicht mehr
 // vor. Vorhandene Zeilen dieser Art bleiben in der Datenbank liegen, werden
 // aber nirgends mehr gelesen oder geschrieben.
@@ -41,7 +41,8 @@ type CustomHoliday struct {
 	Country string `json:"country"`
 }
 
-// Template: map[personName]map[weekday(string)]shiftType
+// Template hält je Person und Wochentag (0 = Montag) die Schicht, die der
+// Autoplan dort einträgt.
 type Template map[string]map[string]string
 
 type AppData struct {
@@ -75,8 +76,8 @@ func EmptySlot() DaySlot {
 	}
 }
 
-// Normalize fills in anything an older or hand-edited data file may be
-// missing, so handlers never have to deal with nil maps.
+// Normalize füllt auf, was eine ältere oder von Hand bearbeitete Datei
+// vermissen lässt - damit niemand weiter oben mit nil-Karten rechnen muss.
 func Normalize(d *AppData) {
 	if d.Schichten == nil {
 		d.Schichten = map[string]DaySlot{}
@@ -107,8 +108,8 @@ func Normalize(d *AppData) {
 	}
 }
 
-// UnwrapRufKW repairs KW plans that were stored one level too deep as
-// {"ruf_kw": {...}} by an earlier version, and never returns nil.
+// UnwrapRufKW holt Wochenpläne wieder heraus, die eine ältere Fassung eine
+// Ebene zu tief als {"ruf_kw": {...}} abgelegt hat. Liefert nie nil.
 func UnwrapRufKW(m map[string]any) map[string]any {
 	for len(m) == 1 {
 		inner, ok := m["ruf_kw"].(map[string]any)

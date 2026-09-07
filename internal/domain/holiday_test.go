@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-// Die beweglichen indischen Feiertage stehen in Tabellen. Der Test haelt fest,
+// Die beweglichen indischen Feiertage stehen in Tabellen. Der Test hält fest,
 // dass beide Tabellen denselben Zeitraum abdecken wie MovableIN* verspricht -
-// sonst meldet die Oberflaeche eine Deckung, die es nicht gibt.
-func TestHoliAndDiwaliTablesCoverTheSameYears(t *testing.T) {
+// sonst meldet die Oberfläche eine Deckung, die es nicht gibt.
+func TestHoliUndDiwaliDeckenDieselbenJahreAb(t *testing.T) {
 	for year := MovableINFirstYear; year <= MovableINLastYear; year++ {
 		if _, ok := holiDates[year]; !ok {
 			t.Errorf("Holi %d fehlt", year)
@@ -21,7 +21,7 @@ func TestHoliAndDiwaliTablesCoverTheSameYears(t *testing.T) {
 		t.Errorf("Holi-Tabelle hat %d Einträge, erwartet %d",
 			len(holiDates), MovableINLastYear-MovableINFirstYear+1)
 	}
-	// Every tabulated date has to fall in its own year and parse cleanly.
+	// Jedes tabellierte Datum muss in sein eigenes Jahr fallen und lesbar sein.
 	for _, table := range []map[int]string{holiDates, diwaliDates} {
 		for year, date := range table {
 			d, err := time.Parse("2006-01-02", date)

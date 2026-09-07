@@ -12,13 +12,13 @@ type Holiday struct {
 	Custom  bool   `json:"custom,omitempty"`
 }
 
-// AppliesTo reports whether the holiday affects an employee of that team.
-// An employee without a team is never blocked by a holiday.
+// AppliesTo sagt, ob der Feiertag jemanden aus diesem Team betrifft.
+// Wer kein Team hat, wird von keinem Feiertag aufgehalten.
 func (h Holiday) AppliesTo(team string) bool {
 	return team != "" && (h.Country == team || h.Country == "DE+IN")
 }
 
-// easter calculates Easter Sunday for a given year (Gregorian)
+// easter rechnet den Ostersonntag eines Jahres aus (gregorianisch).
 func easter(year int) time.Time {
 	a := year % 19
 	b := year / 100
@@ -45,7 +45,7 @@ func addDays(t time.Time, n int) time.Time {
 	return t.AddDate(0, 0, n)
 }
 
-// germanHolidays returns public holidays for Baden-Württemberg
+// germanHolidays liefert die gesetzlichen Feiertage in Baden-Württemberg.
 func germanHolidays(year int) map[string]Holiday {
 	e := easter(year)
 	hols := map[string]Holiday{
@@ -67,12 +67,12 @@ func germanHolidays(year int) map[string]Holiday {
 	return hols
 }
 
-// Holi and Diwali follow the Hindu lunisolar calendar and have no closed
-// formula, so their dates are tabulated. Source: qppstudio.net, which lists
-// the day India observes as the public holiday - for Holi that is Rangwali
-// Holi (the colour festival), not the Holika Dahan evening before it.
-// Beyond MovableINLastYear the two are simply missing; the UI points that out
-// so they can be added as custom holidays.
+// Holi und Diwali folgen dem hinduistischen Lunisolarkalender und haben keine
+// Formel, deshalb stehen sie als Tabelle. Quelle: qppstudio.net, dort steht
+// jeweils der Tag, den Indien als gesetzlichen Feiertag begeht - bei Holi also
+// Rangwali Holi (das Farbenfest), nicht der Abend Holika Dahan davor.
+// Jenseits von MovableINLastYear fehlen beide schlicht; die Oberfläche weist
+// darauf hin, damit man sie als eigene Feiertage nachträgt.
 const (
 	MovableINFirstYear = 2026
 	MovableINLastYear  = 2036
@@ -92,8 +92,8 @@ var diwaliDates = map[int]string{
 	2035: "2035-10-30", 2036: "2036-10-18",
 }
 
-// indianHolidays returns the fixed-date Indian public holidays plus Holi and
-// Diwali for the years these are tabulated for.
+// indianHolidays liefert die indischen Feiertage mit festem Datum und dazu
+// Holi und Diwali für die Jahre, für die sie tabelliert sind.
 func indianHolidays(year int) map[string]Holiday {
 	hols := map[string]Holiday{
 		fmt.Sprintf("%d-01-26", year): {Name: "Republic Day", Country: "IN"},
@@ -110,7 +110,7 @@ func indianHolidays(year int) map[string]Holiday {
 	return hols
 }
 
-// bridgeDays finds bridge days (Brückentage) between holidays/weekends
+// bridgeDays findet Brückentage zwischen Feiertagen und Wochenenden.
 func bridgeDays(year int, existing map[string]Holiday) map[string]Holiday {
 	bridges := map[string]Holiday{}
 	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -119,11 +119,11 @@ func bridgeDays(year int, existing map[string]Holiday) map[string]Holiday {
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
 		key := dateKey(d)
 		dow := d.Weekday()
-		// Only weekdays
+		// Nur Werktage
 		if dow == time.Saturday || dow == time.Sunday {
 			continue
 		}
-		// Not already a holiday
+		// Und nur, was nicht selbst schon Feiertag ist
 		if _, ok := existing[key]; ok {
 			continue
 		}
@@ -151,7 +151,6 @@ func bridgeDays(year int, existing map[string]Holiday) map[string]Holiday {
 	return bridges
 }
 
-// AllHolidays combines DE + IN holidays for a year, plus custom holidays
 // AllHolidays liefert alle Feiertage eines Jahres: gesetzliche in DE und IN,
 // Brückentage und die selbst eingetragenen.
 func AllHolidays(year int, customs []CustomHoliday) map[string]Holiday {
@@ -160,15 +159,15 @@ func AllHolidays(year int, customs []CustomHoliday) map[string]Holiday {
 	de := germanHolidays(year)
 	in := indianHolidays(year)
 
-	// Merge DE
+	// Deutschland
 	for k, v := range de {
 		result[k] = v
 	}
 
-	// Merge IN - if same date, mark as both
+	// Indien - fällt es auf denselben Tag, gilt der Tag für beide Teams
 	for k, v := range in {
 		if existing, ok := result[k]; ok {
-			// Same day - merge
+			// Derselbe Tag: beide Namen zusammenziehen
 			result[k] = Holiday{
 				Name:    existing.Name + " / " + v.Name,
 				Country: "DE+IN",
@@ -178,13 +177,13 @@ func AllHolidays(year int, customs []CustomHoliday) map[string]Holiday {
 		}
 	}
 
-	// Add bridge days
+	// Brückentage
 	bridges := bridgeDays(year, result)
 	for k, v := range bridges {
 		result[k] = v
 	}
 
-	// Custom holidays
+	// Selbst eingetragene Feiertage
 	for _, ch := range customs {
 		t, err := time.Parse("2006-01-02", ch.Date)
 		if err != nil {

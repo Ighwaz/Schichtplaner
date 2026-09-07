@@ -1,8 +1,8 @@
-// Package store haelt den Schichtplan in einer SQLite-Datei im Datenordner.
+// Package store hält den Schichtplan in einer SQLite-Datei im Datenordner.
 //
 // Das Paket kennt die Begriffe aus domain, aber weder HTTP noch die
-// Oberflaeche. Jede Schreiboperation laeuft in einer Transaktion und schreibt
-// eine Zeile in den Aenderungsverlauf.
+// Oberfläche. Jede Schreiboperation läuft in einer Transaktion und schreibt
+// eine Zeile in den Änderungsverlauf.
 package store
 
 import (
@@ -21,19 +21,19 @@ import (
 const (
 	// DBFileName ist der Name der Datenbankdatei im Datenordner.
 	DBFileName = "schichtplan.db"
-	// legacyFileName ist der Plan aelterer Fassungen. Er wird einmal in die
-	// Datenbank uebernommen und danach nicht mehr geschrieben.
+	// legacyFileName ist der Plan älterer Fassungen. Er wandert einmal in die
+	// Datenbank und wird danach nicht mehr geschrieben.
 	legacyFileName = "schichtplan_daten.json"
 )
 
-// journalMode: kein WAL. Alle Zugriffe sind ohnehin serialisiert (App.mu), und
-// ein Rollback-Journal haelt die Daten in EINER Datei - wer den Ordner sichert,
+// journalMode: kein WAL. Die Zugriffe sind ohnehin aufgereiht (Server.mu), und
+// ein Rollback-Journal hält die Daten in EINER Datei - wer den Ordner sichert,
 // erwischt sonst leicht nur schichtplan.db ohne das -wal daneben.
 var journalMode = "DELETE"
 
-// Store keeps the shift plan in a SQLite database inside the data folder.
-// Every write runs in a transaction and touches only the affected rows, and
-// every change is appended to the changelog table.
+// Store hält den Schichtplan in einer SQLite-Datei im Datenordner. Jeder
+// Schreibvorgang läuft in einer Transaktion und rührt nur die betroffenen
+// Zeilen an; jede Änderung landet zusätzlich im Änderungsverlauf.
 type Store struct {
 	db     *sql.DB
 	folder string
@@ -87,9 +87,9 @@ CREATE TABLE IF NOT EXISTS changelog (
 
 // ── Open / close ──────────────────────────────────────────────────────────────
 
-// Open oeffnet die Datenbank im angegebenen Ordner und legt das Schema an,
-// falls es noch fehlt. Ein Plan aus einer aelteren Fassung wird dabei einmalig
-// uebernommen.
+// Open öffnet die Datenbank im angegebenen Ordner und legt das Schema an,
+// falls es noch fehlt. Ein Plan aus einer älteren Fassung wird dabei einmalig
+// übernommen.
 func Open(ctx context.Context, folder string) (*Store, error) {
 	path := filepath.Join(folder, DBFileName)
 	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=journal_mode(" + journalMode + ")&_pragma=busy_timeout(5000)"
@@ -97,7 +97,8 @@ func Open(ctx context.Context, folder string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	// One connection is enough and keeps writers from tripping over each other.
+	// Eine Verbindung genügt und hält Schreiber davon ab, sich gegenseitig auf
+	// die Füße zu treten.
 	db.SetMaxOpenConns(1)
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
@@ -115,8 +116,8 @@ func Open(ctx context.Context, folder string) (*Store, error) {
 	return s, nil
 }
 
-// Path nennt die Datei, in der der Plan liegt - die Oberflaeche zeigt sie in
-// der Fussleiste an.
+// Path nennt die Datei, in der der Plan liegt - die Oberfläche zeigt sie in
+// der Fußleiste an.
 func (s *Store) Path() string {
 	if s == nil {
 		return ""
@@ -131,8 +132,8 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// importLegacyJSON moves an existing schichtplan_daten.json into the database,
-// but only into an empty one - an existing database is never overwritten.
+// importLegacyJSON übernimmt eine vorhandene schichtplan_daten.json in die
+// Datenbank, aber nur in eine leere - eine bestehende wird nie überschrieben.
 func (s *Store) importLegacyJSON(ctx context.Context) error {
 	var setting string
 	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='json_imported'`).Scan(&setting)
@@ -167,7 +168,7 @@ func (s *Store) importLegacyJSON(ctx context.Context) error {
 
 func timestamp() string { return time.Now().Format(time.RFC3339) }
 
-// plural formats a count with the fitting German word, e.g. "1 Eintrag".
+// plural setzt eine Anzahl mit dem passenden Wort, etwa "1 Eintrag".
 func plural(n int, one, many string) string {
 	if n == 1 {
 		return fmt.Sprintf("%d %s", n, one)
@@ -177,7 +178,7 @@ func plural(n int, one, many string) string {
 
 // ── Reading ───────────────────────────────────────────────────────────────────
 
-// Load assembles the whole plan in the shape the frontend expects.
+// Load setzt den ganzen Plan in der Form zusammen, die die Oberfläche erwartet.
 func (s *Store) Load(ctx context.Context) (domain.AppData, error) {
 	d := domain.DefaultData()
 
@@ -280,7 +281,7 @@ func closeRows(rows *sql.Rows) error {
 	return rows.Close()
 }
 
-// Day returns the entries of a single date.
+// Day liefert die Einträge eines einzelnen Tages.
 func (s *Store) Day(ctx context.Context, date string) (domain.DaySlot, error) {
 	slot := domain.EmptySlot()
 	rows, err := s.db.QueryContext(ctx, `SELECT shift, name FROM shifts WHERE date = ? ORDER BY rowid`, date)
@@ -298,7 +299,7 @@ func (s *Store) Day(ctx context.Context, date string) (domain.DaySlot, error) {
 	return slot, closeRows(rows)
 }
 
-// Team returns the team of an employee, or "" if the name is unknown.
+// Team liefert das Team eines Mitarbeiters - "" bei unbekanntem Namen.
 func (s *Store) Team(ctx context.Context, name string) (string, error) {
 	var team string
 	err := s.db.QueryRowContext(ctx, `SELECT team FROM employees WHERE name = ?`, name).Scan(&team)
@@ -352,7 +353,8 @@ func (s *Store) RufKW(ctx context.Context) (map[string]any, error) {
 
 // ── Writing ───────────────────────────────────────────────────────────────────
 
-// tx runs fn in a transaction and appends one changelog entry for it.
+// tx führt fn in einer Transaktion aus und schreibt eine Zeile in den
+// Änderungsverlauf.
 func (s *Store) tx(ctx context.Context, action, detail string, fn func(*sql.Tx) error) error {
 	t, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -374,8 +376,8 @@ func (s *Store) tx(ctx context.Context, action, detail string, fn func(*sql.Tx) 
 	return t.Commit()
 }
 
-// ReplaceAll overwrites the entire database content - used by import, snapshot
-// and the one-time migration of the old JSON file.
+// ReplaceAll überschreibt den gesamten Inhalt - benutzt von Import, Snapshot
+// und der einmaligen Übernahme der alten JSON-Datei.
 func (s *Store) ReplaceAll(ctx context.Context, d domain.AppData, action string) error {
 	detail := plural(len(d.Mitarbeiter), "Mitarbeiter", "Mitarbeiter") + ", " + plural(len(d.Schichten), "Tag", "Tage")
 	return s.tx(ctx, action, detail, func(t *sql.Tx) error {
@@ -429,7 +431,8 @@ func insertEmployee(t *sql.Tx, m domain.Employee) error {
 	return err
 }
 
-// insertDay writes the entries of one day; the caller has cleared it before.
+// insertDay schreibt die Einträge eines Tages; der Aufrufer hat ihn vorher
+// geleert.
 func insertDay(t *sql.Tx, date string, slot domain.DaySlot) error {
 	var err error
 	domain.ForEachShift(&slot, func(shift string, names *[]string) {
@@ -472,7 +475,7 @@ func setSetting(t *sql.Tx, key string, value any) error {
 
 // ── Shifts ────────────────────────────────────────────────────────────────────
 
-// AddShifts inserts entries and returns how many were actually new.
+// AddShifts legt Einträge an und sagt, wie viele davon neu waren.
 func (s *Store) AddShifts(ctx context.Context, action string, changes []domain.ShiftChange) (int, error) {
 	added := 0
 	err := s.tx(ctx, action, plural(len(changes), "Eintrag", "Einträge"), func(t *sql.Tx) error {
@@ -494,7 +497,7 @@ func (s *Store) AddShifts(ctx context.Context, action string, changes []domain.S
 	return added, err
 }
 
-// RemoveShifts deletes entries and returns how many were present.
+// RemoveShifts entfernt Einträge und sagt, wie viele davon dastanden.
 func (s *Store) RemoveShifts(ctx context.Context, action string, changes []domain.ShiftChange) (int, error) {
 	removed := 0
 	err := s.tx(ctx, action, plural(len(changes), "Eintrag", "Einträge"), func(t *sql.Tx) error {
@@ -513,7 +516,7 @@ func (s *Store) RemoveShifts(ctx context.Context, action string, changes []domai
 	return removed, err
 }
 
-// ReplaceDays overwrites the given dates with slot.
+// ReplaceDays überschreibt die genannten Tage mit slot.
 func (s *Store) ReplaceDays(ctx context.Context, dates []string, slot domain.DaySlot) error {
 	return s.tx(ctx, "tag:ersetzen", plural(len(dates), "Tag", "Tage"), func(t *sql.Tx) error {
 		for _, date := range dates {
@@ -528,7 +531,7 @@ func (s *Store) ReplaceDays(ctx context.Context, dates []string, slot domain.Day
 	})
 }
 
-// MergeDays adds the entries of slot to the given dates.
+// MergeDays fügt die Einträge aus slot zu den genannten Tagen hinzu.
 func (s *Store) MergeDays(ctx context.Context, dates []string, slot domain.DaySlot) error {
 	return s.tx(ctx, "tag:einfügen", plural(len(dates), "Tag", "Tage"), func(t *sql.Tx) error {
 		for _, date := range dates {
@@ -540,8 +543,8 @@ func (s *Store) MergeDays(ctx context.Context, dates []string, slot domain.DaySl
 	})
 }
 
-// ReplaceAllShifts swaps the complete shift table - used by undo/redo, which
-// sends the whole plan back.
+// ReplaceAllShifts tauscht die gesamte Schichttabelle aus - dafür schickt
+// Rückgängig/Wiederholen den ganzen Plan zurück.
 func (s *Store) ReplaceAllShifts(ctx context.Context, days map[string]domain.DaySlot) error {
 	return s.tx(ctx, "snapshot", plural(len(days), "Tag", "Tage"), func(t *sql.Tx) error {
 		if _, err := t.Exec(`DELETE FROM shifts`); err != nil {
@@ -585,8 +588,8 @@ func (s *Store) UpdateEmployee(ctx context.Context, oldName string, m domain.Emp
 	})
 }
 
-// renameInBlobs rewrites the name inside templates and the KW plan, which are
-// stored as JSON documents.
+// renameInBlobs schreibt den Namen auch in Templates und KW-Plan um; beide
+// liegen als JSON-Dokumente in der Datenbank.
 func renameInBlobs(t *sql.Tx, oldName, newName string) error {
 	rows, err := t.Query(`SELECT name, data FROM templates`)
 	if err != nil {
@@ -646,8 +649,8 @@ func renameInBlobs(t *sql.Tx, oldName, newName string) error {
 	return nil
 }
 
-// replaceName swaps oldName for newName in a KW entry, which is either a single
-// name or a list of names.
+// replaceName tauscht oldName gegen newName in einem Wocheneintrag - der hält
+// entweder einen Namen oder eine Liste.
 func replaceName(v any, oldName, newName string) (any, bool) {
 	switch val := v.(type) {
 	case string:
@@ -667,9 +670,9 @@ func replaceName(v any, oldName, newName string) (any, bool) {
 	return v, false
 }
 
-// DeleteEmployee removes the employee and every shift entry of that name. It
-// returns the entries and the employee record itself, so a later restore can
-// bring back team, colour and icon along with the shifts.
+// DeleteEmployee entfernt den Mitarbeiter und jeden Schichteintrag mit seinem
+// Namen. Zurück kommen die Einträge und der Mitarbeiter selbst, damit ein
+// späteres Wiederherstellen Team, Farbe und Symbol mitbringt.
 func (s *Store) DeleteEmployee(ctx context.Context, name string) (domain.Employee, map[string]map[string]bool, error) {
 	var gone domain.Employee
 	backup := map[string]map[string]bool{}
@@ -711,8 +714,8 @@ func (s *Store) DeleteEmployee(ctx context.Context, name string) (domain.Employe
 	return gone, backup, err
 }
 
-// AddEmployees creates several employees in one transaction and reports how
-// many were new; names that already exist are left untouched.
+// AddEmployees legt mehrere Mitarbeiter in einer Transaktion an und sagt, wie
+// viele neu waren; vorhandene Namen bleiben unangetastet.
 func (s *Store) AddEmployees(ctx context.Context, list []domain.Employee) (added, skipped int, err error) {
 	err = s.tx(ctx, "mitarbeiter:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
 		added, skipped = 0, 0
@@ -780,8 +783,8 @@ func (s *Store) AddCustomHoliday(ctx context.Context, ch domain.CustomHoliday) e
 	})
 }
 
-// AddCustomHolidays inserts several holidays in one transaction. An entry that
-// is already there with the same date and name counts as skipped.
+// AddCustomHolidays legt mehrere Feiertage in einer Transaktion an. Ein Eintrag,
+// den es mit demselben Datum und Namen schon gibt, zählt als übersprungen.
 func (s *Store) AddCustomHolidays(ctx context.Context, list []domain.CustomHoliday) (added, skipped int, err error) {
 	err = s.tx(ctx, "feiertag:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
 		added, skipped = 0, 0

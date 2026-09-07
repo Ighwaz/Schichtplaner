@@ -1,9 +1,9 @@
-// Package httpapi bedient die Oberflaeche: es nimmt Anfragen entgegen, holt
-// die Antwort bei domain und store und schreibt sie als JSON zurueck.
+// Package httpapi bedient die Oberfläche: es nimmt Anfragen entgegen, holt
+// die Antwort bei domain und store und schreibt sie als JSON zurück.
 //
 // Das Paket kennt weder Wails noch die Datenbank von innen. Was es von der
-// Aussenwelt braucht - die Seite selbst und einen Ordnerdialog - bekommt es
-// beim Bauen uebergeben, damit es sich ohne Fenster testen laesst.
+// Außenwelt braucht - die Seite selbst und einen Ordnerdialog - bekommt es
+// beim Bauen übergeben, damit es sich ohne Fenster testen lässt.
 package httpapi
 
 import (
@@ -20,7 +20,7 @@ import (
 // leeren Namen, hat er abgebrochen.
 type PickFolderFunc func(ctx context.Context) (string, error)
 
-// Server beantwortet die Anfragen der Oberflaeche.
+// Server beantwortet die Anfragen der Oberfläche.
 type Server struct {
 	page       []byte
 	pickFolder PickFolderFunc
@@ -29,11 +29,11 @@ type Server struct {
 	store      *store.Store
 	// mu reiht die Handler auf: eine Folge aus Lesen, Entscheiden und
 	// Schreiben in einem Handler darf sich nicht mit einer anderen Anfrage
-	// verschraenken.
+	// verschränken.
 	mu sync.Mutex
 }
 
-// New baut den Server. page ist die auszuliefernde Oberflaeche, pickFolder der
+// New baut den Server. page ist die auszuliefernde Oberfläche, pickFolder der
 // Ordnerdialog des Fensters; ohne Dialog meldet der entsprechende Weg einen
 // Abbruch, was das Testen ohne Fenster erlaubt.
 func New(page []byte, pickFolder PickFolderFunc) *Server {
@@ -43,9 +43,9 @@ func New(page []byte, pickFolder PickFolderFunc) *Server {
 	return &Server{page: page, pickFolder: pickFolder}
 }
 
-// UseFolder oeffnet den Datenordner und merkt ihn sich fuer den naechsten
-// Start. Ist keiner nutzbar, bleibt der Server ohne Ablage - die Oberflaeche
-// zeigt dann "Kein Datenordner gewaehlt" statt gar nicht zu starten.
+// UseFolder öffnet den Datenordner und merkt ihn sich für den nächsten
+// Start. Ist keiner nutzbar, bleibt der Server ohne Ablage - die Oberfläche
+// zeigt dann "Kein Datenordner gewählt" statt gar nicht zu starten.
 func (s *Server) UseFolder(ctx context.Context, folder string) error {
 	if err := s.setDataFolder(ctx, folder); err != nil {
 		return err
@@ -58,9 +58,10 @@ func (s *Server) UseFolder(ctx context.Context, folder string) error {
 // Close gibt die Datenbank frei.
 func (s *Server) Close() error { return s.store.Close() }
 
-// setDataFolder opens the database in folder and replaces any open one. The
-// new database is opened first: if that fails, the previously opened folder
-// stays in use instead of leaving the app without any data at all.
+// setDataFolder öffnet die Datenbank im angegebenen Ordner und löst eine
+// bereits offene ab. Die neue wird zuerst geöffnet: schlägt das fehl, bleibt
+// der bisherige Ordner in Gebrauch, statt das Programm ganz ohne Daten
+// zurückzulassen.
 func (srv *Server) setDataFolder(ctx context.Context, folder string) error {
 	if folder == "" {
 		srv.store.Close()
@@ -78,7 +79,7 @@ func (srv *Server) setDataFolder(ctx context.Context, folder string) error {
 	return nil
 }
 
-// dbPath is the database file, shown in the folder bar of the UI.
+// dbPath ist die Datenbankdatei, die die Oberfläche in der Fußleiste zeigt.
 func (srv *Server) dbPath() string {
 	if srv.dataFolder == "" {
 		return ""
@@ -86,11 +87,11 @@ func (srv *Server) dbPath() string {
 	return srv.store.Path()
 }
 
-// ServeHTTP handles all requests from the Wails WebView
+// ServeHTTP beantwortet alle Anfragen der Oberfläche.
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	// Die Oberflaeche selbst
+	// Die Oberfläche selbst
 	if path == "/" || path == "/index.html" || path == "" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(srv.page)

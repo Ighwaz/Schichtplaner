@@ -1168,28 +1168,28 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 'use strict';
 
 const SCHICHTEN = ['frueh','normal','spaet','rufbereitschaft'];
-// Fuer den Feiertagskonflikt zaehlen nur diese drei - der Normaldienst ist
-// Gleitzeit und wurde nie mitgeprueft. Verhalten unveraendert uebernommen,
+// Für den Feiertagskonflikt zählen nur diese drei - der Normaldienst ist
+// Gleitzeit und wurde nie mitgeprüft. Verhalten unverändert übernommen,
 // siehe tests/regelkern.test.mjs ("Normaldienst am Feiertag").
 const ARBEIT_FUER_FEIERTAG = ['frueh','spaet','rufbereitschaft'];
-// Ein Zeitraum ueber mehr als zehn Jahre ist immer ein Vertipper. Ohne
-// Deckel baut ein Fehlklick Millionen Datumsschluessel und friert das
+// Ein Zeitraum über mehr als zehn Jahre ist immer ein Vertipper. Ohne
+// Deckel baut ein Fehlklick Millionen Datumsschlüssel und friert das
 // Fenster ein.
 const MAX_TAGE = 3660;
 
 const istGanzzahl = w => typeof w === 'number' && Number.isFinite(w) && Math.floor(w) === w;
 const KEY_MUSTER  = /^\d{4}-\d{2}-\d{2}$/;
 
-// Tagesschluessel "JJJJ-MM-TT". Bewusst ohne Date: der Schluessel ist eine
-// Zeichenkette, keine Zeitangabe - sonst zoege eine Zeitzone daran.
+// Tagesschlüssel "JJJJ-MM-TT". Bewusst ohne Date: der Schlüssel ist eine
+// Zeichenkette, keine Zeitangabe - sonst zöge eine Zeitzone daran.
 function tagKey(jahr, monat, tag){
   if(!istGanzzahl(jahr) || !istGanzzahl(monat) || !istGanzzahl(tag))
     throw new RangeError('tagKey: Jahr, Monat und Tag muessen ganze Zahlen sein');
   return jahr + '-' + String(monat).padStart(2,'0') + '-' + String(tag).padStart(2,'0');
 }
 
-// Schluessel -> lokales Date. 'T00:00:00' ohne Z ist Absicht: der Kalender
-// rechnet durchweg in Ortszeit, sonst laege ein Tag oestlich von UTC im
+// Schlüssel -> lokales Date. 'T00:00:00' ohne Z ist Absicht: der Kalender
+// rechnet durchweg in Ortszeit, sonst läge ein Tag östlich von UTC im
 // falschen Feld.
 function alsDatum(wert){
   if(wert instanceof Date){
@@ -1199,7 +1199,7 @@ function alsDatum(wert){
   if(typeof wert === 'string' && KEY_MUSTER.test(wert)){
     const d = new Date(wert + 'T00:00:00');
     if(Number.isNaN(d.getTime())) throw new RangeError('alsDatum: ungueltiger Tag ' + wert);
-    // '2026-02-31' parst der Browser still auf den 3. Maerz - das ist kein
+    // '2026-02-31' parst der Browser still auf den 3. März - das ist kein
     // Tag, den jemand gemeint hat.
     if(tagKey(d.getFullYear(), d.getMonth()+1, d.getDate()) !== wert)
       throw new RangeError('alsDatum: den Tag gibt es nicht: ' + wert);
@@ -1210,7 +1210,7 @@ function alsDatum(wert){
 
 // ISO-8601-Kalenderwoche: die Woche mit dem ersten Donnerstag des Jahres
 // ist Woche 1. Rechnung in UTC, damit keine Sommerzeitumstellung
-// dazwischenfaehrt; die Tagesbestandteile kommen aus der Ortszeit.
+// dazwischenfährt; die Tagesbestandteile kommen aus der Ortszeit.
 function isoWoche(wert){
   const d = alsDatum(wert);
   const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -1220,8 +1220,8 @@ function isoWoche(wert){
   return Math.ceil((((tmp - jahresStart) / 86400000) + 1) / 7);
 }
 
-// Alle Tage zwischen zwei Schluesseln, einschliesslich beider Enden und in
-// beliebiger Reihenfolge uebergeben.
+// Alle Tage zwischen zwei Schlüsseln, einschließlich beider Enden und in
+// beliebiger Reihenfolge übergeben.
 function tageImZeitraum(a, b){
   const von = alsDatum(a), bis = alsDatum(b);
   const [lo, hi] = von <= bis ? [von, bis] : [bis, von];
@@ -1238,7 +1238,7 @@ function tageImZeitraum(a, b){
 }
 
 // Das Raster einer Monatsansicht: volle Wochen von Montag bis Sonntag, vorne
-// und hinten mit den Nachbarmonaten aufgefuellt.
+// und hinten mit den Nachbarmonaten aufgefüllt.
 function monatsRaster(jahr, monat){
   if(!istGanzzahl(jahr) || !istGanzzahl(monat) || monat < 1 || monat > 12)
     throw new RangeError('monatsRaster: Monat 1-12 erwartet, bekommen: ' + monat);
@@ -1267,7 +1267,7 @@ function monatsRaster(jahr, monat){
 
 // Soll einer Schicht an einem Tag. Am Wochenende wird nur Rufbereitschaft
 // besetzt; Frueh, Normaldienst und Spaet werden dort nicht angemahnt.
-// Ein ausdrueckliches Soll von 0 bleibt 0 - nur ein fehlender Eintrag gilt
+// Ein ausdrückliches Soll von 0 bleibt 0 - nur ein fehlender Eintrag gilt
 // als 1.
 function sollAmTag(soll, schicht, key){
   if(key != null && schicht !== 'rufbereitschaft'){
@@ -1315,7 +1315,7 @@ function tageUnterSoll(jahr, monat, schichten, soll){
 // Kern die Mitarbeiterliste nicht kennen muss.
 function konflikte(slot, key, feiertag, teamVon){
   const tag = slot || {};
-  // Map statt Objekt: ein Name wie "constructor" oder "__proto__" wuerde in
+  // Map statt Objekt: ein Name wie "constructor" oder "__proto__" würde in
   // einem Objekt auf Object.prototype treffen und nie als doppelt auffallen.
   const zaehler = new Map();
   for(const s of ['frueh','spaet'])
@@ -1332,9 +1332,9 @@ function konflikte(slot, key, feiertag, teamVon){
 }
 
 // Die eine Regel hinter jedem Klick: stehen alle Genannten bereits an allen
-// Zieltagen in der Schicht, traegt der Klick aus - sonst ein. Ein Klick
-// bedeutet damit dasselbe, ob er einen Tag trifft oder dreissig.
-// null heisst: nichts zu tun.
+// Zieltagen in der Schicht, trägt der Klick aus - sonst ein. Ein Klick
+// bedeutet damit dasselbe, ob er einen Tag trifft oder dreißig.
+// null heißt: nichts zu tun.
 function naechsteAktion(tage, namen, schichten, schicht){
   if(!Array.isArray(tage) || !Array.isArray(namen) || !tage.length || !namen.length) return null;
   const plan = schichten || {};
@@ -1357,7 +1357,7 @@ function zeitraumKlasse(key, von, bis){
   return '';
 }
 
-// Anzeigename auf dem Chip: das erste Wort, ohne haengendes Komma -
+// Anzeigename auf dem Chip: das erste Wort, ohne hängendes Komma -
 // "Bauer, Martin" wird zu "Bauer".
 function kurzName(name){
   if(name == null) return '';
@@ -1376,8 +1376,8 @@ global.Regelkern = {
 
 <script>
 'use strict';
-// Die Planungsregeln stehen im Block <script id="regelkern"> darueber.
-// Alles hier drunter ist Oberflaeche: Zustand, DOM und Netz.
+// Die Planungsregeln stehen im Block <script id="regelkern"> darüber.
+// Alles hier drunter ist Oberfläche: Zustand, DOM und Netz.
 const RK = globalThis.Regelkern;
 // ══════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -1414,10 +1414,10 @@ let deletedBackups={}, pendingRestore=null, dragState=null, newColor=null;
 let undoStack=[], redoStack=[];
 let rufKW={};
 let profOldName=null, profColor=null, profEmoji=null, profPrefs={};
-// Template editor state: {personName: {dow: shift}}
+// Zustand des Template-Editors: {Name: {Wochentag: Schicht}}
 let tmplData={};
-// Beim Loeschen gemerkte Mitarbeiterdaten (Team/Farbe/Icon/Wuensche),
-// damit ein Wiederherstellen nicht nur die Eintraege zurueckbringt.
+// Beim Löschen gemerkte Mitarbeiterdaten (Team/Farbe/Icon/Wünsche),
+// damit ein Wiederherstellen nicht nur die Einträge zurückbringt.
 let deletedProfiles={};
 let activeView='cal';
 const currentSubTab={};
@@ -1430,15 +1430,16 @@ const currentSubTab={};
 // RUF-KW PLAN
 // ══════════════════════════════════════════════════════════════
 function getISOWeeks(year){
-  // Returns all ISO weeks whose Thursday falls in the given year
+  // Alle Kalenderwochen, deren Donnerstag in dieses Jahr fällt
   const weeks=[];
-  // Start from the Monday of the week containing Jan 4 (always in W01)
+  // Losgehen beim Montag der Woche, in der der 4. Januar liegt - das ist
+  // immer die KW 1
   const jan4=new Date(year,0,4);
   const startMon=new Date(jan4);
   startMon.setDate(jan4.getDate()-((jan4.getDay()+6)%7));
   let mon=new Date(startMon);
   for(let safety=0; safety<60; safety++){
-    // Thursday of this week determines the ISO year
+    // Der Donnerstag dieser Woche bestimmt das ISO-Jahr
     const thu=new Date(mon); thu.setDate(mon.getDate()+3);
     const isoYear=thu.getFullYear();
     if(isoYear>year) break;  // past our year
@@ -1456,7 +1457,7 @@ function fmtDate(d){return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-
 function fmtDateShort(d){return d.toLocaleDateString('de-DE',{day:'numeric',month:'short'});}
 function getTodayKwKey(){
   const d=new Date();
-  // ISO week: shift to Thursday of the week, then compute
+  // ISO-Woche: auf den Donnerstag der Woche rücken, dann zählen
   const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
   const day=tmp.getUTCDay()||7;
   tmp.setUTCDate(tmp.getUTCDate()+4-day);
@@ -1469,16 +1470,17 @@ function initRufKWYear(){
   ['rufkw-year','rufkw-apply-year'].forEach(id=>{
     const sel=document.getElementById(id); if(!sel) return;
     const years=new Set(Object.keys(rufKW).map(k=>k.slice(0,4)));
-    // Always include today's real year + next 2, regardless of calendar navigation
+    // Das laufende Jahr und die zwei folgenden stehen immer zur Wahl,
+    // unabhängig davon, wohin der Kalender gerade navigiert wurde
     const todayYear=new Date().getFullYear();
     for(let y=todayYear; y<=todayYear+2; y++) years.add(String(y));
     const sorted=[...years].sort();
-    // Default to today's year if nothing selected yet
+    // Vorbelegt ist das laufende Jahr, solange nichts gewählt wurde
     const current=sel.value&&sorted.includes(sel.value)?sel.value:String(todayYear);
     sel.innerHTML=sorted.map(y=>`<option value="${y}"${y===current?' selected':''}>${y}</option>`).join('');
   });
   // Vorbelegt ist das ganze Jahr. Vorher stand hier der gerade angezeigte
-  // Kalendermonat - wer Wochen ueber das Jahr verteilt hatte und uebertrug,
+  // Kalendermonat - wer Wochen über das Jahr verteilt hatte und übertrug,
   // bekam stillschweigend nur diesen einen Monat.
   const apMon=document.getElementById('rufkw-apply-month');
   if(apMon) apMon.innerHTML='<option value="" selected>Ganzes Jahr</option>'+
@@ -1486,16 +1488,17 @@ function initRufKWYear(){
 }
 
 function syncRufKWFromCalendar(){
-  // Scan schichten for rufbereitschaft entries, group by ISO KW, populate rufKW
+  // Die eingetragene Rufbereitschaft nach Kalenderwochen bündeln und daraus
+  // den Wochenplan füllen
   const counts = {};  // {kwKey: {personName: dayCount}}
   Object.entries(schichten).forEach(([dateKey, slot]) => {
     const people = slot.rufbereitschaft || [];
     if(!people.length) return;
     const d = new Date(dateKey + 'T00:00:00');
     const kw = isoWeek(d);
-    // ISO year from Thursday
+    // ISO-Jahr über den Donnerstag
     const thu = new Date(d); thu.setDate(d.getDate() + (4 - ((d.getDay()+6)%7 + 1)));
-    // simpler: use same formula as isoWeek
+    // dieselbe Rechnung wie in isoWeek
     const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     const dayNum = tmp.getUTCDay() || 7;
     tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
@@ -1505,13 +1508,14 @@ function syncRufKWFromCalendar(){
     people.forEach(name => { counts[kwKey][name] = (counts[kwKey][name]||0) + 1; });
   });
 
-  // For each KW, pick the person(s) with most days — typically all 7 days = one person
+  // Je Woche zählt, wer die meisten Tage hat - üblicherweise sind das alle
+  // sieben und damit eine Person
   let imported = 0;
   Object.entries(counts).forEach(([kwKey, personDays]) => {
     const maxDays = Math.max(...Object.values(personDays));
-    // All persons who have entries (could be multiple if split week)
+    // Alle mit Einträgen - bei geteilten Wochen sind es mehrere
     const persons = Object.entries(personDays)
-      .filter(([,d]) => d >= maxDays * 0.5)  // at least half the max days
+      .filter(([,d]) => d >= maxDays * 0.5)  // mindestens die Hälfte der Tage
       .map(([n]) => n);
     if(persons.length && !rufKW[kwKey]) {
       rufKW[kwKey] = persons.length === 1 ? persons[0] : persons;
@@ -1550,14 +1554,14 @@ function showKwRufDialog(kw, weekDates){
     'Fertig'
   ).then(()=>{ renderRufKWTable(); });
 }
-// Namen einer Kalenderwoche - der Plan haelt entweder einen Namen oder eine
+// Namen einer Kalenderwoche - der Plan hält entweder einen Namen oder eine
 // Liste, beides kommt vor.
 function kwNamen(kwKey){
   const roh=rufKW[kwKey];
   return roh?(Array.isArray(roh)?[...roh]:[roh]):[];
 }
 
-// Schluessel der Woche, in der ein Tag liegt - gleiche Schreibweise wie
+// Schlüssel der Woche, in der ein Tag liegt - gleiche Schreibweise wie
 // isoWeekKey im Go-Teil.
 function kwSchluessel(datum){
   const tmp=new Date(Date.UTC(datum.getFullYear(),datum.getMonth(),datum.getDate()));
@@ -1567,7 +1571,7 @@ function kwSchluessel(datum){
 
 // Jede Aenderung am KW-Plan wird sofort gespeichert. Der Server liest beim
 // Uebertragen den abgelegten Plan, nicht den Schirm - ohne das Speichern
-// trug "In den Kalender uebertragen" den vorherigen Stand ein.
+// trug "In den Kalender übertragen" den vorherigen Stand ein.
 async function setzeKwPersonen(kwKey,namen){
   if(namen&&namen.length) rufKW[kwKey]=namen; else delete rufKW[kwKey];
   renderRufKWTable();
@@ -1587,7 +1591,7 @@ async function toggleKwPerson(name, weekDates){
 function renderRufKWTable(){
   initRufKWYear();
   const sel=document.getElementById('rufkw-year'); if(!sel) return;
-  // Wire onchange if not already done
+  // Den onchange-Griff nur einmal anhängen
   if(!sel._wired){ sel.addEventListener('change', renderRufKWTable); sel._wired=true; }
   const year=parseInt(sel.value);
   const weeks=getISOWeeks(year);
@@ -1645,7 +1649,7 @@ function renderRufKWTable(){
     });
     tdP.appendChild(cell); tr.appendChild(tdP);
 
-    // Was steht tatsaechlich im Kalender? Und deckt es sich mit dem Plan?
+    // Was steht tatsächlich im Kalender? Und deckt es sich mit dem Plan?
     const ist=kwImKalender(w);
     const istNamen=Object.keys(ist).sort();
     const planNamen=[...names].sort();
@@ -1690,13 +1694,13 @@ function renderRufKWTable(){
 // ══════════════════════════════════════════════════════════════
 // RUFBEREITSCHAFT REIHUM
 // ══════════════════════════════════════════════════════════════
-// Reihenfolge der Personen fuer die Rotation; ueberlebt das Schliessen.
+// Reihenfolge der Personen für die Rotation; überlebt das Schließen.
 let reihumFolge=[];
 
 function openRufReihum(){
   const jahr=parseInt(document.getElementById('rufkw-year')?.value||curYear);
   const wochen=getISOWeeks(jahr);
-  // Namen ergaenzen, die noch nicht in der Reihenfolge stehen
+  // Namen ergänzen, die noch nicht in der Reihenfolge stehen
   mitarbeiter.forEach(m=>{ if(!reihumFolge.some(r=>r.name===m.name)) reihumFolge.push({name:m.name,an:true}); });
   reihumFolge=reihumFolge.filter(r=>mitarbeiter.some(m=>m.name===r.name));
 
@@ -1740,10 +1744,10 @@ function renderReihumListe(){
   renderReihumVorschau();
 }
 
-// Platz in der Rotation (nur die aktiven zaehlen mit)
+// Platz in der Rotation (nur die aktiven zählen mit)
 function nummerVon(i){ return reihumFolge.slice(0,i+1).filter(r=>r.an).length; }
 
-// Welche Wochen wuerden gefuellt - und mit wem?
+// Welche Wochen würden gefüllt - und mit wem?
 function reihumPlan(){
   const jahr=parseInt(document.getElementById('rufkw-year')?.value||curYear);
   const wochen=getISOWeeks(jahr);
@@ -1784,12 +1788,12 @@ async function rufReihumFuellen(){
   toast(`${plan.length} Wochen verteilt – mit „▶ In den Kalender übertragen" eintragen`);
 }
 
-// Welche Wochen gerade aufgeklappt sind - bleibt ueber das Neuzeichnen hinweg.
+// Welche Wochen gerade aufgeklappt sind - bleibt über das Neuzeichnen hinweg.
 const offeneWochen=new Set();
 
-// Die sieben Tage einer Woche als eigene Zeilen. Die Wochenzeile darueber ist
+// Die sieben Tage einer Woche als eigene Zeilen. Die Wochenzeile darüber ist
 // der Plan; hier steht, was wirklich im Kalender eingetragen ist, und hier
-// traegt man eine Vertretung fuer einen einzelnen Tag ein.
+// trägt man eine Vertretung für einen einzelnen Tag ein.
 function tageZeilen(w,geplant){
   const zeilen=[];
   const wochentage=['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -1849,7 +1853,7 @@ async function setzeTagRuf(key,name,eintragen){
   toast(`${name}: ${fmtDateShort(new Date(key+'T00:00:00'))} ${eintragen?'eingetragen':'entfernt'}`);
 }
 
-// Personenauswahl fuer einen einzelnen Tag.
+// Personenauswahl für einen einzelnen Tag.
 let _rufTagKey=null;
 function openRufTagPicker(key,anchor){
   _rufTagKey=key;
@@ -1883,7 +1887,7 @@ function openRufTagPicker(key,anchor){
   picker.style.top=(r.bottom+4+240>window.innerHeight?r.top-244:r.bottom+4)+'px';
 }
 
-// Rufbereitschaft, die fuer die Tage dieser Woche wirklich im Kalender steht.
+// Rufbereitschaft, die für die Tage dieser Woche wirklich im Kalender steht.
 function kwImKalender(w){
   const zaehler={};
   for(let i=0;i<7;i++){
@@ -2018,17 +2022,18 @@ async function init(){
   newColor=randColor();
   document.getElementById('new-color').style.background=newColor;
 
-  // Bind events first so UI is interactive immediately
+  // Erst die Ereignisse binden, damit die Oberfläche sofort bedienbar ist
   bindEvents();
   ladeZoom();
   ladeSidebar();
 
-  // Load data with retry (handles EXE startup timing)
+  // Daten mit Wiederholung laden - beim Start der EXE steht der Server
+  // manchmal noch nicht bereit
   let d={};
   for(let i=0; i<10; i++){
     try{
       d = await api('/api/data');
-      // Accept if we have data, OR if server responded without error 3+ times
+      // Angenommen wird, was ohne Fehler zurückkommt
       if(d && !d.error) break;
     }catch(e){
       await new Promise(r=>setTimeout(r,600));
@@ -2036,16 +2041,16 @@ async function init(){
   }
   applyData(d);
 
-  // Load holidays (non-blocking: render calendar first, update after)
+  // Feiertage nachladen - der Kalender steht schon, sie kommen hinterher
   renderAll();
 
-  // Load holidays in background, then re-render calendar
+  // Im Hintergrund holen, dann den Kalender neu zeichnen
   loadHolidays(curYear).then(()=>{
     renderCalendar();
   }).catch(()=>{});
   loadHolidayCoverage();
 
-  // Warn if no folder is set
+  // Hinweis, wenn kein Datenordner gewählt ist
   const dir = await api('/api/datadir').catch(()=>({}));
   if(!dir.folder) toast('⚠ Kein Datenordner – bitte „Wechseln" klicken');
 }
@@ -2142,7 +2147,7 @@ function switchSubTab(view, subId){
     e.preventDefault(); waehleSchicht(p.dataset.shift);
   });
 
-  // Mehr-Menue oeffnen und schliessen
+  // Mehr-Menü öffnen und schließen
   const more=document.getElementById('more-menu');
   document.getElementById('btn-more').addEventListener('click',e=>{
     e.stopPropagation(); more.classList.toggle('hidden');
@@ -2166,7 +2171,7 @@ function switchSubTab(view, subId){
     if(e.target.files[0]) document.getElementById('backup-drop-label').textContent='📂 '+e.target.files[0].name;
   });
   document.getElementById('btn-refresh').addEventListener('click',refreshData);
-  // Template apply via onclick on btn-run-tmpl
+  // Das Anwenden hängt am onclick von btn-run-tmpl
 
   document.querySelectorAll('.sb-tab').forEach(tab=>{
     tab.addEventListener('click',()=>{
@@ -2185,7 +2190,7 @@ function switchSubTab(view, subId){
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();doUndo();}
     if((e.ctrlKey||e.metaKey)&&(e.shiftKey&&e.key==='Z'||e.key==='y')){e.preventDefault();doRedo();}
     if(e.key==='Escape'){closeAllModals();closeDayMenu();document.getElementById('more-menu').classList.add('hidden');clearAll();copiedDay=null;renderCalendar();}
-    // Kuerzel nur, wenn gerade nicht getippt wird
+    // Kürzel nur, wenn gerade nicht getippt wird
     if(e.ctrlKey||e.metaKey||e.altKey) return;
     const ziel=e.target instanceof Element?e.target:null;
     if(ziel&&ziel.closest('input,select,textarea,[contenteditable]')) return;
@@ -2306,10 +2311,10 @@ function updateLabel(){
         updateLabel(); renderCalendar();
       });
     } else {
-      // Add curYear if not already present
+      // Das gerade gezeigte Jahr ergänzen, falls es fehlt
       if(![...ySel.options].find(o=>parseInt(o.value)===curYear)){
         const o=document.createElement('option'); o.value=curYear; o.textContent=curYear;
-        // Insert in sorted order
+        // An der richtigen Stelle einfügen
         let inserted=false;
         for(let i=0;i<ySel.options.length;i++){
           if(parseInt(ySel.options[i].value)>curYear){ ySel.insertBefore(o,ySel.options[i]); inserted=true; break; }
@@ -2330,7 +2335,7 @@ async function refreshFolderBar(){
   const d=await api('/api/datadir');
   const lbl=document.getElementById('folder-label');
   if(d.folder){
-    // Show only last part of path for brevity
+    // Nur den letzten Teil des Pfades zeigen
     const parts=d.folder.replace(/\\/g,'/').split('/');
     lbl.textContent='📁 '+parts[parts.length-1];
     lbl.title=d.folder+(d.file?'\n'+d.file:'');
@@ -2394,7 +2399,7 @@ function showColorPicker(anchor,memberName){
 function initials(name){return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
 function avContent(m){return m.icon?`<span style="font-size:17px;line-height:1">${m.icon}</span>`:`<span>${initials(m.name)}</span>`;}
 
-// Suche und Team-Filter der Seitenleiste gelten auch fuer die Monatsuebersicht.
+// Suche und Team-Filter der Seitenleiste gelten auch für die Monatsübersicht.
 function visibleMembers(){
   const search=(document.getElementById('sb-search')?.value||'').toLowerCase();
   const teamF=document.getElementById('sb-team-filter')?.value||'';
@@ -2457,13 +2462,14 @@ async function handleMemberClick(e){
 function selectPerson(name){
   selectedPersons.clear();
   selectedPerson=selectedPerson?.name===name?null:mitarbeiter.find(m=>m.name===name);
-  // Don't clear range when selecting a person - user may select person THEN set range
+  // Die Strecke beim Personenwechsel stehen lassen - erst die Person und
+  // dann den Zeitraum zu wählen ist ein üblicher Weg
   multiDays.clear();renderMembers();updateSelInfo();
 }
 
 // Der Werkzeug-Block sagt in einem Satz, wer eingetragen wird und was der
-// naechste Klick tut. Ohne Werkzeug und mit aufgespanntem Zeitraum steht hier
-// stattdessen, was sich loeschen laesst.
+// nächste Klick tut. Ohne Werkzeug und mit aufgespanntem Zeitraum steht hier
+// stattdessen, was sich löschen lässt.
 function updateSelInfo(){
   const el=document.getElementById('sel-info');
   const hintEl=document.getElementById('tool-hint');
@@ -2484,7 +2490,7 @@ function updateSelInfo(){
 
   if(!selectedPerson){
     if(rangeStart&&frozenRangeEnd){
-      // Ohne Werkzeug, aber mit Strecke: hier wird geloescht.
+      // Ohne Werkzeug, aber mit Strecke: hier wird gelöscht.
       const dates=getRangeDates();
       const fmt=k=>new Date(k+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});
       const lbl=dates.length===1?fmt(dates[0]):fmt(dates[0])+' – '+fmt(dates[dates.length-1]);
@@ -2526,7 +2532,7 @@ async function doAdd(name,team,color){
   if(d.error){toast(d.error);return;}
   mitarbeiter.push({name,team,color:color||AVATAR_COLORS[0],icon:'',prefs:{}});
   document.getElementById('new-name').value='';newColor=randColor();document.getElementById('new-color').style.background=newColor;
-  // Close add form after adding
+  // Das Formular nach dem Anlegen wieder zuklappen
   document.getElementById('add-form').classList.remove('open');document.getElementById('add-toggle').classList.remove('open');
   renderMembers();renderCalendar();renderTemplateTable();toast(name+' hinzugefügt');
 }
@@ -2554,9 +2560,9 @@ async function confirmRestore(doRestore){
   closeModal('restore-modal');if(!pendingRestore)return;
   const{name,team,color}=pendingRestore;pendingRestore=null;
   const prof=doRestore?deletedProfiles[name]:null;
-  // Beim Wiederherstellen zaehlt das gemerkte Profil, nicht das Formular:
-  // sonst kaeme die Person mit falschem Team zurueck und die Feiertagslogik
-  // wuerde ab dann andere Tage sperren.
+  // Beim Wiederherstellen zählt das gemerkte Profil, nicht das Formular:
+  // sonst käme die Person mit falschem Team zurück und die Feiertagslogik
+  // würde ab dann andere Tage sperren.
   await doAdd(name,prof?.team??team,prof?.color??color);
   if(doRestore){
     if(prof){
@@ -2671,7 +2677,7 @@ const dk       = RK.tagKey;
 const isoWeek  = RK.isoWoche;
 const getISOWeek = RK.isoWoche;
 
-// Schichtwahl an einer Stelle - Maus, Tastatur und Kuerzel laufen hier zusammen.
+// Schichtwahl an einer Stelle - Maus, Tastatur und Kürzel laufen hier zusammen.
 function waehleSchicht(shift){
   if(!ALL_SHIFTS.includes(shift)) return;
   selectedShift=shift;
@@ -2680,8 +2686,8 @@ function waehleSchicht(shift){
 }
 
 // ── TAGESMENUE ────────────────────────────────────────────────
-// Vier Knoepfe in jeder Zelle waren bis zu 168 Klickziele im Monat. Jetzt
-// oeffnet ein Knopf - oder der Rechtsklick - dieselbe kurze Liste.
+// Vier Knöpfe in jeder Zelle waren bis zu 168 Klickziele im Monat. Jetzt
+// öffnet ein Knopf - oder der Rechtsklick - dieselbe kurze Liste.
 let dayMenuEl=null;
 function closeDayMenu(){ if(dayMenuEl){ dayMenuEl.remove(); dayMenuEl=null; } }
 function openDayMenu(key,anchor,x,y){
@@ -2723,7 +2729,7 @@ function openDayMenu(key,anchor,x,y){
   setTimeout(()=>document.addEventListener('click',closeDayMenu,{once:true}),0);
 }
 
-// Mehrere Tage auf einmal leeren - der Weg fuer Entf auf einer Auswahl.
+// Mehrere Tage auf einmal leeren - der Weg für Entf auf einer Auswahl.
 async function leereTage(tage){
   if(!tage.length) return;
   const ok=await confirmDialog('Tage leeren?',
@@ -2742,7 +2748,7 @@ async function leereTage(tage){
 
 function renderCalendar(){
   const grid = document.getElementById('cal-grid');
-  // Remove all but the 8 headers (KW + Mo..So)
+  // Alles bis auf die acht Kopfzellen entfernen (KW + Mo..So)
   while(grid.children.length > 8) grid.removeChild(grid.lastChild);
 
   const {zellen:allCells, wochen} = RK.monatsRaster(curYear, curMonth);
@@ -2767,13 +2773,13 @@ function renderCalendar(){
   });
   renderStats();
   updateCheckChip();
-  // Die Monatsuebersicht zeigt dieselben Daten; sie muss bei jedem Monats-
+  // Die Monatsübersicht zeigt dieselben Daten; sie muss bei jedem Monats-
   // wechsel und nach jeder Aenderung mitgezogen werden.
   if(activeView==='matrix') renderMatrix();
 }
 
-// Vorschau: solange ein Werkzeug gewaehlt ist, zeigt die Zelle unter dem
-// Zeiger als gestrichelter Chip, was der naechste Klick eintragen wuerde.
+// Vorschau: solange ein Werkzeug gewählt ist, zeigt die Zelle unter dem
+// Zeiger als gestrichelter Chip, was der nächste Klick eintragen würde.
 function zeigeVorschau(el){
   const namen=selectedPersons.size>0?[...selectedPersons]:selectedPerson?[selectedPerson.name]:[];
   if(!namen.length) return;
@@ -2828,8 +2834,8 @@ function makeCell(key,dayNum,other){
   numRow.appendChild(numLeft);
 
   if(!other){
-    // Ein Knopf statt vier: Notiz, Kopieren, Einfuegen und Leeren stehen im
-    // Menue, das auch der Rechtsklick auf die Zelle oeffnet.
+    // Ein Knopf statt vier: Notiz, Kopieren, Einfügen und Leeren stehen im
+    // Menü, das auch der Rechtsklick auf die Zelle öffnet.
     const b=document.createElement('button');
     b.className='dab'; b.textContent='⋯';
     b.title='Notiz, kopieren, einfügen, leeren (auch per Rechtsklick)';
@@ -2853,7 +2859,7 @@ function makeCell(key,dayNum,other){
     if(hasAny){const cb=document.createElement('div');cb.className='conflict-badge';const parts=[];if(schichtC.length)parts.push('Konfl.: '+schichtC.join(', '));if(holC.length){const h=holidays[key];parts.push('Feiertag ('+h.country+'): '+holC.join(', '));}cb.textContent='⚠ '+parts.join(' | ');cb.title=cb.textContent;el.appendChild(cb);}
     // Jeder Tag zeigt immer alle drei Schichten in derselben Reihenfolge, auch
     // wenn eine leer ist - so steht dieselbe Schicht in jeder Zelle an
-    // derselben Stelle und Luecken fallen beim Ueberfliegen auf.
+    // derselben Stelle und Lücken fallen beim Ueberfliegen auf.
     const ca=document.createElement('div');ca.className='chips-area';
     ALL_SHIFTS.forEach(s=>{
       const people=slot[s]||[], tgt=sollFor(s,key), fehlt=people.length<tgt;
@@ -2902,12 +2908,12 @@ async function handleCellClick(e,key){
 
   if(!namen.length){
     // Ohne Werkzeug bleibt der Kalender lesend - bis auf Shift+Klick, der
-    // einen Zeitraum zum Loeschen aufspannt.
+    // einen Zeitraum zum Löschen aufspannt.
     if(shift&&letzterKlick){
       rangeStart=letzterKlick; previewEnd=key; frozenRangeEnd=key;
       renderCalendar(); updateSelInfo(); return;
     }
-    // Erst raeumen, dann den Ankerpunkt setzen - clearSelection() loescht ihn.
+    // Erst räumen, dann den Ankerpunkt setzen - clearSelection() löscht ihn.
     clearSelection(); letzterKlick=key;
     toast('Erst einen Mitarbeiter wählen – dann Klick zum Eintragen');
     return;
@@ -2915,8 +2921,8 @@ async function handleCellClick(e,key){
 
   if(shift&&letzterKlick){
     // Der vorherige Klick hat die Absicht gesetzt - eintragen oder austragen.
-    // Shift zieht sie bis hierher durch, sonst liesse sich ein Zeitraum nie
-    // wieder leeren: der Ankertag waere ja schon ausgetragen.
+    // Shift zieht sie bis hierher durch, sonst ließe sich ein Zeitraum nie
+    // wieder leeren: der Ankertag wäre ja schon ausgetragen.
     let dates;
     try{ dates=datesInRange(letzterKlick,key); }
     catch(e){ toast('Zeitraum zu groß – bitte enger wählen'); letzterKlick=key; return; }
@@ -2931,7 +2937,7 @@ async function handleCellClick(e,key){
   if(modus) letzterModus=modus;
 }
 
-// Ein Klick auf einen Tag - fuer eine wie fuer mehrere Personen derselbe
+// Ein Klick auf einen Tag - für eine wie für mehrere Personen derselbe
 // Ablauf, damit sich beide Auswahlarten nicht widersprechen.
 async function handleDayClick(key,ctrl,namen){
   if(!namen.length) return;
@@ -2949,7 +2955,7 @@ async function handleDayClick(key,ctrl,namen){
 }
 
 // Eintragen oder entfernen - je nachdem, ob schon alle Genannten an allen
-// Tagen in der gewaehlten Schicht stehen. Ein einzelner Klick verhaelt sich
+// Tagen in der gewählten Schicht stehen. Ein einzelner Klick verhält sich
 // damit genauso wie einer auf eine Mehrfachauswahl oder einen Zeitraum.
 async function schichtAufTagen(tage,namen,modus){
   const aktion=modus||RK.naechsteAktion(tage,namen,schichten,selectedShift);
@@ -3002,7 +3008,7 @@ async function applyToDateList(dates,names,action){
   else toast(msg+' auf '+dates.length+' Tag(e) eingetragen');
 }
 
-// force = Rueckfrage bestaetigt; replace = es war die Ersetzen-Rueckfrage,
+// force = Rückfrage bestätigt; replace = es war die Ersetzen-Rückfrage,
 // nur dann gibt die Person ihre bisherige Arbeitsschicht an dem Tag ab.
 async function postSchicht(dates,action,schicht,name,force=false,replace=false){
   return api('/api/schicht',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dates,schicht,name,action,force,replace})});
@@ -3040,7 +3046,7 @@ async function clearRangeAll(){
 async function clearRangeShift(shift){
   frozenRangeEnd=null;   const dates=getRangeDates(); pushUndo();
   dates.forEach(k=>{if(schichten[k]&&schichten[k][shift]) schichten[k][shift]=[];});
-  // Sync to server via paste with selective slot
+  // Beim Server nachziehen
   for(const d of dates){
     await api('/api/schicht',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({dates:[d],schicht:shift,name:'__clear__',action:'clear_shift'})});
@@ -3057,7 +3063,7 @@ async function clearRangePerson(name){
       if(schichten[k][s]){const i=schichten[k][s].indexOf(name);if(i!==-1)schichten[k][s].splice(i,1);}
     });
   });
-  // Sync: remove person from all shifts on all dates
+  // Beim Server nachziehen: die Person aus allen Schichten aller Tage nehmen
   for(const shift of ALL_SHIFTS){
     await api('/api/schicht',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({dates,schicht:shift,name,action:'remove'})});
@@ -3078,7 +3084,7 @@ function clearAll(){
 function rangeClass(key){ return RK.zeitraumKlasse(key,rangeStart,previewEnd); }
 // Vorschau des Zeitraums: nur die Klassen der Tageszellen anpassen. Ein
 // kompletter renderCalendar() bei jeder Mausbewegung tauscht das DOM aus und
-// kann den naechsten Klick verschlucken.
+// kann den nächsten Klick verschlucken.
 function updateRangePreview(){
   document.querySelectorAll('.day-cell').forEach(cell=>{
     if(cell.classList.contains('other'))return;
@@ -3088,8 +3094,8 @@ function updateRangePreview(){
   });
 }
 const datesInRange = RK.tageImZeitraum;
-// Vorschau der Strecke, solange Shift gedrueckt ist: der Zeiger zeigt, was
-// der naechste Klick fassen wuerde, ohne dass ein Modus dafuer noetig waere.
+// Vorschau der Strecke, solange Shift gedrückt ist: der Zeiger zeigt, was
+// der nächste Klick fassen würde, ohne dass ein Modus dafür nötig wäre.
 document.addEventListener('mouseover',e=>{
   const cell=e.target.closest('.day-cell:not(.other)');
   if(e.shiftKey&&letzterKlick&&!frozenRangeEnd){
@@ -3100,7 +3106,7 @@ document.addEventListener('mouseover',e=>{
   }
   if(rangeStart&&!frozenRangeEnd){ rangeStart=null; previewEnd=null; updateRangePreview(); }
 });
-// Shift loslassen raeumt die Vorschau wieder ab.
+// Shift loslassen räumt die Vorschau wieder ab.
 document.addEventListener('keyup',e=>{
   if(e.key!=='Shift'||frozenRangeEnd) return;
   if(rangeStart){ rangeStart=null; previewEnd=null; updateRangePreview(); }
@@ -3114,16 +3120,16 @@ function getConflicts(slot,key){
   return {schichtC:k.doppelt, holC:k.amFeiertag, hasAny:k.hatKonflikt};
 }
 // Soll einer Schicht an einem bestimmten Tag. Am Wochenende wird nur
-// Rufbereitschaft besetzt - dieselbe Regel gilt fuer die Zaehler in den
-// Tageszellen, in der Monatsuebersicht und fuer die Unterbesetzung.
+// Rufbereitschaft besetzt - dieselbe Regel gilt für die Zähler in den
+// Tageszellen, in der Monatsübersicht und für die Unterbesetzung.
 function sollFor(shift,key){ return RK.sollAmTag(soll,shift,key); }
 function isUnderstaffed(slot,key){ return RK.unterSoll(slot,key,soll); }
 // Kalenderansicht aktivieren - von jumpToDate und vom Autoplan genutzt.
-// Monatsnavigation und Schichtauswahl gehoeren nur zu den Ansichten, die auch
-// einen Monat zeigen. Die uebrigen bringen ihre eigenen Bedienelemente mit.
+// Monatsnavigation und Schichtauswahl gehören nur zu den Ansichten, die auch
+// einen Monat zeigen. Die übrigen bringen ihre eigenen Bedienelemente mit.
 // Die Datumssteuerung bleibt stehen, wo sie ist, und graut nur aus, wenn die
-// offene Ansicht nicht am Monat haengt - so springt die Leiste nicht.
-// Die Feiertagsansicht haengt am Jahr und zaehlt darum mit.
+// offene Ansicht nicht am Monat hängt - so springt die Leiste nicht.
+// Die Feiertagsansicht hängt am Jahr und zählt darum mit.
 function updateContextBar(){
   document.getElementById('dnav')?.classList.toggle('off',!['cal','matrix','hol'].includes(activeView));
   updateCheckChip();
@@ -3136,7 +3142,7 @@ function understaffedDays(){
     .map(t=>({key:t.key,missing:t.missing.map(m=>({s:m.schicht,ist:m.ist,soll:m.soll}))}));
 }
 
-// Ein Chip statt Pruef-Knopf: die Zahl steht in der Leiste, der Klick fuehrt
+// Ein Chip statt Prüf-Knopf: die Zahl steht in der Leiste, der Klick führt
 // zur Liste. Ist alles besetzt, verschwindet er.
 function updateCheckChip(){
   const chip=document.getElementById('btn-check');
@@ -3247,7 +3253,7 @@ async function applyTemplateDirectly(){
   if(bisJ*12+bisM < vonJ*12+vonM){ toast('„bis" liegt vor „von"'); return; }
 
   pushUndo();
-  // Monat fuer Monat anwenden - jeder Aufruf ist eine eigene Transaktion.
+  // Monat für Monat anwenden - jeder Aufruf ist eine eigene Transaktion.
   const d={planned:0,skipped_conflict:0,skipped_holiday:0};
   for(let t=vonJ*12+vonM-1; t<=bisJ*12+bisM-1; t++){
     const j=Math.floor(t/12), m=t%12+1;
@@ -3260,7 +3266,7 @@ async function applyTemplateDirectly(){
   if(d.error) toast('Fehler: '+d.error);
   else{
     await reloadSchichten();
-    // Navigate to the applied month
+    // Zum angewendeten Monat springen
     curYear=selYear; curMonth=selMonth;
     updateLabel(); renderCalendar();
     showCalendarView();
@@ -3276,13 +3282,13 @@ async function applyTemplateDirectly(){
 // ══════════════════════════════════════════════════════════════
 // TEMPLATE EDITOR
 // ══════════════════════════════════════════════════════════════
-// Im Template steht nur die Arbeitsschicht. Rufbereitschaft laeuft ueber den
-// KW-Plan und wuerde hier nur doppelt gepflegt.
+// Im Template steht nur die Arbeitsschicht. Rufbereitschaft läuft über den
+// KW-Plan und würde hier nur doppelt gepflegt.
 const TMPL_CYCLE=['','frueh','normal','spaet','frei'];
 const TMPL_CYCLE_WE=TMPL_CYCLE;
 
 function fillTemplateFromPrefs(){
-  // Populate tmplData from each mitarbeiter's prefs
+  // Das Template aus den Wünschen der Mitarbeiter füllen
   let filled=0;
   mitarbeiter.forEach(m=>{
     const prefs=m.prefs||{};
@@ -3344,7 +3350,7 @@ function renderTemplateTable(){
     tbl.appendChild(tr);
   });
 
-  // Load saved templates list
+  // Die Liste der gespeicherten Templates holen
   loadTemplates();
 }
 
@@ -3370,7 +3376,7 @@ async function loadTemplates(){
     btn.addEventListener('click',()=>{
       const name=btn.dataset.tmpl;
       document.getElementById('tmpl-name-input').value=name;
-      // Load template data into editor
+      // Ein Template in den Editor laden
       const tmpl=templates[name]||{};
       tmplData={};
       Object.entries(tmpl).forEach(([person,days])=>{
@@ -3384,7 +3390,7 @@ async function loadTemplates(){
 async function saveTemplate(){
   const name=document.getElementById('tmpl-name-input').value.trim();
   if(!name){toast('Template-Name eingeben');return;}
-  // Convert tmplData to string-keyed for JSON
+  // Für JSON brauchen die Wochentage Zeichenketten als Schlüssel
   const payload={};
   Object.entries(tmplData).forEach(([person,days])=>{payload[person]={};Object.entries(days).forEach(([d,s])=>{payload[person][String(d)]=s;});});
   await api('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,template:payload})});
@@ -3399,7 +3405,7 @@ async function deleteTemplate(name){
 // ══════════════════════════════════════════════════════════════
 // RUFBEREITSCHAFT OVERVIEW
 // ══════════════════════════════════════════════════════════════
-// Zaehler je Person aus den tatsaechlichen Kalendereintraegen des Jahres.
+// Zähler je Person aus den tatsächlichen Kalendereinträgen des Jahres.
 function renderRufSummary(){
   const sumWrap=document.getElementById('ruf-summary');
   if(!sumWrap) return;
@@ -3440,8 +3446,8 @@ function exportRufCSV(){
 // ══════════════════════════════════════════════════════════════
 // CUSTOM HOLIDAYS
 // ══════════════════════════════════════════════════════════════
-// Holi und Diwali wechseln jaehrlich das Datum und sind nur fuer einen
-// begrenzten Zeitraum hinterlegt - danach muessen sie von Hand ergaenzt werden.
+// Holi und Diwali wechseln jährlich das Datum und sind nur für einen
+// begrenzten Zeitraum hinterlegt - danach müssen sie von Hand ergänzt werden.
 let holidayCoverage=null;
 async function loadHolidayCoverage(){
   try{ holidayCoverage=await api('/api/holiday_coverage'); }catch(e){ holidayCoverage=null; }
@@ -3464,7 +3470,7 @@ function renderCoverageNote(){
 // MONATSÜBERSICHT
 // ══════════════════════════════════════════════════════════════
 // Eine Zeile je Person, eine Spalte je Tag. Zeigt auf einen Blick, wer wann
-// arbeitet, wo Luecken sind und wer an einem Tag doppelt eingeteilt ist.
+// arbeitet, wo Lücken sind und wer an einem Tag doppelt eingeteilt ist.
 function renderMatrix(){
   const tbl=document.getElementById('mx-table');
   if(!tbl) return;
@@ -3505,7 +3511,7 @@ function renderMatrix(){
       `<td class="mx-sum">${zaehl.frueh}/${zaehl.spaet}/${zaehl.rufbereitschaft}</td></tr>`;
   });
 
-  // Fusszeile: Besetzung je Tag, rot wenn unter Soll
+  // Fußzeile: Besetzung je Tag, rot wenn unter Soll
   const fuss=['<tr class="mx-foot"><td class="mx-name">Besetzung F/S/R</td>'];
   tage.forEach(t=>{
     const slot=schichten[t.key]||{};
@@ -3538,7 +3544,7 @@ function renderMatrix(){
   });
 }
 
-// Tage des Monats mit Kurzform fuer die Spaltenkoepfe
+// Tage des Monats mit Kurzform für die Spaltenköpfe
 function daysOfMonth(jahr,monat){
   const out=[], letzter=new Date(jahr,monat,0).getDate();
   for(let d=1;d<=letzter;d++){
@@ -3688,7 +3694,7 @@ async function addCustomHoliday(){
   customHolidays.push({date,name,country});
   customHolidays.sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('hol-name').value='';document.getElementById('hol-date').value='';
-  // Reload holidays to include new custom one
+  // Feiertage neu laden, damit der neue dabei ist
   const yr=parseInt(date.slice(0,4));if(!holidays[date])await loadHolidays(yr);else{const h=await api('/api/holidays/'+yr);Object.assign(holidays,h);}
   renderCustomHolidays();renderCalendar();toast('Feiertag hinzugefügt');
 }
@@ -3755,10 +3761,10 @@ function confirmDialog(title,html,yesLabel='Ja'){
     dlg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)';
     dlg.innerHTML=`<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:22px;max-width:360px;width:92vw;box-shadow:0 20px 60px var(--shadow)"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;margin-bottom:11px">${title}</div><p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">${html}</p><div style="display:flex;gap:8px"><button id="_cdlg-yes" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:700;cursor:pointer">${yesLabel}</button><button id="_cdlg-no" style="flex:1;padding:9px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:600;cursor:pointer">Abbrechen</button></div></div>`;
     document.body.appendChild(dlg);
-    // Erst ausblenden, dann aufloesen, und erst im naechsten Durchlauf entfernen:
+    // Erst ausblenden, dann auflösen, und erst im nächsten Durchlauf entfernen:
     // Aufrufer lesen ihre eigenen Eingabefelder aus dem Dialog aus, nachdem das
-    // Versprechen erfuellt ist. Wird sofort entfernt, sind die Felder weg und
-    // die Auswahl faellt stillschweigend auf die Vorgabe zurueck.
+    // Versprechen erfüllt ist. Wird sofort entfernt, sind die Felder weg und
+    // die Auswahl fällt stillschweigend auf die Vorgabe zurück.
     dlg.querySelector('#_cdlg-yes').onclick=()=>{
       dlg.style.display='none'; resolve(true); setTimeout(()=>dlg.remove(),0);
     };
@@ -3771,7 +3777,7 @@ function confirmDialog(title,html,yesLabel='Ja'){
 // HELPERS
 // ══════════════════════════════════════════════════════════════
 function doExportData(){
-  // Direct download of the full JSON backup
+  // Die vollständige Sicherung direkt herunterladen
   window.location = '/api/export_data';
   toast('Backup wird heruntergeladen…');
 }
@@ -3783,9 +3789,9 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 // ══════════════════════════════════════════════════════════════
 // ANZEIGEGRÖSSE
 // ══════════════════════════════════════════════════════════════
-// Die Oberflaeche ist in Pixeln gesetzt; eine Schriftgroesse am Wurzelelement
-// wuerde daran nichts aendern. zoom skaliert das komplette Layout mit - im
-// Ausdruck wird es zurueckgesetzt, dort gilt die eigene Druckgroesse.
+// Die Oberfläche ist in Pixeln gesetzt; eine Schriftgröße am Wurzelelement
+// würde daran nichts ändern. zoom skaliert das komplette Layout mit - im
+// Ausdruck wird es zurückgesetzt, dort gilt die eigene Druckgröße.
 const ZOOM_STUFEN=[0.9,1,1.1,1.25,1.4,1.6];
 let zoomStufe=1;
 
@@ -3820,7 +3826,7 @@ function ladeSidebar(){
 }
 
 function ladeZoom(){
-  // Vorgabe eine Stufe ueber 100% - die Oberflaeche ist von Haus aus klein.
+  // Vorgabe eine Stufe über 100% - die Oberfläche ist von Haus aus klein.
   let s=2;
   try{ const v=localStorage.getItem('schichtplaner-zoom'); if(v!==null) s=parseInt(v); }catch(e){}
   setZoom(isNaN(s)?1:s);
@@ -3871,7 +3877,7 @@ async function doImportData(){
   } else {
     resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';
     resEl.textContent=`✓ Import erfolgreich: ${d.mitarbeiter} Mitarbeiter, ${d.schichten} Tage, ${d.templates} Templates`;
-    // Reload all data
+    // Alle Daten neu laden
     applyData(await api('/api/data'));
     await loadHolidays(curYear);
     renderMembers(); renderCalendar(); renderStats();

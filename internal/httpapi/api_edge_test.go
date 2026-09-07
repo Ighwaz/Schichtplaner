@@ -10,12 +10,12 @@ import (
 	"testing"
 )
 
-// Diese Datei deckt ab, was handlers_test.go offen laesst: die Handler hinter
-// den Bedienschritten der Oberflaeche (Tag leeren, kopieren, einfuegen, Soll,
-// Notiz, Rueckgaengig), die Antwort auf unsinnige Eingaben und das Verhalten
+// Diese Datei deckt ab, was handlers_test.go offen lässt: die Handler hinter
+// den Bedienschritten der Oberfläche (Tag leeren, kopieren, einfügen, Soll,
+// Notiz, Rückgängig), die Antwort auf unsinnige Eingaben und das Verhalten
 // unter gleichzeitigen Zugriffen.
 
-// roh schickt eine Anfrage durch den Router und gibt den Recorder zurueck -
+// roh schickt eine Anfrage durch den Router und gibt den Recorder zurück -
 // anders als call() ohne Anspruch darauf, dass die Antwort 200 und JSON ist.
 func roh(a *Server, method, path, body string) *httptest.ResponseRecorder {
 	var r *http.Request
@@ -30,7 +30,7 @@ func roh(a *Server, method, path, body string) *httptest.ResponseRecorder {
 	return w
 }
 
-// mustJSON baut einen JSON-Koerper aus Go-Werten - fuer Eingaben, die sich
+// mustJSON baut einen JSON-Körper aus Go-Werten - für Eingaben, die sich
 // nicht gefahrlos als Zeichenkette zusammenkleben lassen.
 func mustJSON(v any) string {
 	b, err := json.Marshal(v)
@@ -46,7 +46,7 @@ func tagInhalt(t *testing.T, a *Server, datum, schicht string) []string {
 	return entered(t, a, datum, schicht)
 }
 
-// ── Tag leeren, kopieren, einfuegen ───────────────────────────────────────────
+// ── Tag leeren, kopieren, einfügen ───────────────────────────────────────────
 
 func TestPasteReplaceLeertDenTagVollstaendig(t *testing.T) {
 	a := newTestApp(t)
@@ -56,7 +56,7 @@ func TestPasteReplaceLeertDenTagVollstaendig(t *testing.T) {
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-09-01"],"schicht":"rufbereitschaft","name":"Bauer","action":"add"}`)
 
-	// Genau das schickt "Tag leeren" aus dem Tagesmenue.
+	// Genau das schickt "Tag leeren" aus dem Tagesmenü.
 	call(t, a, http.MethodPost, "/api/paste",
 		`{"slot":{"frueh":[],"normal":[],"spaet":[],"rufbereitschaft":[]},"dates":["2026-09-01"],"mode":"replace"}`)
 
@@ -92,7 +92,7 @@ func TestPasteMergeLaesstBestehendesStehen(t *testing.T) {
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-09-01"],"schicht":"frueh","name":"Bauer","action":"add"}`)
 
-	// Ohne "mode" faellt der Handler auf merge zurueck.
+	// Ohne "mode" fällt der Handler auf merge zurück.
 	call(t, a, http.MethodPost, "/api/paste",
 		`{"slot":{"frueh":["Wolf"]},"dates":["2026-09-01"]}`)
 
@@ -137,8 +137,8 @@ func TestSollWirdGespeichertUndNullBleibtNull(t *testing.T) {
 	if soll["frueh"] != 2.0 {
 		t.Fatalf("frueh: %v", soll["frueh"])
 	}
-	// Der Normaldienst steht ueblicherweise auf 0. Kaeme hier 1 zurueck,
-	// zaehlte die Oberflaeche jeden Tag als unterbesetzt.
+	// Der Normaldienst steht üblicherweise auf 0. Käme hier 1 zurück,
+	// zählte die Oberfläche jeden Tag als unterbesetzt.
 	if soll["normal"] != 0.0 {
 		t.Fatalf("normal haette 0 bleiben muessen, ist: %v", soll["normal"])
 	}
@@ -171,7 +171,7 @@ func TestNotizSchreibenAendernLeeren(t *testing.T) {
 	}
 }
 
-// ── Rueckgaengig / Wiederholen ────────────────────────────────────────────────
+// ── Rückgängig / Wiederholen ────────────────────────────────────────────────
 
 func TestSnapshotSetztDenGanzenPlanZurueck(t *testing.T) {
 	a := newTestApp(t)
@@ -179,7 +179,7 @@ func TestSnapshotSetztDenGanzenPlanZurueck(t *testing.T) {
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-09-01","2026-09-02"],"schicht":"frueh","name":"Bauer","action":"add"}`)
 
-	// So sieht der Undo-Sprung aus: die Oberflaeche schickt den alten Stand.
+	// So sieht der Undo-Sprung aus: die Oberfläche schickt den alten Stand.
 	call(t, a, http.MethodPost, "/api/snapshot",
 		`{"schichten":{"2026-09-01":{"frueh":["Bauer"],"normal":[],"spaet":[],"rufbereitschaft":[]}}}`)
 
@@ -197,8 +197,8 @@ func TestSnapshotOhneDatenAendertNichts(t *testing.T) {
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-09-01"],"schicht":"frueh","name":"Bauer","action":"add"}`)
 
-	// null statt einer Karte: der Handler bestaetigt, ruehrt aber nichts an -
-	// sonst loeschte ein leerer Undo-Stapel den ganzen Plan.
+	// null statt einer Karte: der Handler bestätigt, rührt aber nichts an -
+	// sonst löschte ein leerer Undo-Stapel den ganzen Plan.
 	call(t, a, http.MethodPost, "/api/snapshot", `{"schichten":null}`)
 
 	if got := tagInhalt(t, a, "2026-09-01", "frueh"); len(got) != 1 {
@@ -245,10 +245,10 @@ func TestUnbekannteWegeUndFalscheMethodenGeben404(t *testing.T) {
 
 func TestLesendeWegeAntwortenAufJedeMethode(t *testing.T) {
 	a := newTestApp(t)
-	// Festgehalten, wie es ist: /api/data, /api/history und die uebrigen
-	// Lesewege pruefen die Methode nicht, ein POST liest also genauso.
+	// Festgehalten, wie es ist: /api/data, /api/history und die übrigen
+	// Lesewege prüfen die Methode nicht, ein POST liest also genauso.
 	// Harmlos, weil die Handler nichts schreiben - aber es ist Absicht der
-	// Routing-Tabelle, keine Nachlaessigkeit dieses Tests.
+	// Routing-Tabelle, keine Nachlässigkeit dieses Tests.
 	for _, pfad := range []string{"/api/data", "/api/history", "/api/datadir", "/api/holiday_coverage"} {
 		for _, methode := range []string{http.MethodGet, http.MethodPost} {
 			w := roh(a, methode, pfad, "")
@@ -270,7 +270,7 @@ func TestWurzelLiefertDieOberflaeche(t *testing.T) {
 			t.Fatalf("%s: Content-Type %q", pfad, ct)
 		}
 		// Der Regelkern muss mitgeliefert werden - ohne ihn startet die
-		// Oberflaeche nicht, und tests/regelkern.test.mjs findet ihn nicht.
+		// Oberfläche nicht, und tests/regelkern.test.mjs findet ihn nicht.
 		if !strings.Contains(w.Body.String(), `<script id="regelkern">`) {
 			t.Fatalf("%s: der Regelkern fehlt in der ausgelieferten Seite", pfad)
 		}
@@ -323,7 +323,7 @@ func TestGleichzeitigeEintraegeAufDenselbenTag(t *testing.T) {
 	}
 
 	// Alle tragen sich gleichzeitig in dieselbe Schicht desselben Tages ein.
-	// Der Mutex in ServeHTTP muss das serialisieren; sonst gehen Eintraege
+	// Der Mutex in ServeHTTP muss das serialisieren; sonst gehen Einträge
 	// verloren oder die Transaktionen kollidieren.
 	var wg sync.WaitGroup
 	fehler := make(chan string, anzahl)

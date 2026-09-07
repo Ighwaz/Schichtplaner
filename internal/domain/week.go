@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-// KWNames reads a KW entry, which is either a single name or a list of names.
+// KWNames liest einen Wocheneintrag aus. Er hält entweder einen Namen oder
+// eine Liste von Namen; alles andere wird übergangen.
 func KWNames(raw any) []string {
 	switch v := raw.(type) {
 	case string:
@@ -22,7 +23,8 @@ func KWNames(raw any) []string {
 	return nil
 }
 
-// ISOWeekKey formats a date as the KW key used by the plan, e.g. 2026-W12.
+// ISOWeekKey bildet den Wochenschlüssel eines Tages, wie ihn der Plan benutzt:
+// etwa 2026-W12.
 func ISOWeekKey(t time.Time) string {
 	year, week := t.ISOWeek()
 	return fmt.Sprintf("%d-W%02d", year, week)

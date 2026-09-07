@@ -28,8 +28,9 @@ func (srv *Server) handleSaveRufKW(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	// The frontend posts {"ruf_kw": {"2026-W12": [...]}} - store the inner map,
-	// otherwise the KW keys sit one level too deep and apply/reload lose them.
+	// Die Oberfläche schickt {"ruf_kw": {"2026-W12": [...]}} - abgelegt wird die
+	// innere Karte, sonst liegen die Wochenschlüssel eine Ebene zu tief und
+	// Übertragen wie Neuladen finden sie nicht mehr.
 	plan := domain.UnwrapRufKW(body)
 	if srv.write(w, func(s *store.Store) error { return s.SaveRufKW(r.Context(), plan) }) {
 		writeJSON(w, map[string]bool{"ok": true})

@@ -56,7 +56,7 @@ func (srv *Server) handleAddCustomHoliday(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// handleBulkCustomHolidays creates a whole list of holidays at once.
+// handleBulkCustomHolidays legt eine ganze Liste eigener Feiertage an.
 func (srv *Server) handleBulkCustomHolidays(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Feiertage []domain.CustomHoliday `json:"feiertage"`

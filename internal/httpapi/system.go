@@ -1,4 +1,4 @@
-// Alles, was nicht am Plan haengt: Rueckgaengig-Sprung, Aenderungsverlauf,
+// Alles, was nicht am Plan hängt: Rückgängig-Sprung, Aenderungsverlauf,
 // Datenordner und die Sicherung.
 package httpapi
 
@@ -52,8 +52,9 @@ func (srv *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 
 // ── /api/holiday_coverage ─────────────────────────────────────────────────────
 
-// handleHolidayCoverage reports for which years Holi and Diwali are tabulated,
-// so the UI can point out that they have to be added by hand beyond that.
+// handleHolidayCoverage nennt die Jahre, für die Holi und Diwali tabelliert
+// sind - darüber hinaus weist die Oberfläche darauf hin, dass man sie von Hand
+// nachtragen muss.
 func (srv *Server) handleHolidayCoverage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]int{
 		"in_movable_from": domain.MovableINFirstYear,
@@ -99,7 +100,7 @@ func (srv *Server) handleSetDatadir(w http.ResponseWriter, r *http.Request) {
 	srv.useFolder(r.Context(), w, body.Folder)
 }
 
-// useFolder wechselt den Datenordner und merkt ihn sich fuer den naechsten
+// useFolder wechselt den Datenordner und merkt ihn sich für den nächsten
 // Start.
 func (srv *Server) useFolder(ctx context.Context, w http.ResponseWriter, folder string) {
 	if err := srv.UseFolder(ctx, folder); err != nil {

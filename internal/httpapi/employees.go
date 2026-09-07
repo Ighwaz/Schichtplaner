@@ -1,5 +1,5 @@
-// Mitarbeiter: anlegen, umbenennen, loeschen, wiederherstellen, Farbe und
-// Praeferenzen - und der Gesamtabzug des Plans.
+// Mitarbeiter: anlegen, umbenennen, löschen, wiederherstellen, Farbe und
+// Präferenzen - und der Gesamtabzug des Plans.
 package httpapi
 
 import (
@@ -20,7 +20,8 @@ func (srv *Server) handleGetData(w http.ResponseWriter, r *http.Request) {
 
 // ── /api/mitarbeiter ─────────────────────────────────────────────────────────
 
-// respondEmployees answers with the current employee list plus optional extras.
+// respondEmployees antwortet mit der Mitarbeiterliste und, falls angegeben,
+// zusätzlichen Feldern.
 func (srv *Server) respondEmployees(ctx context.Context, w http.ResponseWriter, extra map[string]any) {
 	s, ok := srv.requireStore(w)
 	if !ok {
@@ -81,7 +82,7 @@ func (srv *Server) handleAddMitarbeiter(w http.ResponseWriter, r *http.Request) 
 	srv.respondEmployees(r.Context(), w, nil)
 }
 
-// handleBulkMitarbeiter creates a whole list of employees at once.
+// handleBulkMitarbeiter legt eine ganze Liste auf einmal an.
 func (srv *Server) handleBulkMitarbeiter(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Mitarbeiter []struct {
@@ -174,8 +175,9 @@ func (srv *Server) handleDeleteMitarbeiter(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	// The backup lets the frontend offer a restore when the name is re-added -
-	// including team, colour and icon, not just the shift entries.
+	// Die Sicherung erlaubt der Oberfläche, beim erneuten Anlegen desselben
+	// Namens ein Wiederherstellen anzubieten - samt Team, Farbe und Symbol,
+	// nicht nur den Schichteinträgen.
 	gone, backup, err := s.DeleteEmployee(r.Context(), name)
 	if err != nil {
 		fail(w, err)

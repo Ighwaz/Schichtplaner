@@ -28,12 +28,13 @@ func readJSON(r *http.Request, v any) error {
 	return nil
 }
 
-// fail reports a problem to the frontend, which shows it as a toast.
+// fail meldet ein Problem an die Oberfläche, die es als Hinweis einblendet.
 func fail(w http.ResponseWriter, err error) {
 	writeJSON(w, map[string]string{"error": err.Error()})
 }
 
-// requireStore returns the open data store, or reports that no folder is set.
+// requireStore liefert die offene Ablage - oder meldet, dass kein Datenordner
+// gewählt ist.
 func (srv *Server) requireStore(w http.ResponseWriter) (*store.Store, bool) {
 	if srv.store == nil {
 		writeJSON(w, map[string]string{"error": "Kein Datenordner gewählt"})
@@ -42,7 +43,7 @@ func (srv *Server) requireStore(w http.ResponseWriter) (*store.Store, bool) {
 	return srv.store, true
 }
 
-// data loads the whole plan, or reports why it could not be read.
+// data lädt den ganzen Plan - oder meldet, warum das nicht ging.
 func (srv *Server) data(ctx context.Context, w http.ResponseWriter) (domain.AppData, bool) {
 	s, ok := srv.requireStore(w)
 	if !ok {
@@ -56,7 +57,8 @@ func (srv *Server) data(ctx context.Context, w http.ResponseWriter) (domain.AppD
 	return d, true
 }
 
-// write runs one store operation and reports a failure instead of swallowing it.
+// write führt einen Schreibvorgang aus und meldet einen Fehlschlag, statt ihn
+// zu verschlucken.
 func (srv *Server) write(w http.ResponseWriter, fn func(*store.Store) error) bool {
 	s, ok := srv.requireStore(w)
 	if !ok {
@@ -69,8 +71,8 @@ func (srv *Server) write(w http.ResponseWriter, fn func(*store.Store) error) boo
 	return true
 }
 
-// uploadedFile returns the "file" part of a multipart upload, or reports the
-// error to the client and returns false.
+// uploadedFile liefert den Teil "file" eines Uploads - oder meldet den Fehler
+// an die Oberfläche und gibt false zurück.
 func uploadedFile(w http.ResponseWriter, r *http.Request, maxMemory int64) (multipart.File, bool) {
 	if err := r.ParseMultipartForm(maxMemory); err != nil {
 		writeJSON(w, map[string]string{"error": "Ungültiger Upload"})

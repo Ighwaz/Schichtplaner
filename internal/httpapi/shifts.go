@@ -1,4 +1,4 @@
-// Schichten: eintragen, austragen, Soll, Notizen und das Einfuegen ganzer
+// Schichten: eintragen, austragen, Soll, Notizen und das Einfügen ganzer
 // Tage. Die Regeln dahinter stehen in domain, hier steht nur der Weg dorthin.
 package httpapi
 
@@ -20,8 +20,8 @@ func (srv *Server) handleSchicht(w http.ResponseWriter, r *http.Request) {
 		Name    string   `json:"name"`
 		Action  string   `json:"action"`
 		Force   bool     `json:"force"`
-		// Replace is set when the user confirmed the "Schicht ersetzen?" dialog;
-		// only then is an existing work shift of that day given up.
+		// Replace steht, wenn der Anwender die Rückfrage "Schicht ersetzen?"
+		// bestätigt hat; nur dann gibt er eine bestehende Arbeitsschicht ab.
 		Replace bool `json:"replace"`
 	}
 	if err := readJSON(r, &body); err != nil {
@@ -71,8 +71,8 @@ func (srv *Server) handleSchicht(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Die Oberflaeche erwartet je Tag entweder den neuen Stand oder die
-	// Rueckfrage - diese Form ist Teil der API und bleibt unveraendert.
+	// Die Oberfläche erwartet je Tag entweder den neuen Stand oder die
+	// Rückfrage - diese Form ist Teil der API und bleibt unverändert.
 	results := map[string]any{}
 	for date, tag := range plan.Days {
 		switch tag.Ask {
@@ -98,7 +98,8 @@ func (srv *Server) handleSchicht(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// holidaysForDates loads the holidays of every year the given dates touch.
+// holidaysForDates lädt die Feiertage aller Jahre, die die genannten Tage
+// berühren.
 func (srv *Server) holidaysForDates(ctx context.Context, s *store.Store, dates []string) (map[string]domain.Holiday, error) {
 	customs, err := s.CustomHolidays(ctx)
 	if err != nil {

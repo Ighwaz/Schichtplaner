@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// Der Plan aelterer Fassungen lag als JSON-Datei im Datenordner. Beim ersten
-// Oeffnen wandert er in die Datenbank - danach nie wieder, sonst ueberschriebe
+// Der Plan älterer Fassungen lag als JSON-Datei im Datenordner. Beim ersten
+// Oeffnen wandert er in die Datenbank - danach nie wieder, sonst überschriebe
 // ein Neustart neuere Aenderungen mit dem alten Stand.
-func TestLegacyJSONIsImportedOnce(t *testing.T) {
+func TestAlterPlanWirdGenauEinmalUebernommen(t *testing.T) {
 	folder := t.TempDir()
 	legacy := `{"mitarbeiter":[{"name":"Alt","team":"DE","color":"#fff","prefs":{}}],
 		"schichten":{"2026-03-02":{"frueh":["Alt"]}},"notizen":{"2026-03-02":"Notiz"},
@@ -33,7 +33,8 @@ func TestLegacyJSONIsImportedOnce(t *testing.T) {
 		t.Fatalf("notes/soll not imported: %#v %#v", d.Notizen, d.Soll)
 	}
 
-	// A second start must not import the JSON again over newer edits.
+	// Ein zweiter Start darf die JSON-Datei nicht erneut über neuere
+	// Änderungen legen.
 	if _, _, err := s.DeleteEmployee(t.Context(), "Alt"); err != nil {
 		t.Fatal(err)
 	}

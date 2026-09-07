@@ -14,7 +14,8 @@ func SlotField(s *DaySlot, shift string) *[]string {
 	return nil
 }
 
-// SlotFor returns the day's slot, or an empty one if the day has no entries yet.
+// SlotFor liefert den Tag aus dem Plan - oder einen leeren, wenn dort noch
+// nichts steht.
 func SlotFor(d *AppData, date string) DaySlot {
 	if slot, ok := d.Schichten[date]; ok {
 		return slot
@@ -22,7 +23,7 @@ func SlotFor(d *AppData, date string) DaySlot {
 	return EmptySlot()
 }
 
-// ForEachShift calls fn for every shift list of a slot.
+// ForEachShift ruft fn für jede Schichtliste eines Tages auf.
 func ForEachShift(slot *DaySlot, fn func(shift string, names *[]string)) {
 	for _, shift := range allShifts {
 		if f := SlotField(slot, shift); f != nil {
@@ -31,8 +32,9 @@ func ForEachShift(slot *DaySlot, fn func(shift string, names *[]string)) {
 	}
 }
 
-// AddToSlot adds name to one shift of a slot and reports whether that changed
-// anything - an unknown shift or a name that is already there changes nothing.
+// AddToSlot trägt name in eine Schicht des Tages ein und sagt, ob sich dadurch
+// etwas geändert hat - eine unbekannte Schicht oder ein Name, der schon dort
+// steht, ändern nichts.
 func AddToSlot(slot *DaySlot, shift, name string) bool {
 	f := SlotField(slot, shift)
 	if f == nil || contains(*f, name) {
@@ -42,7 +44,7 @@ func AddToSlot(slot *DaySlot, shift, name string) bool {
 	return true
 }
 
-// RemoveFromSlot removes name from one shift and reports whether it was there.
+// RemoveFromSlot nimmt name aus einer Schicht heraus und sagt, ob er dort stand.
 func RemoveFromSlot(slot *DaySlot, shift, name string) bool {
 	f := SlotField(slot, shift)
 	if f == nil || !contains(*f, name) {
@@ -52,11 +54,11 @@ func RemoveFromSlot(slot *DaySlot, shift, name string) bool {
 	return true
 }
 
-// blockingShifts lists the work shifts name already holds that day and that
-// cannot be combined with shift. Rufbereitschaft runs alongside everything.
+// blockingShifts nennt die Arbeitsschichten, in denen name an diesem Tag schon
+// steht und die sich nicht mit shift vertragen. Rufbereitschaft läuft neben
+// allem her.
 func blockingShifts(slot *DaySlot, shift, name string) []string {
-	// Rufbereitschaft laeuft neben jeder Arbeitsschicht her und wird deshalb
-	// weder blockiert noch blockiert sie selbst.
+	// Sie wird deshalb weder blockiert, noch blockiert sie selbst.
 	if !workShifts[shift] || shift == "rufbereitschaft" {
 		return nil
 	}
@@ -91,9 +93,9 @@ func remove(arr []string, s string) []string {
 	return out
 }
 
-// workShifts sind die Schichten, die miteinander kollidieren koennen.
-// "normal" ist der Tagdienst mit Gleitzeit - er liegt zwischen Frueh und
-// Spaet und schliesst beide aus.
+// workShifts sind die Schichten, die einander ausschließen. "normal" ist der
+// Tagdienst mit Gleitzeit - er liegt zwischen Früh und Spät und schließt beide
+// aus.
 var workShifts = map[string]bool{
 	"frueh": true, "normal": true, "spaet": true, "rufbereitschaft": true,
 }
