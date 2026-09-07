@@ -56,19 +56,22 @@ wails build
 
 ```
 schichtplaner/
-├── main.go            # Einstiegspunkt, Wails-Setup
-├── app.go             # HTTP-Router, Startup, Datenordner
-├── data.go            # Datenstrukturen, Slot-Helfer
-├── store.go           # SQLite-Speicher, Migration, Änderungsprotokoll
-├── handlers.go        # API-Handler
-├── holidays.go        # Feiertage DE (BW) + IN
-├── ics.go             # ICS Export/Import
-├── handlers_test.go   # Tests
+├── main.go            # Verdrahtung: Oberfläche einbetten, Server bauen, Fenster öffnen
+├── internal/
+│   ├── domain/        # Begriffe und Regeln - ohne Datenbank, ohne HTTP
+│   ├── store/         # SQLite: Schema, Transaktionen, Änderungsverlauf
+│   ├── httpapi/       # Anfragen entgegennehmen, Antworten schreiben
+│   └── config/        # merkt den zuletzt benutzten Datenordner
+├── tests/             # Tests der Oberfläche (Node + jsdom)
 ├── go.mod
 ├── wails.json
 └── frontend/
     └── index.html     # Gesamtes UI (HTML/CSS/JS)
 ```
+
+`main.go` liegt im Wurzelverzeichnis, weil `wails build` das Modul im aktuellen
+Verzeichnis übersetzt und `frontend/` daneben erwartet. Näheres im Abschnitt
+„Aufbau" der [README](README.md).
 
 ## Vorteile gegenüber Python/PyInstaller
 

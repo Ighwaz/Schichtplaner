@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"encoding/json"
@@ -6,25 +6,38 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"schichtplaner/internal/domain"
+	"schichtplaner/internal/store"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
-	"time"
 )
 
-// newTestApp returns an App backed by a throwaway database.
-func newTestApp(t *testing.T) *App {
+// testSeite ist die echte Oberfläche aus dem Projekt. Der Server bekommt sie
+// im Betrieb eingebettet; hier wird sie gelesen, damit auch der Weg "/" das
+// prüft, was wirklich ausgeliefert wird.
+var testSeite = sync.OnceValue(func() []byte {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "frontend", "index.html"))
+	if err != nil {
+		panic("frontend/index.html nicht lesbar: " + err.Error())
+	}
+	return raw
+})
+
+// newTestApp liefert einen Server mit einer Wegwerf-Datenbank.
+func newTestApp(t *testing.T) *Server {
 	t.Helper()
-	a := &App{}
-	if err := a.setDataFolder(t.TempDir()); err != nil {
+	a := New(testSeite(), nil)
+	if err := a.setDataFolder(t.Context(), t.TempDir()); err != nil {
 		t.Fatalf("Store öffnen: %v", err)
 	}
 	t.Cleanup(func() { a.store.Close() })
 	return a
 }
 
-// call runs one request through the router and decodes the JSON response.
-func call(t *testing.T, a *App, method, path, body string) map[string]interface{} {
+// call schickt eine Anfrage durch den Router und liest die JSON-Antwort.
+func call(t *testing.T, a *Server, method, path, body string) map[string]any {
 	t.Helper()
 	var r *http.Request
 	if body == "" {
@@ -38,7 +51,7 @@ func call(t *testing.T, a *App, method, path, body string) map[string]interface{
 	if w.Code != http.StatusOK {
 		t.Fatalf("%s %s: status %d, body %s", method, path, w.Code, w.Body.String())
 	}
-	var out map[string]interface{}
+	var out map[string]any
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatalf("%s %s: bad JSON %q: %v", method, path, w.Body.String(), err)
 	}
@@ -48,14 +61,14 @@ func call(t *testing.T, a *App, method, path, body string) map[string]interface{
 	return out
 }
 
-// entered returns the names on one date and shift. A date without any entries
-// is simply absent from the plan, which counts as empty.
-func entered(t *testing.T, a *App, date, shift string) []string {
+// entered liefert die Namen an einem Tag in einer Schicht. Ein Tag ohne
+// Einträge fehlt im Plan schlicht - das zählt als leer.
+func entered(t *testing.T, a *Server, date, shift string) []string {
 	t.Helper()
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	days, _ := data["schichten"].(map[string]interface{})
-	day, _ := days[date].(map[string]interface{})
-	list, _ := day[shift].([]interface{})
+	days, _ := data["schichten"].(map[string]any)
+	day, _ := days[date].(map[string]any)
+	list, _ := day[shift].([]any)
 	out := []string{}
 	for _, v := range list {
 		out = append(out, v.(string))
@@ -63,22 +76,22 @@ func entered(t *testing.T, a *App, date, shift string) []string {
 	return out
 }
 
-// result picks one date out of a /api/schicht response.
-func result(t *testing.T, res map[string]interface{}, date string) map[string]interface{} {
+// result greift einen Tag aus einer Antwort von /api/schicht heraus.
+func result(t *testing.T, res map[string]any, date string) map[string]any {
 	t.Helper()
-	day, ok := res["results"].(map[string]interface{})[date].(map[string]interface{})
+	day, ok := res["results"].(map[string]any)[date].(map[string]any)
 	if !ok {
 		t.Fatalf("kein Ergebnis für %s: %#v", date, res["results"])
 	}
 	return day
 }
 
-func addEmployee(t *testing.T, a *App, name, team string) {
+func addEmployee(t *testing.T, a *Server, name, team string) {
 	t.Helper()
 	call(t, a, http.MethodPost, "/api/mitarbeiter", `{"name":"`+name+`","team":"`+team+`"}`)
 }
 
-func addShift(t *testing.T, a *App, date, shift, name string) {
+func addShift(t *testing.T, a *Server, date, shift, name string) {
 	t.Helper()
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["`+date+`"],"schicht":"`+shift+`","name":"`+name+`","action":"add"}`)
@@ -86,14 +99,14 @@ func addShift(t *testing.T, a *App, date, shift, name string) {
 
 // ── Frontend contracts ────────────────────────────────────────────────────────
 
-func TestRufKWRoundTrip(t *testing.T) {
+func TestRufKWPlanUeberlebtDenRundlauf(t *testing.T) {
 	a := newTestApp(t)
 
-	// The frontend posts the plan wrapped in a "ruf_kw" envelope.
+	// Die Oberfläche schickt den Plan in einer Hülle namens "ruf_kw".
 	call(t, a, http.MethodPost, "/api/ruf_kw", `{"ruf_kw":{"2026-W02":["Anna"]}}`)
 
 	got := call(t, a, http.MethodGet, "/api/data", "")
-	plan, ok := got["ruf_kw"].(map[string]interface{})
+	plan, ok := got["ruf_kw"].(map[string]any)
 	if !ok {
 		t.Fatalf("ruf_kw missing or wrong type: %#v", got["ruf_kw"])
 	}
@@ -101,35 +114,36 @@ func TestRufKWRoundTrip(t *testing.T) {
 		t.Fatalf("KW key lost, plan is %#v", plan)
 	}
 
-	// Applying the plan must reach the individual days of that week.
+	// Das Übertragen muss bei den einzelnen Tagen dieser Woche ankommen.
 	res := call(t, a, http.MethodPost, "/api/ruf_kw/apply", `{"year":2026,"month":1}`)
 	if res["applied"].(float64) != 7 {
 		t.Fatalf("expected 7 applied days, got %v", res["applied"])
 	}
 }
 
-func TestDeleteAndRestoreEmployee(t *testing.T) {
+func TestMitarbeiterLoeschenUndWiederherstellen(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	addShift(t, a, "2026-04-01", "frueh", "Anna")
 
 	del := call(t, a, http.MethodDelete, "/api/mitarbeiter/Anna", "")
-	backup, ok := del["backup"].(map[string]interface{})
+	backup, ok := del["backup"].(map[string]any)
 	if !ok || backup["2026-04-01"] == nil {
 		t.Fatalf("delete did not return a usable backup: %#v", del["backup"])
 	}
-	// The shift entry must be gone from the stored data, not just from the UI.
+	// Der Eintrag muss aus den Daten verschwunden sein, nicht nur aus dem Bild.
 	if got := entered(t, a, "2026-04-01", "frueh"); len(got) != 0 {
 		t.Fatalf("deleted employee still in shift: %#v", got)
 	}
 
-	// Re-adding plus restore brings the entry back and keeps the employee list.
+	// Neu anlegen und wiederherstellen bringt den Eintrag zurück, ohne die
+	// Mitarbeiterliste zu verdoppeln.
 	addEmployee(t, a, "Anna", "DE")
 	call(t, a, http.MethodPost, "/api/mitarbeiter/restore",
 		`{"name":"Anna","entries":{"2026-04-01":{"frueh":true}}}`)
 
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	if n := len(data["mitarbeiter"].([]interface{})); n != 1 {
+	if n := len(data["mitarbeiter"].([]any)); n != 1 {
 		t.Fatalf("restore clobbered the employee list, %d left", n)
 	}
 	if got := entered(t, a, "2026-04-01", "frueh"); len(got) != 1 {
@@ -137,7 +151,7 @@ func TestDeleteAndRestoreEmployee(t *testing.T) {
 	}
 }
 
-func TestRenameEmployeeUpdatesReferences(t *testing.T) {
+func TestUmbenennenZiehtAlleEintraegeMit(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	addShift(t, a, "2026-04-01", "frueh", "Anna")
@@ -150,24 +164,24 @@ func TestRenameEmployeeUpdatesReferences(t *testing.T) {
 		t.Errorf("shift not renamed: %#v", got)
 	}
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	tmpl := data["templates"].(map[string]interface{})["Standard"].(map[string]interface{})
+	tmpl := data["templates"].(map[string]any)["Standard"].(map[string]any)
 	if _, ok := tmpl["Anna Neu"]; !ok {
 		t.Errorf("template not renamed: %#v", tmpl)
 	}
-	kw := data["ruf_kw"].(map[string]interface{})["2026-W02"].([]interface{})
+	kw := data["ruf_kw"].(map[string]any)["2026-W02"].([]any)
 	if kw[0] != "Anna Neu" {
 		t.Errorf("KW plan not renamed: %#v", kw)
 	}
 }
 
-func TestSchichtIgnoresMalformedDates(t *testing.T) {
+func TestUnbrauchbareDatumsangabenWerdenUebergangen(t *testing.T) {
 	a := newTestApp(t)
-	// A short date must not panic the handler.
+	// Ein zu kurzes Datum darf den Handler nicht umwerfen.
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["","2026-04-01"],"schicht":"frueh","name":"Anna","action":"add"}`)
 }
 
-func TestICSRoundTrip(t *testing.T) {
+func TestICSUeberlebtExportUndImport(t *testing.T) {
 	a := newTestApp(t)
 	addShift(t, a, "2026-04-01", "spaet", "Anna")
 
@@ -181,26 +195,26 @@ func TestICSRoundTrip(t *testing.T) {
 
 // ── Conflict rules ────────────────────────────────────────────────────────────
 
-func TestToggleUsesTheSameConflictRules(t *testing.T) {
+func TestUmschaltenFolgtDenselbenKonfliktregeln(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 
-	// 1. Mai 2026 is a public holiday in DE, so a toggle must ask first -
-	// exactly like an add does.
+	// Der 1. Mai 2026 ist in DE gesetzlicher Feiertag, also muss auch das
+	// Umschalten vorher fragen - genau wie das Eintragen.
 	res := call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-05-01"],"schicht":"frueh","name":"Anna","action":"toggle"}`)
 	if got := result(t, res, "2026-05-01")["error"]; got != "holiday_conflict" {
 		t.Fatalf("toggle skipped the holiday check: %v", got)
 	}
 
-	// 2. Forced toggle enters the shift and reports the warning.
+	// 2. Bestätigt trägt es ein und meldet die Warnung.
 	res = call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-05-01"],"schicht":"frueh","name":"Anna","action":"toggle","force":true}`)
-	if len(res["hol_warnings"].([]interface{})) != 1 {
+	if len(res["hol_warnings"].([]any)) != 1 {
 		t.Fatalf("expected a holiday warning, got %#v", res["hol_warnings"])
 	}
 
-	// 3. Toggling again removes it.
+	// 3. Nochmal umschalten trägt wieder aus.
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-05-01"],"schicht":"frueh","name":"Anna","action":"toggle","force":true}`)
 	if got := entered(t, a, "2026-05-01", "frueh"); len(got) != 0 {
@@ -208,7 +222,7 @@ func TestToggleUsesTheSameConflictRules(t *testing.T) {
 	}
 }
 
-func TestNeedsConfirmBeforeReplacingAWorkShift(t *testing.T) {
+func TestZweiteArbeitsschichtFragtVorherNach(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	addShift(t, a, "2026-04-02", "frueh", "Anna")
@@ -219,19 +233,19 @@ func TestNeedsConfirmBeforeReplacingAWorkShift(t *testing.T) {
 		t.Fatalf("expected needs_confirm, got %v", got)
 	}
 
-	// Rufbereitschaft is never reported as the blocking shift: it may run
-	// alongside a work shift and survives a replacement.
+	// Rufbereitschaft wird nie als blockierend gemeldet: sie läuft neben einer
+	// Arbeitsschicht her und übersteht auch ein Ersetzen.
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-04-02"],"schicht":"rufbereitschaft","name":"Anna","action":"add","force":true}`)
 	res = call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-04-02"],"schicht":"spaet","name":"Anna","action":"add"}`)
-	blocking := result(t, res, "2026-04-02")["blocking"].([]interface{})
+	blocking := result(t, res, "2026-04-02")["blocking"].([]any)
 	if len(blocking) != 1 || blocking[0] != "frueh" {
 		t.Fatalf("expected only frueh to block, got %#v", blocking)
 	}
 }
 
-func TestConfirmedReplaceGivesUpTheOldShift(t *testing.T) {
+func TestBestaetigtesErsetzenGibtDieAlteSchichtAb(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	addShift(t, a, "2026-04-02", "frueh", "Anna")
@@ -239,7 +253,7 @@ func TestConfirmedReplaceGivesUpTheOldShift(t *testing.T) {
 		`{"dates":["2026-04-02"],"schicht":"rufbereitschaft","name":"Anna","action":"add","force":true}`)
 
 	// The user confirmed "Schicht ersetzen?", so Früh gives way to Spät -
-	// while Rufbereitschaft stays, as the dialog promises.
+	// während die Rufbereitschaft bleibt, wie die Rückfrage verspricht.
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-04-02"],"schicht":"spaet","name":"Anna","action":"add","force":true,"replace":true}`)
 
@@ -254,14 +268,16 @@ func TestConfirmedReplaceGivesUpTheOldShift(t *testing.T) {
 	}
 }
 
-func TestForcedHolidayEntryKeepsOtherShifts(t *testing.T) {
+func TestEintragAmFeiertagLaesstAndereSchichtenStehen(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
-	// 1. Mai is a DE holiday, so the first entry needs the holiday confirmation.
+	// Der 1. Mai ist ein DE-Feiertag, der erste Eintrag braucht also die
+	// Feiertagsbestätigung.
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-05-01"],"schicht":"frueh","name":"Anna","action":"add","force":true}`)
 
-	// Confirming only the holiday dialog must not silently drop another shift.
+	// Wer nur den Feiertag bestätigt, darf damit nicht still eine andere
+	// Schicht verlieren.
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-05-01"],"schicht":"spaet","name":"Anna","action":"add","force":true}`)
 	if got := entered(t, a, "2026-05-01", "frueh"); len(got) != 1 {
@@ -271,50 +287,7 @@ func TestForcedHolidayEntryKeepsOtherShifts(t *testing.T) {
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 
-func TestLegacyJSONIsImportedOnce(t *testing.T) {
-	folder := t.TempDir()
-	legacy := `{"mitarbeiter":[{"name":"Alt","team":"DE","color":"#fff","prefs":{}}],
-		"schichten":{"2026-03-02":{"frueh":["Alt"]}},"notizen":{"2026-03-02":"Notiz"},
-		"soll":{"frueh":2,"spaet":1,"rufbereitschaft":1},"templates":{},"ruf_kw":{}}`
-	if err := os.WriteFile(filepath.Join(folder, dataFileName), []byte(legacy), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	s, err := openStore(folder)
-	if err != nil {
-		t.Fatalf("openStore: %v", err)
-	}
-	d, err := s.Load()
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if len(d.Mitarbeiter) != 1 || d.Mitarbeiter[0].Name != "Alt" {
-		t.Fatalf("employee not imported: %#v", d.Mitarbeiter)
-	}
-	if d.Notizen["2026-03-02"] != "Notiz" || d.Soll.Frueh != 2 {
-		t.Fatalf("notes/soll not imported: %#v %#v", d.Notizen, d.Soll)
-	}
-
-	// A second start must not import the JSON again over newer edits.
-	if _, _, err := s.DeleteEmployee("Alt"); err != nil {
-		t.Fatal(err)
-	}
-	s.Close()
-	s2, err := openStore(folder)
-	if err != nil {
-		t.Fatalf("reopen: %v", err)
-	}
-	defer s2.Close()
-	d, err = s2.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(d.Mitarbeiter) != 0 {
-		t.Fatalf("legacy JSON was imported a second time: %#v", d.Mitarbeiter)
-	}
-}
-
-func TestChangesAreRecordedInHistory(t *testing.T) {
+func TestAenderungenLandenImVerlauf(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	addShift(t, a, "2026-04-01", "frueh", "Anna")
@@ -322,7 +295,7 @@ func TestChangesAreRecordedInHistory(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/api/history", nil)
 	w := httptest.NewRecorder()
 	a.ServeHTTP(w, r)
-	var entries []ChangeEntry
+	var entries []domain.ChangeEntry
 	if err := json.Unmarshal(w.Body.Bytes(), &entries); err != nil {
 		t.Fatalf("history: %v (%s)", err, w.Body.String())
 	}
@@ -334,7 +307,7 @@ func TestChangesAreRecordedInHistory(t *testing.T) {
 	}
 }
 
-func TestBackupExportAndImport(t *testing.T) {
+func TestSicherungSchreibenUndEinlesen(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	addShift(t, a, "2026-04-01", "frueh", "Anna")
@@ -344,7 +317,7 @@ func TestBackupExportAndImport(t *testing.T) {
 	a.ServeHTTP(w, r)
 	backup := w.Body.String()
 
-	// Wiping and re-importing has to restore the same plan.
+	// Leeren und wieder einlesen muss denselben Plan ergeben.
 	call(t, a, http.MethodDelete, "/api/mitarbeiter/Anna", "")
 
 	body, ctype := multipartBody(t, "backup.json", backup)
@@ -358,7 +331,7 @@ func TestBackupExportAndImport(t *testing.T) {
 	}
 }
 
-// multipartBody builds a minimal multipart body with one "file" part.
+// multipartBody baut einen knappen Upload-Körper mit einem Teil "file".
 func multipartBody(t *testing.T, filename, content string) (string, string) {
 	t.Helper()
 	const boundary = "TESTBOUNDARY"
@@ -370,7 +343,7 @@ func multipartBody(t *testing.T, filename, content string) (string, string) {
 
 // ── Feiertage ─────────────────────────────────────────────────────────────────
 
-func TestCustomHolidayAsksLikeAStatutoryOne(t *testing.T) {
+func TestEigenerFeiertagFragtWieEinGesetzlicher(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Ravi", "IN")
 	call(t, a, http.MethodPost, "/api/custom_holidays",
@@ -383,7 +356,7 @@ func TestCustomHolidayAsksLikeAStatutoryOne(t *testing.T) {
 		t.Fatalf("own holiday did not ask: %#v", day)
 	}
 
-	// A holiday of the other team leaves the entry alone.
+	// Ein Feiertag des anderen Teams stört den Eintrag nicht.
 	addEmployee(t, a, "Anna", "DE")
 	res = call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-07-15"],"schicht":"frueh","name":"Anna","action":"add"}`)
@@ -391,7 +364,7 @@ func TestCustomHolidayAsksLikeAStatutoryOne(t *testing.T) {
 		t.Fatalf("holiday of the other team should not block: %v", got)
 	}
 
-	// Confirming enters it anyway.
+	// Bestätigt wird trotzdem eingetragen.
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-07-15"],"schicht":"frueh","name":"Ravi","action":"add","force":true}`)
 	if got := entered(t, a, "2026-07-15", "frueh"); len(got) != 2 {
@@ -399,96 +372,71 @@ func TestCustomHolidayAsksLikeAStatutoryOne(t *testing.T) {
 	}
 }
 
-func TestMovableIndianHolidaysAreTabulated(t *testing.T) {
+func TestBeweglicheIndischeFeiertageStehenInDerTabelle(t *testing.T) {
 	a := newTestApp(t)
 
-	// Inside the tabulated range Holi and Diwali are known...
+	// Innerhalb des tabellierten Zeitraums sind Holi und Diwali bekannt ...
 	hols := call(t, a, http.MethodGet, "/api/holidays/2029", "")
-	if h, ok := hols["2029-03-01"].(map[string]interface{}); !ok || h["name"] != "Holi" {
+	if h, ok := hols["2029-03-01"].(map[string]any); !ok || h["name"] != "Holi" {
 		t.Errorf("Holi 2029 missing: %#v", hols["2029-03-01"])
 	}
-	if h, ok := hols["2029-11-05"].(map[string]interface{}); !ok || h["name"] != "Diwali" {
+	if h, ok := hols["2029-11-05"].(map[string]any); !ok || h["name"] != "Diwali" {
 		t.Errorf("Diwali 2029 missing: %#v", hols["2029-11-05"])
 	}
 
-	// ...beyond it they are absent, and the API says where the table ends so
-	// the UI can ask for them to be entered by hand.
+	// ... darüber hinaus fehlen sie, und die API nennt das Ende der Tabelle,
+	// damit die Oberfläche zum Nachtragen auffordern kann.
 	cover := call(t, a, http.MethodGet, "/api/holiday_coverage", "")
 	last := int(cover["in_movable_to"].(float64))
-	if last != inMovableLastYear {
-		t.Fatalf("coverage %d does not match the table (%d)", last, inMovableLastYear)
+	if last != domain.MovableINLastYear {
+		t.Fatalf("coverage %d does not match the table (%d)", last, domain.MovableINLastYear)
 	}
 	beyond := call(t, a, http.MethodGet, "/api/holidays/"+strconv.Itoa(last+1), "")
 	for date, h := range beyond {
-		name := h.(map[string]interface{})["name"]
+		name := h.(map[string]any)["name"]
 		if name == "Holi" || name == "Diwali" {
 			t.Errorf("unexpected %v on %s beyond the table", name, date)
 		}
 	}
-	// The fixed-date Indian holidays are still there.
+	// Die indischen Feiertage mit festem Datum stehen weiterhin da.
 	if _, ok := beyond[strconv.Itoa(last+1)+"-01-26"]; !ok {
 		t.Error("Republic Day missing beyond the table")
 	}
 }
 
-func TestHoliAndDiwaliTablesCoverTheSameYears(t *testing.T) {
-	for year := inMovableFirstYear; year <= inMovableLastYear; year++ {
-		if _, ok := holiDates[year]; !ok {
-			t.Errorf("Holi %d fehlt", year)
-		}
-		if _, ok := diwaliDates[year]; !ok {
-			t.Errorf("Diwali %d fehlt", year)
-		}
-	}
-	if len(holiDates) != inMovableLastYear-inMovableFirstYear+1 {
-		t.Errorf("Holi-Tabelle hat %d Einträge, erwartet %d",
-			len(holiDates), inMovableLastYear-inMovableFirstYear+1)
-	}
-	// Every tabulated date has to fall in its own year and parse cleanly.
-	for _, table := range []map[int]string{holiDates, diwaliDates} {
-		for year, date := range table {
-			d, err := time.Parse("2006-01-02", date)
-			if err != nil {
-				t.Errorf("%s ist kein gültiges Datum: %v", date, err)
-			} else if d.Year() != year {
-				t.Errorf("%s steht unter Jahr %d", date, year)
-			}
-		}
-	}
-}
-
-func TestFailedFolderSwitchKeepsTheOldOne(t *testing.T) {
+func TestGescheiterterOrdnerwechselLaesstDenAltenStehen(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	good := a.dataFolder
 
-	// A folder whose database path is occupied by a directory cannot be opened.
+	// Ein Ordner, in dem an der Stelle der Datenbank ein Verzeichnis liegt,
+	// lässt sich nicht öffnen.
 	broken := t.TempDir()
-	if err := os.Mkdir(filepath.Join(broken, dbFileName), 0755); err != nil {
+	if err := os.Mkdir(filepath.Join(broken, store.DBFileName), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.setDataFolder(broken); err == nil {
+	if err := a.setDataFolder(t.Context(), broken); err == nil {
 		t.Fatal("expected the broken folder to be refused")
 	}
 
-	// The app has to keep working on the folder it had.
+	// Das Programm muss mit dem Ordner weiterarbeiten, den es hatte.
 	if a.dataFolder != good || a.store == nil {
 		t.Fatalf("folder switch tore down the working store: %q, store=%v", a.dataFolder, a.store != nil)
 	}
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	if n := len(data["mitarbeiter"].([]interface{})); n != 1 {
+	if n := len(data["mitarbeiter"].([]any)); n != 1 {
 		t.Fatalf("data no longer reachable, %d Mitarbeiter", n)
 	}
 }
 
-func TestDeleteReturnsTheEmployeeForRestore(t *testing.T) {
+func TestLoeschenLiefertDenMitarbeiterZurueck(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	call(t, a, http.MethodPut, "/api/mitarbeiter/Anna",
 		`{"name":"Anna","team":"DE","color":"#123456","icon":"🌙"}`)
 
 	del := call(t, a, http.MethodDelete, "/api/mitarbeiter/Anna", "")
-	emp, ok := del["employee"].(map[string]interface{})
+	emp, ok := del["employee"].(map[string]any)
 	if !ok {
 		t.Fatalf("delete did not return the employee: %#v", del["employee"])
 	}
@@ -497,10 +445,10 @@ func TestDeleteReturnsTheEmployeeForRestore(t *testing.T) {
 	}
 }
 
-func TestAutoplanSkipsShiftConflicts(t *testing.T) {
+func TestAutoplanUeberspringtKonflikte(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
-	// 2026-06-01 is a Monday; Anna already works the early shift there.
+	// Der 1.6.2026 ist ein Montag; Anna steht dort schon in der Frühschicht.
 	addShift(t, a, "2026-06-01", "frueh", "Anna")
 	call(t, a, http.MethodPost, "/api/templates", `{"name":"Spaet","template":{"Anna":{"0":"spaet"}}}`)
 
@@ -511,7 +459,7 @@ func TestAutoplanSkipsShiftConflicts(t *testing.T) {
 	if res["planned"].(float64) != 4 {
 		t.Fatalf("expected the other four Mondays to be planned, got %v", res["planned"])
 	}
-	// The existing early shift must be untouched, and no double booking.
+	// Die bestehende Frühschicht bleibt unangetastet, und niemand steht doppelt.
 	if got := entered(t, a, "2026-06-01", "frueh"); len(got) != 1 {
 		t.Errorf("existing shift changed: %#v", got)
 	}
@@ -520,12 +468,13 @@ func TestAutoplanSkipsShiftConflicts(t *testing.T) {
 	}
 }
 
-func TestICSImportHandlesFoldedLines(t *testing.T) {
+func TestICSImportVertraegtUmgebrocheneZeilen(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 
-	// Calendars fold every line past 75 octets; the continuation starts with
-	// a space. An unfolded parser would drop this event.
+	// Kalender brechen jede Zeile jenseits von 75 Oktetten um; die Fortsetzung
+	// beginnt mit einem Leerzeichen. Wer das nicht rückgängig macht, verliert
+	// diesen Termin.
 	ics := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n" +
 		"BEGIN:VEVENT\r\nUID:1@x\r\nDTSTART;TZID=Europe/Berlin:20260908T140000\r\n" +
 		"SUMMARY:Anna – Spät\r\n schicht\r\nEND:VEVENT\r\n" +
@@ -542,7 +491,7 @@ func TestICSImportHandlesFoldedLines(t *testing.T) {
 	}
 }
 
-func TestICSExportFoldsLongLines(t *testing.T) {
+func TestICSExportBrichtLangeZeilenUm(t *testing.T) {
 	a := newTestApp(t)
 	long := "Maximiliane Friederike von Habsburg-Lothringen zu Sonnenfels"
 	addShift(t, a, "2026-04-01", "rufbereitschaft", long)
@@ -557,7 +506,7 @@ func TestICSExportFoldsLongLines(t *testing.T) {
 			t.Fatalf("line longer than 75 octets: %q", line)
 		}
 	}
-	// And it has to survive the round trip through our own importer.
+	// Und es muss den Rundlauf durch den eigenen Import überstehen.
 	b := newTestApp(t)
 	body, ctype := multipartBody(t, "cal.ics", out)
 	r = httptest.NewRequest(http.MethodPost, "/api/import_ics", strings.NewReader(body))
@@ -571,7 +520,7 @@ func TestICSExportFoldsLongLines(t *testing.T) {
 
 // ── Massenanlage ──────────────────────────────────────────────────────────────
 
-func TestBulkEmployees(t *testing.T) {
+func TestMassenanlageVonMitarbeitern(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 
@@ -585,21 +534,21 @@ func TestBulkEmployees(t *testing.T) {
 	if res["angelegt"].(float64) != 2 {
 		t.Fatalf("expected two new employees, got %v", res["angelegt"])
 	}
-	// Anna exists already; the second Ravi and the blank name are dropped before
-	// the store sees them, so only Anna counts as skipped.
+	// Anna gibt es schon; der zweite Ravi und der leere Name fallen weg, bevor
+	// die Ablage sie sieht - übersprungen zählt daher nur Anna.
 	if res["uebersprungen"].(float64) != 1 {
 		t.Errorf("expected one skipped, got %v", res["uebersprungen"])
 	}
 	names := map[string]bool{}
-	for _, m := range res["mitarbeiter"].([]interface{}) {
-		names[m.(map[string]interface{})["name"].(string)] = true
+	for _, m := range res["mitarbeiter"].([]any) {
+		names[m.(map[string]any)["name"].(string)] = true
 	}
 	if len(names) != 3 || !names["Jonas"] {
 		t.Fatalf("unexpected list, names trimmed? %#v", names)
 	}
 }
 
-func TestBulkCustomHolidays(t *testing.T) {
+func TestMassenanlageVonFeiertagen(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 
@@ -613,13 +562,13 @@ func TestBulkCustomHolidays(t *testing.T) {
 		t.Fatalf("expected two holidays, got %v", res["angelegt"])
 	}
 
-	// Without a country the entry defaults to DE, and it has to block like a
-	// statutory holiday does.
-	list := call(t, a, http.MethodGet, "/api/data", "")["custom_holidays"].([]interface{})
+	// Ohne Landesangabe gilt DE, und der Eintrag muss so nachfragen wie ein
+	// gesetzlicher Feiertag.
+	list := call(t, a, http.MethodGet, "/api/data", "")["custom_holidays"].([]any)
 	if len(list) != 2 {
 		t.Fatalf("expected two stored holidays, got %d", len(list))
 	}
-	if c := list[0].(map[string]interface{})["country"]; c != "DE" {
+	if c := list[0].(map[string]any)["country"]; c != "DE" {
 		t.Errorf("missing country should default to DE, got %v", c)
 	}
 	sch := call(t, a, http.MethodPost, "/api/schicht",
@@ -628,7 +577,7 @@ func TestBulkCustomHolidays(t *testing.T) {
 		t.Errorf("bulk holiday does not block: %v", got)
 	}
 
-	// Re-running the same list changes nothing.
+	// Dieselbe Liste noch einmal ändert nichts.
 	res = call(t, a, http.MethodPost, "/api/custom_holidays/bulk",
 		`{"feiertage":[{"date":"2026-12-24","name":"Heiligabend","country":"DE"}]}`)
 	if res["angelegt"].(float64) != 0 || res["uebersprungen"].(float64) != 1 {
@@ -636,7 +585,7 @@ func TestBulkCustomHolidays(t *testing.T) {
 	}
 }
 
-func TestBulkRejectsEmptyInput(t *testing.T) {
+func TestMassenanlageWeistLeereEingabeAb(t *testing.T) {
 	a := newTestApp(t)
 	for _, c := range []struct{ path, body string }{
 		{"/api/mitarbeiter/bulk", `{"mitarbeiter":[{"name":"  "}]}`},
@@ -654,7 +603,7 @@ func TestBulkRejectsEmptyInput(t *testing.T) {
 
 // ── Normaldienst ──────────────────────────────────────────────────────────────
 
-func TestNormaldienstIsAWorkShift(t *testing.T) {
+func TestNormaldienstIstEineArbeitsschicht(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Clara", "DE")
 	addShift(t, a, "2026-04-02", "normal", "Clara")
@@ -665,7 +614,7 @@ func TestNormaldienstIsAWorkShift(t *testing.T) {
 	// Normal excludes Früh and Spät on the same day, Rufbereitschaft does not.
 	res := call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-04-02"],"schicht":"frueh","name":"Clara","action":"add"}`)
-	blocking := result(t, res, "2026-04-02")["blocking"].([]interface{})
+	blocking := result(t, res, "2026-04-02")["blocking"].([]any)
 	if len(blocking) != 1 || blocking[0] != "normal" {
 		t.Fatalf("Normaldienst should block Frühschicht: %#v", blocking)
 	}
@@ -683,7 +632,7 @@ func TestNormaldienstIsAWorkShift(t *testing.T) {
 	}
 }
 
-func TestAutoplanWithNormaldienst(t *testing.T) {
+func TestAutoplanMitNormaldienst(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Clara", "DE")
 	call(t, a, http.MethodPost, "/api/templates",
@@ -699,7 +648,7 @@ func TestAutoplanWithNormaldienst(t *testing.T) {
 	}
 }
 
-func TestRufbereitschaftNeverNeedsConfirmation(t *testing.T) {
+func TestRufbereitschaftFragtNie(t *testing.T) {
 	a := newTestApp(t)
 	addEmployee(t, a, "Anna", "DE")
 	// Rufbereitschaft läuft neben jeder Arbeitsschicht her - egal welcher.

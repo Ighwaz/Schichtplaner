@@ -1,20 +1,21 @@
-package main
+package httpapi
 
 import (
 	"bufio"
 	"fmt"
 	"io"
 	"net/http"
+	"schichtplaner/internal/domain"
 	"strings"
 	"time"
 	"unicode/utf8"
 )
 
-// icsLineLimit is the maximum line length RFC 5545 allows, in octets.
+// icsLineLimit ist die Zeilenlänge, die RFC 5545 zulässt - in Oktetten.
 const icsLineLimit = 75
 
-// writeICSLine writes one content line, folded the way RFC 5545 requires:
-// continuation lines start with a space. Multi-byte characters are never
+// writeICSLine schreibt eine Zeile so umgebrochen, wie RFC 5545 es verlangt:
+// Fortsetzungszeilen beginnen mit einem Leerzeichen. Mehrbyte-Zeichen werden nie
 // split across a fold.
 func writeICSLine(sb *strings.Builder, line string) {
 	budget, n := icsLineLimit, 0
@@ -22,7 +23,7 @@ func writeICSLine(sb *strings.Builder, line string) {
 		size := utf8.RuneLen(r)
 		if n+size > budget {
 			sb.WriteString("\r\n ")
-			budget = icsLineLimit - 1 // the leading space counts towards the limit
+			budget = icsLineLimit - 1 // das führende Leerzeichen zählt mit
 			n = 0
 		}
 		sb.WriteRune(r)
@@ -31,9 +32,10 @@ func writeICSLine(sb *strings.Builder, line string) {
 	sb.WriteString("\r\n")
 }
 
-// unfoldICS reads an ICS stream and joins the continuation lines back together
-// before anything is parsed. Calendars from Outlook or Google fold every line
-// past 75 octets, and an unfolded parser silently drops those entries.
+// unfoldICS liest einen ICS-Strom und fügt die Fortsetzungszeilen wieder
+// zusammen, bevor irgendetwas ausgewertet wird. Kalender aus Outlook oder
+// Google brechen jede Zeile jenseits von 75 Oktetten um; wer das nicht
+// rückgängig macht, verliert diese Einträge stillschweigend.
 func unfoldICS(r io.Reader) ([]string, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
@@ -58,20 +60,20 @@ var shiftLabels = map[string]string{
 
 var shiftTimes = map[string][2]string{
 	"frueh": {"060000", "140000"},
-	// Normaldienst ist Gleitzeit; die Zeiten sind nur ein Anhalt fuer den
-	// Kalendereintrag, nicht die tatsaechliche Anwesenheit.
+	// Normaldienst ist Gleitzeit; die Zeiten sind nur ein Anhalt für den
+	// Kalendereintrag, nicht die tatsächliche Anwesenheit.
 	"normal":          {"080000", "170000"},
 	"spaet":           {"140000", "220000"},
 	"rufbereitschaft": {"000000", "235959"},
 }
 
-func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) handleExportICS(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	person := q.Get("person")
 	yearStr := q.Get("year")
 	monthStr := q.Get("month")
 
-	d, ok := a.data(w)
+	d, ok := srv.data(r.Context(), w)
 	if !ok {
 		return
 	}
@@ -96,7 +98,7 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		forEachShift(&slot, func(shift string, names *[]string) {
+		domain.ForEachShift(&slot, func(shift string, names *[]string) {
 			for _, name := range *names {
 				if person != "" && name != person {
 					continue
@@ -125,15 +127,15 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(sb.String()))
 }
 
-func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) handleImportICS(w http.ResponseWriter, r *http.Request) {
 	file, ok := uploadedFile(w, r, 16<<20)
 	if !ok {
 		return
 	}
 	defer file.Close()
 
-	var changes []ShiftChange
-	seen := map[ShiftChange]bool{}
+	var changes []domain.ShiftChange
+	seen := map[domain.ShiftChange]bool{}
 	skipped := 0
 
 	// Build reverse label map
@@ -142,7 +144,7 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 		shiftByLabel[strings.ToLower(v)] = k
 	}
 
-	// Parse ICS - folded lines are joined first, see unfoldICS.
+	// Auswerten - umgebrochene Zeilen sind vorher zusammengefügt, siehe unfoldICS.
 	lines, err := unfoldICS(file)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": "Datei nicht lesbar: " + err.Error()})
@@ -166,7 +168,7 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 				skipped++
 				continue
 			}
-			// Parse date from DTSTART:20260401T060000 or DTSTART;TZID=...:20260401T060000
+			// Datum aus DTSTART:20260401T060000 oder DTSTART;TZID=...:20260401T060000
 			raw := dtstart
 			if i := strings.Index(raw, ":"); i >= 0 {
 				raw = raw[i+1:]
@@ -183,7 +185,7 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 			}
 			date := t.Format("2006-01-02")
 
-			// Parse "Name – Schicht" from summary
+			// "Name – Schicht" aus der Zusammenfassung lesen
 			parts := strings.SplitN(summary, " – ", 2)
 			if len(parts) != 2 {
 				skipped++
@@ -197,7 +199,7 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			change := ShiftChange{Date: date, Shift: shift, Name: name}
+			change := domain.ShiftChange{Date: date, Shift: shift, Name: name}
 			if seen[change] {
 				skipped++
 				continue
@@ -217,16 +219,16 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s, ok := a.requireStore(w)
+	s, ok := srv.requireStore(w)
 	if !ok {
 		return
 	}
-	imported, err := s.AddShifts("import:ics", changes)
+	imported, err := s.AddShifts(r.Context(), "import:ics", changes)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, map[string]interface{}{
+	writeJSON(w, map[string]any{
 		"ok":       true,
 		"imported": imported,
 		"skipped":  skipped + len(changes) - imported,

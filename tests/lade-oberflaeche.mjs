@@ -19,6 +19,20 @@ const html = readFileSync(join(hier, '..', 'frontend', 'index.html'), 'utf8');
 // Ein leerer Tag - dieselbe Form, die der Go-Teil liefert.
 const leererTag = () => ({ frueh: [], normal: [], spaet: [], rufbereitschaft: [] });
 
+// Schluessel einer Kalenderwoche, gleiche Schreibweise wie isoWeekKey in Go.
+export function isoWochenSchluessel(d) {
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const wt = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - wt);
+  const jahresStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  const woche = Math.ceil((((tmp - jahresStart) / 86400000) + 1) / 7);
+  return `${tmp.getUTCFullYear()}-W${String(woche).padStart(2, '0')}`;
+}
+
+// Ein KW-Eintrag ist entweder ein Name oder eine Liste - wie kwNames in Go.
+const namenDerWoche = roh =>
+  typeof roh === 'string' ? [roh] : Array.isArray(roh) ? roh.filter(n => typeof n === 'string') : [];
+
 /**
  * Erfundene API. Haelt Mitarbeiter, Schichten, Soll und Notizen im Speicher
  * und beantwortet genau die Wege, die die Oberflaeche aufruft. Jeder Aufruf
@@ -43,14 +57,40 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
     const koerper = opts && opts.body ? JSON.parse(opts.body) : null;
     aufrufe.push({ pfad, methode: (opts && opts.method) || 'GET', koerper });
 
-    if (pfad === '/api/data') return { ...zustand };
+    const methode = (opts && opts.method) || 'GET';
+    // Ueber die Leitung geht JSON, also Kopien. Wuerde die Attrappe ihre
+    // eigenen Objekte herausgeben, schriebe die Oberflaeche direkt in den
+    // "Serverzustand" - und jeder Test ueber das Speichern ginge falsch durch.
+    const kopie = w => JSON.parse(JSON.stringify(w));
+
+    if (pfad === '/api/data') return kopie(zustand);
     if (pfad === '/api/datadir') return { folder: '/testordner', file: '/testordner/schichtplan.db' };
     if (pfad === '/api/holiday_coverage') return { in_movable_from: 2020, in_movable_to: 2030 };
-    if (pfad.startsWith('/api/holidays/')) return feiertage;
-    if (pfad === '/api/templates') return zustand.templates;
-    if (pfad === '/api/ruf_kw') return zustand.ruf_kw;
-    if (pfad === '/api/custom_holidays') return zustand.custom_holidays;
+    if (pfad.startsWith('/api/holidays/')) return kopie(feiertage);
+    if (pfad === '/api/templates') return kopie(zustand.templates);
+    if (pfad === '/api/custom_holidays') return kopie(zustand.custom_holidays);
     if (pfad.startsWith('/api/history')) return [];
+
+    if (pfad === '/api/ruf_kw' && methode === 'GET') return kopie(zustand.ruf_kw);
+    if (pfad === '/api/ruf_kw' && methode === 'POST') {
+      zustand.ruf_kw = kopie(koerper && koerper.ruf_kw ? koerper.ruf_kw : koerper || {});
+      return { ok: true };
+    }
+    if (pfad === '/api/ruf_kw/apply') {
+      // Wie im Go-Teil: uebertragen wird der GESPEICHERTE Plan, nicht der,
+      // der gerade auf dem Schirm steht.
+      let angelegt = 0;
+      const jahr = koerper.year;
+      const von = koerper.month ? new Date(jahr, koerper.month - 1, 1) : new Date(jahr, 0, 1);
+      const bis = koerper.month ? new Date(jahr, koerper.month, 1) : new Date(jahr + 1, 0, 1);
+      for (const d = new Date(von); d < bis; d.setDate(d.getDate() + 1)) {
+        for (const name of namenDerWoche(zustand.ruf_kw[isoWochenSchluessel(d)])) {
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          if (!tag(key).rufbereitschaft.includes(name)) { tag(key).rufbereitschaft.push(name); angelegt++; }
+        }
+      }
+      return { ok: true, applied: angelegt };
+    }
 
     if (pfad === '/api/schicht') {
       const { dates, schicht, name, action } = koerper;

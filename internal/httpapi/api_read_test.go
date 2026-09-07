@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"encoding/json"
@@ -6,23 +6,24 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"schichtplaner/internal/config"
 	"strings"
 	"testing"
 )
 
-// Die schmalen Lese- und Schreibwege, die handlers_test.go auslaesst:
-// Mitarbeiterliste, Farbe, Praeferenzen, Templates, eigene Feiertage und der
-// KW-Plan. Kurz, aber sie sind der Unterschied zwischen "laeuft bestimmt" und
-// "laeuft nachweislich".
+// Die schmalen Lese- und Schreibwege, die handlers_test.go auslässt:
+// Mitarbeiterliste, Farbe, Präferenzen, Templates, eigene Feiertage und der
+// KW-Plan. Kurz, aber sie sind der Unterschied zwischen "läuft bestimmt" und
+// "läuft nachweislich".
 
 // listeVon dekodiert eine JSON-Liste aus einer Antwort.
-func listeVon(t *testing.T, a *App, pfad string) []interface{} {
+func listeVon(t *testing.T, a *Server, pfad string) []any {
 	t.Helper()
 	w := roh(a, http.MethodGet, pfad, "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET %s: Status %d (%s)", pfad, w.Code, w.Body.String())
 	}
-	var out []interface{}
+	var out []any
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatalf("GET %s: kein JSON-Array: %s", pfad, w.Body.String())
 	}
@@ -53,15 +54,15 @@ func TestFarbeUndPraeferenzenBleibenAmMitarbeiter(t *testing.T) {
 	call(t, a, http.MethodPost, "/api/mitarbeiter/Bauer/prefs", `{"prefs":{"Mo":"frueh","Fr":"spaet"}}`)
 
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	leute, _ := data["mitarbeiter"].([]interface{})
+	leute, _ := data["mitarbeiter"].([]any)
 	if len(leute) != 1 {
 		t.Fatalf("mitarbeiter: %v", data["mitarbeiter"])
 	}
-	m, _ := leute[0].(map[string]interface{})
+	m, _ := leute[0].(map[string]any)
 	if m["color"] != "#4a9eff" {
 		t.Fatalf("Farbe: %v", m["color"])
 	}
-	prefs, _ := m["prefs"].(map[string]interface{})
+	prefs, _ := m["prefs"].(map[string]any)
 	if prefs["Mo"] != "frueh" || prefs["Fr"] != "spaet" {
 		t.Fatalf("Praeferenzen: %v", prefs)
 	}
@@ -110,8 +111,8 @@ func TestEigeneFeiertageAnlegenLesenLoeschen(t *testing.T) {
 		t.Fatalf("erwartet 1 eigenen Feiertag, bekommen %d", len(liste))
 	}
 
-	// Der Schluessel ist "Datum|Name" - ein Datum allein reicht nicht, weil an
-	// einem Tag mehrere eigene Feiertage stehen koennen.
+	// Der Schlüssel ist "Datum|Name" - ein Datum allein reicht nicht, weil an
+	// einem Tag mehrere eigene Feiertage stehen können.
 	if w := roh(a, http.MethodDelete, "/api/custom_holidays/2026-08-14", ""); w.Code != http.StatusBadRequest {
 		t.Fatalf("halber Schluessel: Status %d, erwartet 400", w.Code)
 	}
@@ -150,7 +151,7 @@ func TestVerlaufHaeltDieLetztenAenderungenFest(t *testing.T) {
 	call(t, a, http.MethodPost, "/api/schicht",
 		`{"dates":["2026-09-01"],"schicht":"frueh","name":"Bauer","action":"add"}`)
 
-	// Ohne brauchbares limit greift der Vorgabewert - beide Wege muessen
+	// Ohne brauchbares limit greift der Vorgabewert - beide Wege müssen
 	// eine Liste liefern, keinen Fehler.
 	for _, abfrage := range []string{"", "?limit=1", "?limit=0", "?limit=99999", "?limit=abc"} {
 		liste := listeVon(t, a, "/api/history"+abfrage)
@@ -202,9 +203,9 @@ func TestOrdnerwechselWeistUnbrauchbareAngabenAb(t *testing.T) {
 func merkeKonfigWoanders(t *testing.T) string {
 	t.Helper()
 	pfad := filepath.Join(t.TempDir(), "config.json")
-	vorher := configPath
-	configPath = func() string { return pfad }
-	t.Cleanup(func() { configPath = vorher })
+	vorher := config.Path
+	config.Path = func() string { return pfad }
+	t.Cleanup(func() { config.Path = vorher })
 	return pfad
 }
 
@@ -228,12 +229,12 @@ func TestOrdnerwechselSchaltetUmUndMerktSichDasZiel(t *testing.T) {
 		t.Fatal("der Test hat gar nichts gewechselt")
 	}
 
-	// Die Wahl muss den naechsten Start ueberleben.
+	// Die Wahl muss den nächsten Start überleben.
 	roh, err := os.ReadFile(konfig)
 	if err != nil {
 		t.Fatalf("Konfiguration nicht geschrieben: %v", err)
 	}
-	var cfg Config
+	var cfg config.Config
 	if err := json.Unmarshal(roh, &cfg); err != nil {
 		t.Fatalf("Konfiguration ist kein JSON: %s", roh)
 	}
@@ -241,7 +242,7 @@ func TestOrdnerwechselSchaltetUmUndMerktSichDasZiel(t *testing.T) {
 		t.Fatalf("gemerkter Ordner: %q, erwartet %q", cfg.DataFolder, neu)
 	}
 
-	// Und der neue Ordner traegt danach eigene Daten, nicht die alten.
+	// Und der neue Ordner trägt danach eigene Daten, nicht die alten.
 	call(t, a, http.MethodPost, "/api/mitarbeiter", `{"name":"Neu","team":"DE"}`)
 	if liste := listeVon(t, a, "/api/mitarbeiter"); len(liste) != 1 {
 		t.Fatalf("frischer Ordner ist nicht frisch: %v", liste)
