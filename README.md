@@ -116,7 +116,9 @@ unter Windows WebView2.
 go mod tidy
 wails dev      # Hot-Reload
 wails build    # -> build/bin/Schichtplaner.exe
-go test ./...  # API- und Speichertests
+go test ./...  # Regeln, API, Speicher, Nebenläufigkeit
+npm install    # einmalig, holt jsdom
+npm test       # Oberfläche
 ```
 
 Details zum Build siehe [BUILD.md](BUILD.md).
@@ -124,27 +126,62 @@ Details zum Build siehe [BUILD.md](BUILD.md).
 ## Aufbau
 
 ```
-main.go           Einstiegspunkt, Wails-Setup
-app.go            HTTP-Router, Startup, Datenordner
-data.go           Datenstrukturen und Slot-Helfer
-store.go          SQLite-Speicher, Migration, Änderungsprotokoll
-handlers.go       API-Handler
-holidays.go       Feiertage DE (BW) + IN, Brückentage
-ics.go            ICS Export/Import
-handlers_test.go  Tests gegen die API-Verträge des Frontends
-frontend/
-  index.html      gesamtes UI (HTML/CSS/JS)
+main.go                  Verdrahtung: Oberfläche einbetten, Server bauen, Fenster öffnen
+wails.json               Build-Konfiguration
+frontend/index.html      gesamte Oberfläche (HTML/CSS/JS)
+internal/
+  domain/                Begriffe und Regeln - ohne Datenbank, ohne HTTP
+    model.go             Mitarbeiter, Tag, Soll, Template, Änderungseintrag
+    slot.go              Operationen auf einem Tag
+    holiday.go           Feiertage DE (BW) + IN, Brückentage
+    week.go              ISO-Kalenderwochen
+    plan.go              was ein Klick, ein Template, ein KW-Plan bedeutet
+  store/store.go         SQLite: Schema, Transaktionen, Änderungsverlauf
+  httpapi/               Anfragen entgegennehmen, Antworten schreiben
+    server.go            Router, Datenordner
+    json.go              JSON hinein und hinaus, Fehler melden
+    employees.go         Mitarbeiter und Gesamtabzug
+    shifts.go            Schichten, Soll, Notizen, Tage einfügen
+    holidays.go          Feiertage
+    templates.go         Templates und Autoplan
+    rufkw.go             Wochenplan der Rufbereitschaft
+    system.go            Rückgängig-Sprung, Verlauf, Datenordner, Sicherung
+    ics.go               ICS-Export und -Import
+  config/config.go       merkt den zuletzt benutzten Datenordner
+tests/                   Tests der Oberfläche (Node, siehe oben)
 ```
 
+**Wie die Abhängigkeiten laufen.** `domain` kennt niemanden. `store` und
+`httpapi` kennen `domain`. `main` kennt alle drei. Nichts zeigt zurück – wer
+eine Regel ändern will, ändert sie in `domain` und muss weder Handler noch
+Datenbank anfassen.
+
+**Warum `main.go` im Wurzelverzeichnis liegt und nicht unter `/cmd`.**
+`wails build` übersetzt das Modul im aktuellen Verzeichnis und erwartet den
+Ordner aus `wails.json` (`frontend/`) daneben. Ein Hauptpaket unter
+`cmd/schichtplaner/` würde bedeuten, entweder das Frontend dorthin zu
+verschieben (dann findet `wails.json` es nicht mehr) oder den Build von Hand
+nachzubauen. Für **ein** Binary bringt `/cmd` ohnehin nur Ordnung, wo mehrere
+liegen – der Gewinn wiegt den Bruch mit dem Build-Werkzeug nicht auf.
+
+**Kein `/pkg`.** Nichts in diesem Projekt ist dafür gedacht, von außen benutzt
+zu werden. `internal/` sagt das dem Compiler; `/pkg` würde das Gegenteil
+behaupten.
+
+**Wails steht nur in `main.go`.** Der Ordnerdialog kommt als Funktion in den
+Server hinein (`httpapi.New(seite, dialog)`). Deshalb läuft der ganze Kern in
+Tests ohne Fenster – und deshalb prüft `go test ./...` echte Handler statt
+Attrappen.
+
 Das Frontend spricht das Backend ausschließlich über `/api/…` an; die Routen
-sind in [app.go](app.go) gebündelt. `GET /api/history?limit=200` liefert das
-Änderungsprotokoll.
+stehen in [internal/httpapi/server.go](internal/httpapi/server.go).
+`GET /api/history?limit=200` liefert das Änderungsprotokoll.
 
 ## Feiertage
 
 Gesetzliche Feiertage DE (Baden-Württemberg) werden gerechnet, die indischen
 Fixtermine ebenso. **Holi und Diwali** folgen dem lunisolaren Kalender und
-haben keine Formel – sie stehen als Tabelle in [holidays.go](holidays.go) und
+haben keine Formel – sie stehen als Tabelle in [internal/domain/holiday.go](internal/domain/holiday.go) und
 reichen derzeit bis **2036** (Quelle: qppstudio.net, jeweils der Tag, den
 Indien als Feiertag begeht – bei Holi also Rangwali Holi, nicht der Holika
 Dahan am Abend davor).

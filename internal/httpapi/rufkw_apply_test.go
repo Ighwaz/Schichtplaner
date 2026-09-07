@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"fmt"
@@ -12,14 +12,14 @@ import (
 // an der Monatsvorbelegung, hier an den Wochen über der Jahresgrenze.
 
 // rufTage liefert alle Tage, an denen jemand als Rufbereitschaft steht.
-func rufTage(t *testing.T, a *App, name string) []string {
+func rufTage(t *testing.T, a *Server, name string) []string {
 	t.Helper()
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	tage, _ := data["schichten"].(map[string]interface{})
+	tage, _ := data["schichten"].(map[string]any)
 	var raus []string
 	for datum, roh := range tage {
-		tag, _ := roh.(map[string]interface{})
-		liste, _ := tag["rufbereitschaft"].([]interface{})
+		tag, _ := roh.(map[string]any)
+		liste, _ := tag["rufbereitschaft"].([]any)
 		for _, n := range liste {
 			if s, _ := n.(string); s == name {
 				raus = append(raus, datum)
@@ -30,7 +30,7 @@ func rufTage(t *testing.T, a *App, name string) []string {
 	return raus
 }
 
-func planMitWoche(t *testing.T, a *App, kwKey, name string) {
+func planMitWoche(t *testing.T, a *Server, kwKey, name string) {
 	t.Helper()
 	call(t, a, http.MethodPost, "/api/mitarbeiter", fmt.Sprintf(`{"name":%q,"team":"DE"}`, name))
 	call(t, a, http.MethodPost, "/api/ruf_kw",

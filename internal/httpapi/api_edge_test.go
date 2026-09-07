@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 
 // roh schickt eine Anfrage durch den Router und gibt den Recorder zurueck -
 // anders als call() ohne Anspruch darauf, dass die Antwort 200 und JSON ist.
-func roh(a *App, method, path, body string) *httptest.ResponseRecorder {
+func roh(a *Server, method, path, body string) *httptest.ResponseRecorder {
 	var r *http.Request
 	if body == "" {
 		r = httptest.NewRequest(method, path, nil)
@@ -32,7 +32,7 @@ func roh(a *App, method, path, body string) *httptest.ResponseRecorder {
 
 // mustJSON baut einen JSON-Koerper aus Go-Werten - fuer Eingaben, die sich
 // nicht gefahrlos als Zeichenkette zusammenkleben lassen.
-func mustJSON(v interface{}) string {
+func mustJSON(v any) string {
 	b, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
@@ -41,7 +41,7 @@ func mustJSON(v interface{}) string {
 }
 
 // tagInhalt liefert die Namen einer Schicht an einem Tag.
-func tagInhalt(t *testing.T, a *App, datum, schicht string) []string {
+func tagInhalt(t *testing.T, a *Server, datum, schicht string) []string {
 	t.Helper()
 	return entered(t, a, datum, schicht)
 }
@@ -130,7 +130,7 @@ func TestSollWirdGespeichertUndNullBleibtNull(t *testing.T) {
 		`{"frueh":2,"normal":0,"spaet":1,"rufbereitschaft":1}`)
 
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	soll, ok := data["soll"].(map[string]interface{})
+	soll, ok := data["soll"].(map[string]any)
 	if !ok {
 		t.Fatalf("kein Soll in /api/data: %v", data["soll"])
 	}
@@ -150,7 +150,7 @@ func TestNotizSchreibenAendernLeeren(t *testing.T) {
 	a := newTestApp(t)
 	notiz := func() string {
 		data := call(t, a, http.MethodGet, "/api/data", "")
-		n, _ := data["notizen"].(map[string]interface{})
+		n, _ := data["notizen"].(map[string]any)
 		s, _ := n["2026-09-01"].(string)
 		return s
 	}
@@ -302,7 +302,7 @@ func TestNamenMitSonderzeichenUndLaengeUeberlebenDenRundlauf(t *testing.T) {
 			t.Fatalf("%q: Status %d (%s)", n, w.Code, w.Body.String())
 		}
 		call(t, a, http.MethodPost, "/api/schicht",
-			mustJSON(map[string]interface{}{
+			mustJSON(map[string]any{
 				"dates": []string{"2026-09-01"}, "schicht": "frueh", "name": n, "action": "add",
 			}))
 		got := tagInhalt(t, a, "2026-09-01", "frueh")

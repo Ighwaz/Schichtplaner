@@ -1,17 +1,30 @@
-package main
+// Package store haelt den Schichtplan in einer SQLite-Datei im Datenordner.
+//
+// Das Paket kennt die Begriffe aus domain, aber weder HTTP noch die
+// Oberflaeche. Jede Schreiboperation laeuft in einer Transaktion und schreibt
+// eine Zeile in den Aenderungsverlauf.
+package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"schichtplaner/internal/domain"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
 
-const dbFileName = "schichtplan.db"
+const (
+	// DBFileName ist der Name der Datenbankdatei im Datenordner.
+	DBFileName = "schichtplan.db"
+	// legacyFileName ist der Plan aelterer Fassungen. Er wird einmal in die
+	// Datenbank uebernommen und danach nicht mehr geschrieben.
+	legacyFileName = "schichtplan_daten.json"
+)
 
 // journalMode: kein WAL. Alle Zugriffe sind ohnehin serialisiert (App.mu), und
 // ein Rollback-Journal haelt die Daten in EINER Datei - wer den Ordner sichert,
@@ -74,8 +87,11 @@ CREATE TABLE IF NOT EXISTS changelog (
 
 // ── Open / close ──────────────────────────────────────────────────────────────
 
-func openStore(folder string) (*Store, error) {
-	path := filepath.Join(folder, dbFileName)
+// Open oeffnet die Datenbank im angegebenen Ordner und legt das Schema an,
+// falls es noch fehlt. Ein Plan aus einer aelteren Fassung wird dabei einmalig
+// uebernommen.
+func Open(ctx context.Context, folder string) (*Store, error) {
+	path := filepath.Join(folder, DBFileName)
 	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=journal_mode(" + journalMode + ")&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -83,20 +99,29 @@ func openStore(folder string) (*Store, error) {
 	}
 	// One connection is enough and keeps writers from tripping over each other.
 	db.SetMaxOpenConns(1)
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("Datenbank %s: %w", path, err)
 	}
-	if _, err := db.Exec(schemaSQL); err != nil {
+	if _, err := db.ExecContext(ctx, schemaSQL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("Schema anlegen: %w", err)
 	}
 	s := &Store{db: db, folder: folder}
-	if err := s.importLegacyJSON(); err != nil {
+	if err := s.importLegacyJSON(ctx); err != nil {
 		db.Close()
 		return nil, err
 	}
 	return s, nil
+}
+
+// Path nennt die Datei, in der der Plan liegt - die Oberflaeche zeigt sie in
+// der Fussleiste an.
+func (s *Store) Path() string {
+	if s == nil {
+		return ""
+	}
+	return filepath.Join(s.folder, DBFileName)
 }
 
 func (s *Store) Close() error {
@@ -108,9 +133,9 @@ func (s *Store) Close() error {
 
 // importLegacyJSON moves an existing schichtplan_daten.json into the database,
 // but only into an empty one - an existing database is never overwritten.
-func (s *Store) importLegacyJSON() error {
+func (s *Store) importLegacyJSON(ctx context.Context) error {
 	var setting string
-	err := s.db.QueryRow(`SELECT value FROM settings WHERE key='json_imported'`).Scan(&setting)
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='json_imported'`).Scan(&setting)
 	if err == nil {
 		return nil
 	}
@@ -118,25 +143,25 @@ func (s *Store) importLegacyJSON() error {
 		return err
 	}
 	var rows int
-	if err := s.db.QueryRow(`SELECT (SELECT COUNT(*) FROM employees) + (SELECT COUNT(*) FROM shifts)`).Scan(&rows); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM employees) + (SELECT COUNT(*) FROM shifts)`).Scan(&rows); err != nil {
 		return err
 	}
 	if rows > 0 {
 		return nil
 	}
-	raw, err := os.ReadFile(filepath.Join(s.folder, dataFileName))
+	raw, err := os.ReadFile(filepath.Join(s.folder, legacyFileName))
 	if err != nil {
 		return nil // no legacy file, nothing to do
 	}
-	var d AppData
+	var d domain.AppData
 	if err := json.Unmarshal(raw, &d); err != nil {
-		return fmt.Errorf("%s ist kein gültiges JSON: %w", dataFileName, err)
+		return fmt.Errorf("%s ist kein gültiges JSON: %w", legacyFileName, err)
 	}
-	normalizeData(&d)
-	if err := s.ReplaceAll(d, "import:json"); err != nil {
+	domain.Normalize(&d)
+	if err := s.ReplaceAll(ctx, d, "import:json"); err != nil {
 		return err
 	}
-	_, err = s.db.Exec(`INSERT INTO settings (key, value) VALUES ('json_imported', ?)`, timestamp())
+	_, err = s.db.ExecContext(ctx, `INSERT INTO settings (key, value) VALUES ('json_imported', ?)`, timestamp())
 	return err
 }
 
@@ -153,15 +178,15 @@ func plural(n int, one, many string) string {
 // ── Reading ───────────────────────────────────────────────────────────────────
 
 // Load assembles the whole plan in the shape the frontend expects.
-func (s *Store) Load() (AppData, error) {
-	d := defaultData()
+func (s *Store) Load(ctx context.Context) (domain.AppData, error) {
+	d := domain.DefaultData()
 
-	rows, err := s.db.Query(`SELECT name, team, color, icon, prefs FROM employees ORDER BY rowid`)
+	rows, err := s.db.QueryContext(ctx, `SELECT name, team, color, icon, prefs FROM employees ORDER BY rowid`)
 	if err != nil {
 		return d, err
 	}
 	for rows.Next() {
-		var m Employee
+		var m domain.Employee
 		var prefs string
 		if err := rows.Scan(&m.Name, &m.Team, &m.Color, &m.Icon, &prefs); err != nil {
 			rows.Close()
@@ -175,7 +200,7 @@ func (s *Store) Load() (AppData, error) {
 		return d, err
 	}
 
-	rows, err = s.db.Query(`SELECT date, shift, name FROM shifts ORDER BY rowid`)
+	rows, err = s.db.QueryContext(ctx, `SELECT date, shift, name FROM shifts ORDER BY rowid`)
 	if err != nil {
 		return d, err
 	}
@@ -185,15 +210,15 @@ func (s *Store) Load() (AppData, error) {
 			rows.Close()
 			return d, err
 		}
-		slot := slotFor(&d, date)
-		addToSlot(&slot, shift, name)
+		slot := domain.SlotFor(&d, date)
+		domain.AddToSlot(&slot, shift, name)
 		d.Schichten[date] = slot
 	}
 	if err := closeRows(rows); err != nil {
 		return d, err
 	}
 
-	rows, err = s.db.Query(`SELECT date, text FROM notes`)
+	rows, err = s.db.QueryContext(ctx, `SELECT date, text FROM notes`)
 	if err != nil {
 		return d, err
 	}
@@ -209,11 +234,11 @@ func (s *Store) Load() (AppData, error) {
 		return d, err
 	}
 
-	if d.CustomHolidays, err = s.CustomHolidays(); err != nil {
+	if d.CustomHolidays, err = s.CustomHolidays(ctx); err != nil {
 		return d, err
 	}
 
-	rows, err = s.db.Query(`SELECT name, data FROM templates ORDER BY name`)
+	rows, err = s.db.QueryContext(ctx, `SELECT name, data FROM templates ORDER BY name`)
 	if err != nil {
 		return d, err
 	}
@@ -223,7 +248,7 @@ func (s *Store) Load() (AppData, error) {
 			rows.Close()
 			return d, err
 		}
-		t := Template{}
+		t := domain.Template{}
 		json.Unmarshal([]byte(data), &t)
 		d.Templates[name] = t
 	}
@@ -231,19 +256,19 @@ func (s *Store) Load() (AppData, error) {
 		return d, err
 	}
 
-	if d.RufKW, err = s.RufKW(); err != nil {
+	if d.RufKW, err = s.RufKW(ctx); err != nil {
 		return d, err
 	}
 
 	var soll string
-	switch err := s.db.QueryRow(`SELECT value FROM settings WHERE key='soll'`).Scan(&soll); err {
+	switch err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='soll'`).Scan(&soll); err {
 	case nil:
 		json.Unmarshal([]byte(soll), &d.Soll)
 	case sql.ErrNoRows:
 	default:
 		return d, err
 	}
-	normalizeData(&d)
+	domain.Normalize(&d)
 	return d, nil
 }
 
@@ -256,9 +281,9 @@ func closeRows(rows *sql.Rows) error {
 }
 
 // Day returns the entries of a single date.
-func (s *Store) Day(date string) (DaySlot, error) {
-	slot := emptySlot()
-	rows, err := s.db.Query(`SELECT shift, name FROM shifts WHERE date = ? ORDER BY rowid`, date)
+func (s *Store) Day(ctx context.Context, date string) (domain.DaySlot, error) {
+	slot := domain.EmptySlot()
+	rows, err := s.db.QueryContext(ctx, `SELECT shift, name FROM shifts WHERE date = ? ORDER BY rowid`, date)
 	if err != nil {
 		return slot, err
 	}
@@ -268,34 +293,34 @@ func (s *Store) Day(date string) (DaySlot, error) {
 			rows.Close()
 			return slot, err
 		}
-		addToSlot(&slot, shift, name)
+		domain.AddToSlot(&slot, shift, name)
 	}
 	return slot, closeRows(rows)
 }
 
 // Team returns the team of an employee, or "" if the name is unknown.
-func (s *Store) Team(name string) (string, error) {
+func (s *Store) Team(ctx context.Context, name string) (string, error) {
 	var team string
-	err := s.db.QueryRow(`SELECT team FROM employees WHERE name = ?`, name).Scan(&team)
+	err := s.db.QueryRowContext(ctx, `SELECT team FROM employees WHERE name = ?`, name).Scan(&team)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
 	return team, err
 }
 
-func (s *Store) Employees() ([]Employee, error) {
-	d, err := s.Load()
+func (s *Store) Employees(ctx context.Context) ([]domain.Employee, error) {
+	d, err := s.Load(ctx)
 	return d.Mitarbeiter, err
 }
 
-func (s *Store) CustomHolidays() ([]CustomHoliday, error) {
-	out := []CustomHoliday{}
-	rows, err := s.db.Query(`SELECT date, name, country FROM custom_holidays ORDER BY date, name`)
+func (s *Store) CustomHolidays(ctx context.Context) ([]domain.CustomHoliday, error) {
+	out := []domain.CustomHoliday{}
+	rows, err := s.db.QueryContext(ctx, `SELECT date, name, country FROM custom_holidays ORDER BY date, name`)
 	if err != nil {
 		return out, err
 	}
 	for rows.Next() {
-		var ch CustomHoliday
+		var ch domain.CustomHoliday
 		if err := rows.Scan(&ch.Date, &ch.Name, &ch.Country); err != nil {
 			rows.Close()
 			return out, err
@@ -305,9 +330,9 @@ func (s *Store) CustomHolidays() ([]CustomHoliday, error) {
 	return out, closeRows(rows)
 }
 
-func (s *Store) RufKW() (map[string]interface{}, error) {
-	out := map[string]interface{}{}
-	rows, err := s.db.Query(`SELECT kw, names FROM ruf_kw ORDER BY kw`)
+func (s *Store) RufKW(ctx context.Context) (map[string]any, error) {
+	out := map[string]any{}
+	rows, err := s.db.QueryContext(ctx, `SELECT kw, names FROM ruf_kw ORDER BY kw`)
 	if err != nil {
 		return out, err
 	}
@@ -317,7 +342,7 @@ func (s *Store) RufKW() (map[string]interface{}, error) {
 			rows.Close()
 			return out, err
 		}
-		var v interface{}
+		var v any
 		if json.Unmarshal([]byte(names), &v) == nil {
 			out[kw] = v
 		}
@@ -328,17 +353,19 @@ func (s *Store) RufKW() (map[string]interface{}, error) {
 // ── Writing ───────────────────────────────────────────────────────────────────
 
 // tx runs fn in a transaction and appends one changelog entry for it.
-func (s *Store) tx(action, detail string, fn func(*sql.Tx) error) error {
-	t, err := s.db.Begin()
+func (s *Store) tx(ctx context.Context, action, detail string, fn func(*sql.Tx) error) error {
+	t, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: Transaktion beginnen: %w", action, err)
 	}
 	if err := fn(t); err != nil {
 		t.Rollback()
-		return err
+		// Der Vorgang steht vorne, damit die Meldung im Fenster sagt, woran
+		// es lag: "schicht:add: ..." statt nur "no such column".
+		return fmt.Errorf("%s: %w", action, err)
 	}
 	if action != "" {
-		if _, err := t.Exec(`INSERT INTO changelog (ts, action, detail) VALUES (?, ?, ?)`,
+		if _, err := t.ExecContext(ctx, `INSERT INTO changelog (ts, action, detail) VALUES (?, ?, ?)`,
 			timestamp(), action, detail); err != nil {
 			t.Rollback()
 			return err
@@ -349,9 +376,9 @@ func (s *Store) tx(action, detail string, fn func(*sql.Tx) error) error {
 
 // ReplaceAll overwrites the entire database content - used by import, snapshot
 // and the one-time migration of the old JSON file.
-func (s *Store) ReplaceAll(d AppData, action string) error {
+func (s *Store) ReplaceAll(ctx context.Context, d domain.AppData, action string) error {
 	detail := plural(len(d.Mitarbeiter), "Mitarbeiter", "Mitarbeiter") + ", " + plural(len(d.Schichten), "Tag", "Tage")
-	return s.tx(action, detail, func(t *sql.Tx) error {
+	return s.tx(ctx, action, detail, func(t *sql.Tx) error {
 		for _, table := range []string{"employees", "shifts", "notes", "custom_holidays", "templates", "ruf_kw"} {
 			if _, err := t.Exec("DELETE FROM " + table); err != nil {
 				return err
@@ -392,7 +419,7 @@ func (s *Store) ReplaceAll(d AppData, action string) error {
 	})
 }
 
-func insertEmployee(t *sql.Tx, m Employee) error {
+func insertEmployee(t *sql.Tx, m domain.Employee) error {
 	prefs, err := json.Marshal(m.Prefs)
 	if err != nil {
 		return err
@@ -403,9 +430,9 @@ func insertEmployee(t *sql.Tx, m Employee) error {
 }
 
 // insertDay writes the entries of one day; the caller has cleared it before.
-func insertDay(t *sql.Tx, date string, slot DaySlot) error {
+func insertDay(t *sql.Tx, date string, slot domain.DaySlot) error {
 	var err error
-	forEachShift(&slot, func(shift string, names *[]string) {
+	domain.ForEachShift(&slot, func(shift string, names *[]string) {
 		for _, name := range *names {
 			if err != nil {
 				return
@@ -416,7 +443,7 @@ func insertDay(t *sql.Tx, date string, slot DaySlot) error {
 	return err
 }
 
-func insertTemplate(t *sql.Tx, name string, tmpl Template) error {
+func insertTemplate(t *sql.Tx, name string, tmpl domain.Template) error {
 	data, err := json.Marshal(tmpl)
 	if err != nil {
 		return err
@@ -425,7 +452,7 @@ func insertTemplate(t *sql.Tx, name string, tmpl Template) error {
 	return err
 }
 
-func insertRufKW(t *sql.Tx, kw string, names interface{}) error {
+func insertRufKW(t *sql.Tx, kw string, names any) error {
 	raw, err := json.Marshal(names)
 	if err != nil {
 		return err
@@ -434,7 +461,7 @@ func insertRufKW(t *sql.Tx, kw string, names interface{}) error {
 	return err
 }
 
-func setSetting(t *sql.Tx, key string, value interface{}) error {
+func setSetting(t *sql.Tx, key string, value any) error {
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -445,19 +472,12 @@ func setSetting(t *sql.Tx, key string, value interface{}) error {
 
 // ── Shifts ────────────────────────────────────────────────────────────────────
 
-// ShiftChange is one entry to add or remove.
-type ShiftChange struct {
-	Date  string
-	Shift string
-	Name  string
-}
-
 // AddShifts inserts entries and returns how many were actually new.
-func (s *Store) AddShifts(action string, changes []ShiftChange) (int, error) {
+func (s *Store) AddShifts(ctx context.Context, action string, changes []domain.ShiftChange) (int, error) {
 	added := 0
-	err := s.tx(action, plural(len(changes), "Eintrag", "Einträge"), func(t *sql.Tx) error {
+	err := s.tx(ctx, action, plural(len(changes), "Eintrag", "Einträge"), func(t *sql.Tx) error {
 		for _, c := range changes {
-			if slotField(&DaySlot{}, c.Shift) == nil {
+			if domain.SlotField(&domain.DaySlot{}, c.Shift) == nil {
 				continue
 			}
 			res, err := t.Exec(`INSERT OR IGNORE INTO shifts (date, shift, name) VALUES (?, ?, ?)`,
@@ -475,9 +495,9 @@ func (s *Store) AddShifts(action string, changes []ShiftChange) (int, error) {
 }
 
 // RemoveShifts deletes entries and returns how many were present.
-func (s *Store) RemoveShifts(action string, changes []ShiftChange) (int, error) {
+func (s *Store) RemoveShifts(ctx context.Context, action string, changes []domain.ShiftChange) (int, error) {
 	removed := 0
-	err := s.tx(action, plural(len(changes), "Eintrag", "Einträge"), func(t *sql.Tx) error {
+	err := s.tx(ctx, action, plural(len(changes), "Eintrag", "Einträge"), func(t *sql.Tx) error {
 		for _, c := range changes {
 			res, err := t.Exec(`DELETE FROM shifts WHERE date = ? AND shift = ? AND name = ?`,
 				c.Date, c.Shift, c.Name)
@@ -494,8 +514,8 @@ func (s *Store) RemoveShifts(action string, changes []ShiftChange) (int, error) 
 }
 
 // ReplaceDays overwrites the given dates with slot.
-func (s *Store) ReplaceDays(dates []string, slot DaySlot) error {
-	return s.tx("tag:ersetzen", plural(len(dates), "Tag", "Tage"), func(t *sql.Tx) error {
+func (s *Store) ReplaceDays(ctx context.Context, dates []string, slot domain.DaySlot) error {
+	return s.tx(ctx, "tag:ersetzen", plural(len(dates), "Tag", "Tage"), func(t *sql.Tx) error {
 		for _, date := range dates {
 			if _, err := t.Exec(`DELETE FROM shifts WHERE date = ?`, date); err != nil {
 				return err
@@ -509,8 +529,8 @@ func (s *Store) ReplaceDays(dates []string, slot DaySlot) error {
 }
 
 // MergeDays adds the entries of slot to the given dates.
-func (s *Store) MergeDays(dates []string, slot DaySlot) error {
-	return s.tx("tag:einfügen", plural(len(dates), "Tag", "Tage"), func(t *sql.Tx) error {
+func (s *Store) MergeDays(ctx context.Context, dates []string, slot domain.DaySlot) error {
+	return s.tx(ctx, "tag:einfügen", plural(len(dates), "Tag", "Tage"), func(t *sql.Tx) error {
 		for _, date := range dates {
 			if err := insertDay(t, date, slot); err != nil {
 				return err
@@ -522,8 +542,8 @@ func (s *Store) MergeDays(dates []string, slot DaySlot) error {
 
 // ReplaceAllShifts swaps the complete shift table - used by undo/redo, which
 // sends the whole plan back.
-func (s *Store) ReplaceAllShifts(days map[string]DaySlot) error {
-	return s.tx("snapshot", plural(len(days), "Tag", "Tage"), func(t *sql.Tx) error {
+func (s *Store) ReplaceAllShifts(ctx context.Context, days map[string]domain.DaySlot) error {
+	return s.tx(ctx, "snapshot", plural(len(days), "Tag", "Tage"), func(t *sql.Tx) error {
 		if _, err := t.Exec(`DELETE FROM shifts`); err != nil {
 			return err
 		}
@@ -538,14 +558,14 @@ func (s *Store) ReplaceAllShifts(days map[string]DaySlot) error {
 
 // ── Employees ─────────────────────────────────────────────────────────────────
 
-func (s *Store) AddEmployee(m Employee) error {
-	return s.tx("mitarbeiter:neu", m.Name, func(t *sql.Tx) error {
+func (s *Store) AddEmployee(ctx context.Context, m domain.Employee) error {
+	return s.tx(ctx, "mitarbeiter:neu", m.Name, func(t *sql.Tx) error {
 		return insertEmployee(t, m)
 	})
 }
 
-func (s *Store) UpdateEmployee(oldName string, m Employee) error {
-	return s.tx("mitarbeiter:ändern", oldName+" -> "+m.Name, func(t *sql.Tx) error {
+func (s *Store) UpdateEmployee(ctx context.Context, oldName string, m domain.Employee) error {
+	return s.tx(ctx, "mitarbeiter:ändern", oldName+" -> "+m.Name, func(t *sql.Tx) error {
 		if _, err := t.Exec(`UPDATE employees SET name = ?, team = ?, icon = ? WHERE name = ?`,
 			m.Name, m.Team, m.Icon, oldName); err != nil {
 			return err
@@ -572,14 +592,14 @@ func renameInBlobs(t *sql.Tx, oldName, newName string) error {
 	if err != nil {
 		return err
 	}
-	tmpls := map[string]Template{}
+	tmpls := map[string]domain.Template{}
 	for rows.Next() {
 		var name, data string
 		if err := rows.Scan(&name, &data); err != nil {
 			rows.Close()
 			return err
 		}
-		tmpl := Template{}
+		tmpl := domain.Template{}
 		json.Unmarshal([]byte(data), &tmpl)
 		if days, ok := tmpl[oldName]; ok {
 			delete(tmpl, oldName)
@@ -600,14 +620,14 @@ func renameInBlobs(t *sql.Tx, oldName, newName string) error {
 	if err != nil {
 		return err
 	}
-	plans := map[string]interface{}{}
+	plans := map[string]any{}
 	for rows.Next() {
 		var kw, raw string
 		if err := rows.Scan(&kw, &raw); err != nil {
 			rows.Close()
 			return err
 		}
-		var v interface{}
+		var v any
 		if json.Unmarshal([]byte(raw), &v) != nil {
 			continue
 		}
@@ -628,13 +648,13 @@ func renameInBlobs(t *sql.Tx, oldName, newName string) error {
 
 // replaceName swaps oldName for newName in a KW entry, which is either a single
 // name or a list of names.
-func replaceName(v interface{}, oldName, newName string) (interface{}, bool) {
+func replaceName(v any, oldName, newName string) (any, bool) {
 	switch val := v.(type) {
 	case string:
 		if val == oldName {
 			return newName, true
 		}
-	case []interface{}:
+	case []any:
 		changed := false
 		for i, item := range val {
 			if s, ok := item.(string); ok && s == oldName {
@@ -650,10 +670,10 @@ func replaceName(v interface{}, oldName, newName string) (interface{}, bool) {
 // DeleteEmployee removes the employee and every shift entry of that name. It
 // returns the entries and the employee record itself, so a later restore can
 // bring back team, colour and icon along with the shifts.
-func (s *Store) DeleteEmployee(name string) (Employee, map[string]map[string]bool, error) {
-	var gone Employee
+func (s *Store) DeleteEmployee(ctx context.Context, name string) (domain.Employee, map[string]map[string]bool, error) {
+	var gone domain.Employee
 	backup := map[string]map[string]bool{}
-	err := s.tx("mitarbeiter:löschen", name, func(t *sql.Tx) error {
+	err := s.tx(ctx, "mitarbeiter:löschen", name, func(t *sql.Tx) error {
 		var prefs string
 		switch err := t.QueryRow(`SELECT name, team, color, icon, prefs FROM employees WHERE name = ?`, name).
 			Scan(&gone.Name, &gone.Team, &gone.Color, &gone.Icon, &prefs); err {
@@ -693,8 +713,8 @@ func (s *Store) DeleteEmployee(name string) (Employee, map[string]map[string]boo
 
 // AddEmployees creates several employees in one transaction and reports how
 // many were new; names that already exist are left untouched.
-func (s *Store) AddEmployees(list []Employee) (added, skipped int, err error) {
-	err = s.tx("mitarbeiter:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
+func (s *Store) AddEmployees(ctx context.Context, list []domain.Employee) (added, skipped int, err error) {
+	err = s.tx(ctx, "mitarbeiter:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
 		added, skipped = 0, 0
 		for _, m := range list {
 			var exists int
@@ -715,15 +735,15 @@ func (s *Store) AddEmployees(list []Employee) (added, skipped int, err error) {
 	return added, skipped, err
 }
 
-func (s *Store) SetColor(name, color string) error {
-	return s.tx("mitarbeiter:farbe", name, func(t *sql.Tx) error {
+func (s *Store) SetColor(ctx context.Context, name, color string) error {
+	return s.tx(ctx, "mitarbeiter:farbe", name, func(t *sql.Tx) error {
 		_, err := t.Exec(`UPDATE employees SET color = ? WHERE name = ?`, color, name)
 		return err
 	})
 }
 
-func (s *Store) SetPrefs(name string, prefs map[string]string) error {
-	return s.tx("mitarbeiter:wünsche", name, func(t *sql.Tx) error {
+func (s *Store) SetPrefs(ctx context.Context, name string, prefs map[string]string) error {
+	return s.tx(ctx, "mitarbeiter:wünsche", name, func(t *sql.Tx) error {
 		raw, err := json.Marshal(prefs)
 		if err != nil {
 			return err
@@ -735,8 +755,8 @@ func (s *Store) SetPrefs(name string, prefs map[string]string) error {
 
 // ── Notes, Soll, holidays, templates, KW plan ─────────────────────────────────
 
-func (s *Store) SetNote(date, text string) error {
-	return s.tx("notiz", date, func(t *sql.Tx) error {
+func (s *Store) SetNote(ctx context.Context, date, text string) error {
+	return s.tx(ctx, "notiz", date, func(t *sql.Tx) error {
 		if text == "" {
 			_, err := t.Exec(`DELETE FROM notes WHERE date = ?`, date)
 			return err
@@ -746,14 +766,14 @@ func (s *Store) SetNote(date, text string) error {
 	})
 }
 
-func (s *Store) SetSoll(soll SollBesetzung) error {
-	return s.tx("soll", "", func(t *sql.Tx) error {
+func (s *Store) SetSoll(ctx context.Context, soll domain.SollBesetzung) error {
+	return s.tx(ctx, "soll", "", func(t *sql.Tx) error {
 		return setSetting(t, "soll", soll)
 	})
 }
 
-func (s *Store) AddCustomHoliday(ch CustomHoliday) error {
-	return s.tx("feiertag:neu", ch.Date+" "+ch.Name, func(t *sql.Tx) error {
+func (s *Store) AddCustomHoliday(ctx context.Context, ch domain.CustomHoliday) error {
+	return s.tx(ctx, "feiertag:neu", ch.Date+" "+ch.Name, func(t *sql.Tx) error {
 		_, err := t.Exec(`INSERT OR REPLACE INTO custom_holidays (date, name, country) VALUES (?, ?, ?)`,
 			ch.Date, ch.Name, ch.Country)
 		return err
@@ -762,8 +782,8 @@ func (s *Store) AddCustomHoliday(ch CustomHoliday) error {
 
 // AddCustomHolidays inserts several holidays in one transaction. An entry that
 // is already there with the same date and name counts as skipped.
-func (s *Store) AddCustomHolidays(list []CustomHoliday) (added, skipped int, err error) {
-	err = s.tx("feiertag:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
+func (s *Store) AddCustomHolidays(ctx context.Context, list []domain.CustomHoliday) (added, skipped int, err error) {
+	err = s.tx(ctx, "feiertag:mehrere", plural(len(list), "Eintrag", "Einträge"), func(t *sql.Tx) error {
 		added, skipped = 0, 0
 		for _, ch := range list {
 			res, err := t.Exec(`INSERT OR IGNORE INTO custom_holidays (date, name, country) VALUES (?, ?, ?)`,
@@ -782,28 +802,28 @@ func (s *Store) AddCustomHolidays(list []CustomHoliday) (added, skipped int, err
 	return added, skipped, err
 }
 
-func (s *Store) DeleteCustomHoliday(date, name string) error {
-	return s.tx("feiertag:löschen", date+" "+name, func(t *sql.Tx) error {
+func (s *Store) DeleteCustomHoliday(ctx context.Context, date, name string) error {
+	return s.tx(ctx, "feiertag:löschen", date+" "+name, func(t *sql.Tx) error {
 		_, err := t.Exec(`DELETE FROM custom_holidays WHERE date = ? AND name = ?`, date, name)
 		return err
 	})
 }
 
-func (s *Store) SaveTemplate(name string, tmpl Template) error {
-	return s.tx("template:speichern", name, func(t *sql.Tx) error {
+func (s *Store) SaveTemplate(ctx context.Context, name string, tmpl domain.Template) error {
+	return s.tx(ctx, "template:speichern", name, func(t *sql.Tx) error {
 		return insertTemplate(t, name, tmpl)
 	})
 }
 
-func (s *Store) DeleteTemplate(name string) error {
-	return s.tx("template:löschen", name, func(t *sql.Tx) error {
+func (s *Store) DeleteTemplate(ctx context.Context, name string) error {
+	return s.tx(ctx, "template:löschen", name, func(t *sql.Tx) error {
 		_, err := t.Exec(`DELETE FROM templates WHERE name = ?`, name)
 		return err
 	})
 }
 
-func (s *Store) SaveRufKW(plan map[string]interface{}) error {
-	return s.tx("kw-plan:speichern", plural(len(plan), "Woche", "Wochen"), func(t *sql.Tx) error {
+func (s *Store) SaveRufKW(ctx context.Context, plan map[string]any) error {
+	return s.tx(ctx, "kw-plan:speichern", plural(len(plan), "Woche", "Wochen"), func(t *sql.Tx) error {
 		if _, err := t.Exec(`DELETE FROM ruf_kw`); err != nil {
 			return err
 		}
@@ -818,21 +838,14 @@ func (s *Store) SaveRufKW(plan map[string]interface{}) error {
 
 // ── History ───────────────────────────────────────────────────────────────────
 
-// ChangeEntry is one line of the changelog.
-type ChangeEntry struct {
-	Time   string `json:"time"`
-	Action string `json:"action"`
-	Detail string `json:"detail"`
-}
-
-func (s *Store) History(limit int) ([]ChangeEntry, error) {
-	out := []ChangeEntry{}
-	rows, err := s.db.Query(`SELECT ts, action, detail FROM changelog ORDER BY id DESC LIMIT ?`, limit)
+func (s *Store) History(ctx context.Context, limit int) ([]domain.ChangeEntry, error) {
+	out := []domain.ChangeEntry{}
+	rows, err := s.db.QueryContext(ctx, `SELECT ts, action, detail FROM changelog ORDER BY id DESC LIMIT ?`, limit)
 	if err != nil {
 		return out, err
 	}
 	for rows.Next() {
-		var e ChangeEntry
+		var e domain.ChangeEntry
 		if err := rows.Scan(&e.Time, &e.Action, &e.Detail); err != nil {
 			rows.Close()
 			return out, err

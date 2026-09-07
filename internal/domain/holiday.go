@@ -1,4 +1,4 @@
-package main
+package domain
 
 import (
 	"fmt"
@@ -12,9 +12,9 @@ type Holiday struct {
 	Custom  bool   `json:"custom,omitempty"`
 }
 
-// appliesTo reports whether the holiday affects an employee of that team.
+// AppliesTo reports whether the holiday affects an employee of that team.
 // An employee without a team is never blocked by a holiday.
-func (h Holiday) appliesTo(team string) bool {
+func (h Holiday) AppliesTo(team string) bool {
 	return team != "" && (h.Country == team || h.Country == "DE+IN")
 }
 
@@ -45,8 +45,8 @@ func addDays(t time.Time, n int) time.Time {
 	return t.AddDate(0, 0, n)
 }
 
-// getGermanHolidays returns public holidays for Baden-Württemberg
-func getGermanHolidays(year int) map[string]Holiday {
+// germanHolidays returns public holidays for Baden-Württemberg
+func germanHolidays(year int) map[string]Holiday {
 	e := easter(year)
 	hols := map[string]Holiday{
 		fmt.Sprintf("%d-01-01", year): {Name: "Neujahr", Country: "DE"},
@@ -71,11 +71,11 @@ func getGermanHolidays(year int) map[string]Holiday {
 // formula, so their dates are tabulated. Source: qppstudio.net, which lists
 // the day India observes as the public holiday - for Holi that is Rangwali
 // Holi (the colour festival), not the Holika Dahan evening before it.
-// Beyond inMovableLastYear the two are simply missing; the UI points that out
+// Beyond MovableINLastYear the two are simply missing; the UI points that out
 // so they can be added as custom holidays.
 const (
-	inMovableFirstYear = 2026
-	inMovableLastYear  = 2036
+	MovableINFirstYear = 2026
+	MovableINLastYear  = 2036
 )
 
 var holiDates = map[int]string{
@@ -92,9 +92,9 @@ var diwaliDates = map[int]string{
 	2035: "2035-10-30", 2036: "2036-10-18",
 }
 
-// getIndianHolidays returns the fixed-date Indian public holidays plus Holi and
+// indianHolidays returns the fixed-date Indian public holidays plus Holi and
 // Diwali for the years these are tabulated for.
-func getIndianHolidays(year int) map[string]Holiday {
+func indianHolidays(year int) map[string]Holiday {
 	hols := map[string]Holiday{
 		fmt.Sprintf("%d-01-26", year): {Name: "Republic Day", Country: "IN"},
 		fmt.Sprintf("%d-08-15", year): {Name: "Independence Day", Country: "IN"},
@@ -110,8 +110,8 @@ func getIndianHolidays(year int) map[string]Holiday {
 	return hols
 }
 
-// getBridgeDays finds bridge days (Brückentage) between holidays/weekends
-func getBridgeDays(year int, existing map[string]Holiday) map[string]Holiday {
+// bridgeDays finds bridge days (Brückentage) between holidays/weekends
+func bridgeDays(year int, existing map[string]Holiday) map[string]Holiday {
 	bridges := map[string]Holiday{}
 	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
@@ -151,12 +151,14 @@ func getBridgeDays(year int, existing map[string]Holiday) map[string]Holiday {
 	return bridges
 }
 
-// getAllHolidays combines DE + IN holidays for a year, plus custom holidays
-func (a *App) getAllHolidays(year int, customs []CustomHoliday) map[string]Holiday {
+// AllHolidays combines DE + IN holidays for a year, plus custom holidays
+// AllHolidays liefert alle Feiertage eines Jahres: gesetzliche in DE und IN,
+// Brückentage und die selbst eingetragenen.
+func AllHolidays(year int, customs []CustomHoliday) map[string]Holiday {
 	result := map[string]Holiday{}
 
-	de := getGermanHolidays(year)
-	in := getIndianHolidays(year)
+	de := germanHolidays(year)
+	in := indianHolidays(year)
 
 	// Merge DE
 	for k, v := range de {
@@ -177,7 +179,7 @@ func (a *App) getAllHolidays(year int, customs []CustomHoliday) map[string]Holid
 	}
 
 	// Add bridge days
-	bridges := getBridgeDays(year, result)
+	bridges := bridgeDays(year, result)
 	for k, v := range bridges {
 		result[k] = v
 	}

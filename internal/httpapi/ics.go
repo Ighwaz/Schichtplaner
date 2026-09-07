@@ -1,10 +1,11 @@
-package main
+package httpapi
 
 import (
 	"bufio"
 	"fmt"
 	"io"
 	"net/http"
+	"schichtplaner/internal/domain"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -65,13 +66,13 @@ var shiftTimes = map[string][2]string{
 	"rufbereitschaft": {"000000", "235959"},
 }
 
-func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) handleExportICS(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	person := q.Get("person")
 	yearStr := q.Get("year")
 	monthStr := q.Get("month")
 
-	d, ok := a.data(w)
+	d, ok := srv.data(r.Context(), w)
 	if !ok {
 		return
 	}
@@ -96,7 +97,7 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		forEachShift(&slot, func(shift string, names *[]string) {
+		domain.ForEachShift(&slot, func(shift string, names *[]string) {
 			for _, name := range *names {
 				if person != "" && name != person {
 					continue
@@ -125,15 +126,15 @@ func (a *App) handleExportICS(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(sb.String()))
 }
 
-func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) handleImportICS(w http.ResponseWriter, r *http.Request) {
 	file, ok := uploadedFile(w, r, 16<<20)
 	if !ok {
 		return
 	}
 	defer file.Close()
 
-	var changes []ShiftChange
-	seen := map[ShiftChange]bool{}
+	var changes []domain.ShiftChange
+	seen := map[domain.ShiftChange]bool{}
 	skipped := 0
 
 	// Build reverse label map
@@ -197,7 +198,7 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			change := ShiftChange{Date: date, Shift: shift, Name: name}
+			change := domain.ShiftChange{Date: date, Shift: shift, Name: name}
 			if seen[change] {
 				skipped++
 				continue
@@ -217,16 +218,16 @@ func (a *App) handleImportICS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s, ok := a.requireStore(w)
+	s, ok := srv.requireStore(w)
 	if !ok {
 		return
 	}
-	imported, err := s.AddShifts("import:ics", changes)
+	imported, err := s.AddShifts(r.Context(), "import:ics", changes)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, map[string]interface{}{
+	writeJSON(w, map[string]any{
 		"ok":       true,
 		"imported": imported,
 		"skipped":  skipped + len(changes) - imported,

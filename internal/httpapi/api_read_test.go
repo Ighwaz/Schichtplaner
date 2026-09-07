@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"schichtplaner/internal/config"
 	"strings"
 	"testing"
 )
@@ -16,13 +17,13 @@ import (
 // "laeuft nachweislich".
 
 // listeVon dekodiert eine JSON-Liste aus einer Antwort.
-func listeVon(t *testing.T, a *App, pfad string) []interface{} {
+func listeVon(t *testing.T, a *Server, pfad string) []any {
 	t.Helper()
 	w := roh(a, http.MethodGet, pfad, "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET %s: Status %d (%s)", pfad, w.Code, w.Body.String())
 	}
-	var out []interface{}
+	var out []any
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatalf("GET %s: kein JSON-Array: %s", pfad, w.Body.String())
 	}
@@ -53,15 +54,15 @@ func TestFarbeUndPraeferenzenBleibenAmMitarbeiter(t *testing.T) {
 	call(t, a, http.MethodPost, "/api/mitarbeiter/Bauer/prefs", `{"prefs":{"Mo":"frueh","Fr":"spaet"}}`)
 
 	data := call(t, a, http.MethodGet, "/api/data", "")
-	leute, _ := data["mitarbeiter"].([]interface{})
+	leute, _ := data["mitarbeiter"].([]any)
 	if len(leute) != 1 {
 		t.Fatalf("mitarbeiter: %v", data["mitarbeiter"])
 	}
-	m, _ := leute[0].(map[string]interface{})
+	m, _ := leute[0].(map[string]any)
 	if m["color"] != "#4a9eff" {
 		t.Fatalf("Farbe: %v", m["color"])
 	}
-	prefs, _ := m["prefs"].(map[string]interface{})
+	prefs, _ := m["prefs"].(map[string]any)
 	if prefs["Mo"] != "frueh" || prefs["Fr"] != "spaet" {
 		t.Fatalf("Praeferenzen: %v", prefs)
 	}
@@ -202,9 +203,9 @@ func TestOrdnerwechselWeistUnbrauchbareAngabenAb(t *testing.T) {
 func merkeKonfigWoanders(t *testing.T) string {
 	t.Helper()
 	pfad := filepath.Join(t.TempDir(), "config.json")
-	vorher := configPath
-	configPath = func() string { return pfad }
-	t.Cleanup(func() { configPath = vorher })
+	vorher := config.Path
+	config.Path = func() string { return pfad }
+	t.Cleanup(func() { config.Path = vorher })
 	return pfad
 }
 
@@ -233,7 +234,7 @@ func TestOrdnerwechselSchaltetUmUndMerktSichDasZiel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Konfiguration nicht geschrieben: %v", err)
 	}
-	var cfg Config
+	var cfg config.Config
 	if err := json.Unmarshal(roh, &cfg); err != nil {
 		t.Fatalf("Konfiguration ist kein JSON: %s", roh)
 	}
