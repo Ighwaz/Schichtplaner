@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"schichtplaner/internal/domain"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -223,6 +224,30 @@ func (srv *Server) handleImportICS(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Ein fremder Kalender kennt Namen, die es hier nicht gibt. Die werden
+	// uebersprungen und gemeldet, damit man die Leute erst anlegen kann.
+	namen, err := srv.bekannteNamen(r.Context(), s)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	bekannt := changes[:0]
+	fehlend := map[string]bool{}
+	for _, c := range changes {
+		if namen[c.Name] {
+			bekannt = append(bekannt, c)
+		} else {
+			fehlend[c.Name] = true
+			skipped++
+		}
+	}
+	changes = bekannt
+	unbekannt := make([]string, 0, len(fehlend))
+	for n := range fehlend {
+		unbekannt = append(unbekannt, n)
+	}
+	sort.Strings(unbekannt)
+
 	imported, err := s.AddShifts(r.Context(), "import:ics", changes)
 	if err != nil {
 		fail(w, err)
@@ -232,5 +257,8 @@ func (srv *Server) handleImportICS(w http.ResponseWriter, r *http.Request) {
 		"ok":       true,
 		"imported": imported,
 		"skipped":  skipped + len(changes) - imported,
+		// Namen, die es hier nicht gibt - die Oberflaeche nennt sie, damit man
+		// die Leute anlegen und noch einmal einlesen kann.
+		"unbekannt": unbekannt,
 	})
 }

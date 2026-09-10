@@ -210,3 +210,90 @@ func TestKWPlanNimmtEinzelnenNamenUndListe(t *testing.T) {
 		t.Fatalf("Unsinn wurde übernommen: %#v", got)
 	}
 }
+
+// ── Tagesschlüssel ────────────────────────────────────────────────────────────
+
+func TestIstTagesschluessel(t *testing.T) {
+	gut := []string{"2026-01-01", "2024-02-29", "1970-01-01", "2200-12-31", "2026-12-31"}
+	for _, s := range gut {
+		if !IstTagesschluessel(s) {
+			t.Errorf("%q sollte gelten", s)
+		}
+	}
+	schlecht := []string{
+		"", " ", "morgen", "2026-2-1", "2026-02-1", "26-02-01", "01.02.2026",
+		"2026-02-31", "2025-02-29", "2026-13-01", "2026-00-01", "2026-01-00",
+		"0000-01-01", "1969-12-31", "2201-01-01", "2026-04-01 ", " 2026-04-01",
+		"2026-04-01T00:00:00", "2026-04-01Z", "20260401",
+	}
+	for _, s := range schlecht {
+		if IstTagesschluessel(s) {
+			t.Errorf("%q sollte nicht gelten", s)
+		}
+	}
+}
+
+func TestNurEchteTageBehaeltDieReihenfolge(t *testing.T) {
+	rein := []string{"morgen", "2026-04-03", "", "2026-04-01", "2026-02-31", "2026-04-02"}
+	raus := NurEchteTage(rein)
+	if len(raus) != 3 || raus[0] != "2026-04-03" || raus[2] != "2026-04-02" {
+		t.Fatalf("gesiebt: %#v", raus)
+	}
+	if got := NurEchteTage(nil); len(got) != 0 {
+		t.Fatalf("nil: %#v", got)
+	}
+}
+
+func TestNormalizeSiebtUnbrauchbaresAus(t *testing.T) {
+	d := AppData{
+		Mitarbeiter: []Employee{
+			{Name: "Anna"}, {Name: ""}, {Name: "   "}, {Name: "Anna"}, {Name: " Berta "},
+		},
+		Schichten: map[string]DaySlot{
+			"2026-04-01": {Frueh: []string{"Anna"}},
+			"morgen":     {Frueh: []string{"Anna"}},
+			"2026-02-31": {Frueh: []string{"Anna"}},
+		},
+		Notizen: map[string]string{"2026-04-01": "gut", "irgendwann": "weg"},
+	}
+	Normalize(&d)
+
+	if len(d.Mitarbeiter) != 2 {
+		t.Fatalf("Mitarbeiter: %#v", d.Mitarbeiter)
+	}
+	if d.Mitarbeiter[1].Name != "Berta" {
+		t.Fatalf("Leerzeichen nicht abgeschnitten: %q", d.Mitarbeiter[1].Name)
+	}
+	if d.Mitarbeiter[0].Color == "" || d.Mitarbeiter[0].Prefs == nil {
+		t.Fatalf("Farbe oder Wünsche fehlen: %#v", d.Mitarbeiter[0])
+	}
+	if len(d.Schichten) != 1 {
+		t.Fatalf("Schichten: %#v", d.Schichten)
+	}
+	if len(d.Notizen) != 1 {
+		t.Fatalf("Notizen: %#v", d.Notizen)
+	}
+	// Ein leerer Plan bekommt seine Grundform, nicht nil.
+	leer := AppData{}
+	Normalize(&leer)
+	if leer.Schichten == nil || leer.Templates == nil || leer.RufKW == nil || leer.Mitarbeiter == nil {
+		t.Fatalf("Grundform fehlt: %#v", leer)
+	}
+	if leer.Soll.Frueh != 1 || leer.Soll.Normal != 0 {
+		t.Fatalf("Soll-Vorgabe: %#v", leer.Soll)
+	}
+}
+
+func TestUnwrapRufKWHoltDenPlanHeraus(t *testing.T) {
+	tief := map[string]any{"ruf_kw": map[string]any{"2026-W10": []any{"Anna"}}}
+	if got := UnwrapRufKW(tief); len(got) != 1 || got["2026-W10"] == nil {
+		t.Fatalf("nicht ausgepackt: %#v", got)
+	}
+	flach := map[string]any{"2026-W10": []any{"Anna"}}
+	if got := UnwrapRufKW(flach); len(got) != 1 {
+		t.Fatalf("flacher Plan beschädigt: %#v", got)
+	}
+	if got := UnwrapRufKW(nil); got == nil {
+		t.Fatal("nil sollte eine leere Karte werden")
+	}
+}

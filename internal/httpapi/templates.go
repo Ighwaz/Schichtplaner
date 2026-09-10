@@ -62,7 +62,7 @@ func (srv *Server) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 	}
 	tmpl, exists := d.Templates[body.Template]
 	if !exists {
-		writeJSON(w, map[string]string{"error": "domain.Template nicht gefunden"})
+		writeJSON(w, map[string]string{"error": "Template nicht gefunden"})
 		return
 	}
 
@@ -70,6 +70,18 @@ func (srv *Server) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 	for _, m := range d.Mitarbeiter {
 		teams[m.Name] = m.Team
 	}
+	// Ein Template kann jemanden nennen, den es nicht mehr gibt - der wird
+	// uebergangen, nicht als namenloser Eintrag angelegt.
+	geplant := domain.Template{}
+	fehlend := map[string]bool{}
+	for name, wochentage := range tmpl {
+		if _, gibtEs := teams[name]; gibtEs {
+			geplant[name] = wochentage
+		} else {
+			fehlend[name] = true
+		}
+	}
+	tmpl = geplant
 	plan := domain.ApplyTemplate(tmpl, body.Year, body.Month, d.Schichten,
 		domain.AllHolidays(body.Year, d.CustomHolidays), teams)
 
@@ -87,5 +99,6 @@ func (srv *Server) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 		"planned":          planned,
 		"skipped_holiday":  plan.SkippedHoliday,
 		"skipped_conflict": plan.SkippedConflict,
+		"unbekannt":        sortiert(fehlend),
 	})
 }

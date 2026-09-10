@@ -56,10 +56,28 @@ func (srv *Server) handleApplyRufKW(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	applied, err := s.AddShifts(r.Context(), "kw-plan:übertragen", domain.RufKWChanges(plan, body.Year, body.Month))
+	namen, err := srv.bekannteNamen(r.Context(), s)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, map[string]any{"ok": true, "applied": applied})
+	// Im Wochenplan kann jemand stehen, der inzwischen geloescht wurde. Seine
+	// Wochen werden uebergangen statt als namenlose Eintraege angelegt.
+	alle := domain.RufKWChanges(plan, body.Year, body.Month)
+	changes := alle[:0]
+	fehlend := map[string]bool{}
+	for _, c := range alle {
+		if namen[c.Name] {
+			changes = append(changes, c)
+		} else {
+			fehlend[c.Name] = true
+		}
+	}
+
+	applied, err := s.AddShifts(r.Context(), "kw-plan:übertragen", changes)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "applied": applied, "unbekannt": sortiert(fehlend)})
 }

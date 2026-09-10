@@ -86,21 +86,29 @@ func result(t *testing.T, res map[string]any, date string) map[string]any {
 	return day
 }
 
+// addEmployee legt einen Mitarbeiter an. Der Koerper wird gebaut, nicht
+// zusammengeklebt - Namen duerfen Anfuehrungszeichen enthalten.
 func addEmployee(t *testing.T, a *Server, name, team string) {
 	t.Helper()
-	call(t, a, http.MethodPost, "/api/mitarbeiter", `{"name":"`+name+`","team":"`+team+`"}`)
+	call(t, a, http.MethodPost, "/api/mitarbeiter",
+		mustJSON(map[string]string{"name": name, "team": team}))
 }
 
+// addShift traegt eine Schicht ein und legt den Mitarbeiter an, falls er noch
+// fehlt - die API nimmt nur bekannte Namen an.
 func addShift(t *testing.T, a *Server, date, shift, name string) {
 	t.Helper()
-	call(t, a, http.MethodPost, "/api/schicht",
-		`{"dates":["`+date+`"],"schicht":"`+shift+`","name":"`+name+`","action":"add"}`)
+	roh(a, http.MethodPost, "/api/mitarbeiter", mustJSON(map[string]string{"name": name, "team": "DE"}))
+	call(t, a, http.MethodPost, "/api/schicht", mustJSON(map[string]any{
+		"dates": []string{date}, "schicht": shift, "name": name, "action": "add",
+	}))
 }
 
 // ── Frontend contracts ────────────────────────────────────────────────────────
 
 func TestRufKWPlanUeberlebtDenRundlauf(t *testing.T) {
 	a := newTestApp(t)
+	addEmployee(t, a, "Anna", "DE")
 
 	// Die Oberfläche schickt den Plan in einer Hülle namens "ruf_kw".
 	call(t, a, http.MethodPost, "/api/ruf_kw", `{"ruf_kw":{"2026-W02":["Anna"]}}`)
@@ -176,9 +184,24 @@ func TestUmbenennenZiehtAlleEintraegeMit(t *testing.T) {
 
 func TestUnbrauchbareDatumsangabenWerdenUebergangen(t *testing.T) {
 	a := newTestApp(t)
-	// Ein zu kurzes Datum darf den Handler nicht umwerfen.
-	call(t, a, http.MethodPost, "/api/schicht",
-		`{"dates":["","2026-04-01"],"schicht":"frueh","name":"Anna","action":"add"}`)
+	addEmployee(t, a, "Anna", "DE")
+
+	// Leer, falsch geschrieben, und ein Tag, den es nicht gibt: alle drei
+	// fallen weg, der brauchbare Tag wird eingetragen.
+	res := call(t, a, http.MethodPost, "/api/schicht",
+		`{"dates":["","morgen","2026-02-31","0000-01-01","2026-04-01"],`+
+			`"schicht":"frueh","name":"Anna","action":"add"}`)
+
+	ergebnisse, _ := res["results"].(map[string]any)
+	if len(ergebnisse) != 1 {
+		t.Fatalf("nur der 1.4. sollte durchkommen: %#v", ergebnisse)
+	}
+	if _, ok := ergebnisse["2026-04-01"]; !ok {
+		t.Fatalf("der brauchbare Tag fehlt: %#v", ergebnisse)
+	}
+	if got := entered(t, a, "2026-04-01", "frueh"); len(got) != 1 {
+		t.Fatalf("1.4.: %v", got)
+	}
 }
 
 func TestICSUeberlebtExportUndImport(t *testing.T) {
@@ -506,8 +529,11 @@ func TestICSExportBrichtLangeZeilenUm(t *testing.T) {
 			t.Fatalf("line longer than 75 octets: %q", line)
 		}
 	}
-	// Und es muss den Rundlauf durch den eigenen Import überstehen.
+	// Und es muss den Rundlauf durch den eigenen Import überstehen. Der
+	// Mitarbeiter muss dort angelegt sein - Schichten gibt es nur für Leute,
+	// die es gibt.
 	b := newTestApp(t)
+	addEmployee(t, b, long, "DE")
 	body, ctype := multipartBody(t, "cal.ics", out)
 	r = httptest.NewRequest(http.MethodPost, "/api/import_ics", strings.NewReader(body))
 	r.Header.Set("Content-Type", ctype)

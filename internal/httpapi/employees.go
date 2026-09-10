@@ -240,6 +240,18 @@ func (srv *Server) handleRestoreMitarbeiter(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	namen, err := srv.bekannteNamen(r.Context(), s)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	// Wiederhergestellt wird erst, wenn der Mitarbeiter wieder da ist - die
+	// Oberflaeche legt ihn vorher an.
+	if !namen[body.Name] {
+		writeJSON(w, map[string]string{"error": "Mitarbeiter nicht gefunden: " + body.Name})
+		return
+	}
+
 	restored, err := s.AddShifts(r.Context(), "mitarbeiter:wiederherstellen", changes)
 	if err != nil {
 		fail(w, err)
