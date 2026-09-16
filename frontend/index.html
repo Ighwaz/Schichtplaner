@@ -353,6 +353,9 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .mx-kopf{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .mx-kopf h3{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;white-space:nowrap}
 .mx-kopf .mx-zahl{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);white-space:nowrap}
+.mx-kopf select{background:var(--surface2);border:2px solid var(--border);color:var(--text);
+  padding:4px 8px;border-radius:7px;font-size:12px;font-family:inherit;cursor:pointer}
+.mx-kopf select:focus{outline:none;border-color:var(--blue)}
 .mx-kopf .mx-zahl b{color:var(--text2)}
 .mx-scroll{overflow:auto;flex:1;min-height:0;border:2px solid var(--border);border-radius:11px;background:var(--surface)}
 .mx-table{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;table-layout:fixed;min-width:860px}
@@ -382,24 +385,32 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .mx-cell.we .mx-split{background:var(--surface3)}
 .mx-cell.hol .mx-split{background:color-mix(in srgb,var(--spaet) 13%,var(--surface2))}
 
-/* Der Trenner: oben die Arbeitsschicht, unten die Rufbereitschaft. */
+/* Der Trenner. Das erste Band ist das hohe (was einander ausschliesst),
+   jedes weitere ein Streifen darunter. Die Regeln haengen an der Stellung,
+   nicht an einem Namen - ein drittes Band waere damit von selbst der
+   naechste Streifen. */
 .mx-split{display:flex;flex-direction:column;height:34px;border-radius:5px;overflow:hidden;
   background:var(--surface2);border:1px solid transparent}
-.mx-a,.mx-r{display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;
-  font-weight:700;cursor:pointer;transition:filter .1s}
-.mx-a{flex:1;font-size:11px;color:var(--text3)}
-.mx-r{height:11px;flex:none;font-size:8px;letter-spacing:.5px;color:transparent;
-  border-top:1px solid var(--border)}
-.mx-a:hover,.mx-r:hover{outline:2px solid var(--blue);outline-offset:-2px;border-radius:3px}
+.mx-band{display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;
+  font-weight:700;cursor:pointer;transition:filter .1s;color:transparent;
+  height:11px;flex:none;font-size:8px;letter-spacing:.5px;border-top:1px solid var(--border)}
+.mx-band:first-child{flex:1;height:auto;font-size:11px;color:var(--text3);
+  letter-spacing:0;border-top:none}
+.mx-band:hover{outline:2px solid var(--blue);outline-offset:-2px;border-radius:3px}
+.mx-band[draggable=true]{cursor:grab}
+.mx-band.zieht{opacity:.35}
 /* Ausgangspunkt fuer Shift+Klick. Immer hoechstens einer. */
-.mx-a.anker,.mx-r.anker{box-shadow:inset 0 0 0 2px var(--blue)}
-.mx-a.frueh{background:var(--frueh-bg);color:var(--frueh-text)}
-.mx-a.normal{background:var(--normal-bg);color:var(--normal-text)}
-.mx-a.spaet{background:var(--spaet-bg);color:var(--spaet-text)}
-.mx-a.doppelt{background:var(--krank-bg);color:var(--krank-text)}
-.mx-r.an{background:var(--ruf-bg);color:var(--ruf-text);
+.mx-band.anker{box-shadow:inset 0 0 0 2px var(--blue)}
+.mx-split.ziel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.mx-band.frueh{background:var(--frueh-bg);color:var(--frueh-text)}
+.mx-band.normal{background:var(--normal-bg);color:var(--normal-text)}
+.mx-band.spaet{background:var(--spaet-bg);color:var(--spaet-text)}
+.mx-band.doppelt{background:var(--krank-bg);color:var(--krank-text)}
+.mx-band.rufbereitschaft{background:var(--ruf-bg);color:var(--ruf-text);
   border-top-color:color-mix(in srgb,var(--ruf) 40%,transparent)}
 .mx-split.belegt{border-color:var(--border)}
+/* Tage aus dem Nachbarmonat - in der Wochenansicht sichtbar, aber zurueck. */
+.mx-cell.fremd .mx-split{opacity:.5}
 
 /* Summenspalte: vier Zahlen in den Schichtfarben statt einer Kette. */
 .mx-sum{position:sticky;right:0;background:var(--surface2);width:96px;
@@ -415,10 +426,10 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 
 .mx-foot td{background:var(--surface2);position:sticky;bottom:0;z-index:2;border-top:1px solid var(--border)}
 .mx-foot .mx-split{background:transparent;height:30px}
-.mx-foot .mx-a,.mx-foot .mx-r{cursor:default;color:var(--text3);font-size:10px}
-.mx-foot .mx-r{font-size:8.5px}
-.mx-foot .mx-a:hover,.mx-foot .mx-r:hover{outline:none}
-.mx-foot .mx-a.unter,.mx-foot .mx-r.unter{background:var(--krank-bg);color:var(--krank-text);font-weight:800}
+.mx-foot .mx-band{cursor:default;color:var(--text3);font-size:8.5px}
+.mx-foot .mx-band:first-child{font-size:10px}
+.mx-foot .mx-band:hover{outline:none}
+.mx-foot .mx-band.unter{background:var(--krank-bg);color:var(--krank-text);font-weight:800}
 
 .mx-legend{display:flex;flex-wrap:wrap;gap:13px;align-items:center;font-size:11.5px;color:var(--text2);
   margin-left:auto}
@@ -708,7 +719,8 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   .mx-name,.mx-sum,.mx-table thead th,.mx-foot td{position:static!important}
   .mx-table{min-width:0!important}
   .mx-split{height:22px!important;border:1px solid var(--border)!important}
-  .mx-r{height:8px!important}
+  .mx-band{height:8px!important}
+  .mx-band:first-child{height:auto!important}
   .mx-hinweis{display:none!important}
   .ruf-col-body{max-height:none!important;overflow:visible!important}
   .ruf-split{display:block!important}
@@ -913,6 +925,8 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     <div class="mx-wrap">
       <div class="mx-kopf">
         <h3 id="mx-titel">Monatsübersicht</h3>
+        <select id="mx-zeitraum" title="Ganzer Monat oder eine einzelne Woche"></select>
+        <select id="mx-sort" title="Reihenfolge der Zeilen"></select>
         <span class="mx-zahl" id="mx-zahl"></span>
         <div class="mx-legend" id="mx-legend"></div>
       </div>
@@ -920,7 +934,9 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
         beides läuft am selben Tag nebeneinander. Ein Klick auf das obere Feld trägt die gewählte
         Arbeitsschicht ein oder aus, ein Klick auf den unteren Streifen die Rufbereitschaft.
         Mit <b>Shift+Klick</b> geht es vom zuletzt geklickten Tag (blau umrandet) bis hierher –
-        innerhalb derselben Zeile, also eine ganze Woche Rufbereitschaft in zwei Klicks.</p>
+        innerhalb derselben Zeile, also eine ganze Woche Rufbereitschaft in zwei Klicks.
+        Ein belegtes Feld lässt sich auf einen anderen Tag <b>ziehen</b>, ebenfalls nur in
+        derselben Zeile.</p>
       <div class="mx-scroll"><table class="mx-table" id="mx-table"></table></div>
     </div>
   </div>
@@ -1480,52 +1496,92 @@ function kurzName(name){
   return erstes.replace(/[,;]+$/, '');
 }
 
-// Was eine Zelle der Monatsuebersicht zeigt.
+// Die Baender einer Zelle in der Monatsuebersicht, von oben nach unten.
 //
-// Arbeitsschicht und Rufbereitschaft schliessen einander nicht aus, also
-// kann eine Zelle nicht eine Farbe haben - sie braucht zwei Felder. Vorher
-// gewann schlicht die erste gefundene Schicht; wer frueh arbeitete UND
+// Das erste Band fasst zusammen, was einander ausschliesst; jedes weitere
+// steht fuer eine Schichtart, die daneben herlaeuft. Arbeitsschicht und
+// Rufbereitschaft gelten am selben Tag gleichzeitig, also kann eine Zelle
+// nicht eine Farbe haben - sie braucht ein Feld je Art. Vorher gewann
+// schlicht die erste gefundene Schicht; wer frueh arbeitete UND
 // Rufbereitschaft hatte, sah eine gruene Zelle, und die Rufbereitschaft
 // verriet nur noch ein zweiter Buchstabe im Kuerzel.
 //
-// doppelt heisst: zwei einander ausschliessende Arbeitsschichten am selben
-// Tag. Das ist ein Fehler im Plan und wird oben angezeigt, nicht unten.
+// Kaeme eine weitere parallel laufende Art dazu, waere sie hier ein Eintrag
+// und sonst nirgends: Zellen, Fussleiste und Legende bauen sich daraus auf.
+const MATRIX_BAENDER = [
+  { id: 'arbeit', schichten: ARBEITSSCHICHTEN,    exklusiv: true  },
+  { id: 'ruf',    schichten: ['rufbereitschaft'], exklusiv: false },
+];
+
+// Was eine Zelle zeigt: je Band die Schicht, die dort steht.
+//
+// doppelt heisst: zwei einander ausschliessende Schichten in einem Band.
+// Das ist ein Fehler im Plan und wird in dem Band gemeldet, in das er
+// gehoert - nicht in einem anderen.
 function matrixZelle(slot, name){
   const tag  = slot || {};
   const drin = s => Array.isArray(tag[s]) && tag[s].includes(name);
-  const arbeit = ARBEITSSCHICHTEN.filter(drin);
-  const ruf    = drin('rufbereitschaft');
-  return {
-    arbeit:     arbeit[0] || null,
-    alleArbeit: arbeit,
-    doppelt:    arbeit.length > 1,
-    ruf,
-    leer:       arbeit.length === 0 && !ruf,
-  };
+  const baender = MATRIX_BAENDER.map(band => {
+    const alle = band.schichten.filter(drin);
+    return {
+      id:      band.id,
+      schicht: alle[0] || null,
+      alle,
+      doppelt: band.exklusiv && alle.length > 1,
+    };
+  });
+  return { baender, leer: baender.every(b => !b.schicht) };
 }
 
-// Besetzung eines Tages, getrennt nach Arbeit und Rufbereitschaft - die
-// Fussleiste der Monatsuebersicht zeigt beides uebereinander, so wie die
-// Zellen darueber. Unterbesetzung wird je Band gemeldet, damit eine fehlende
-// Rufbereitschaft nicht in der Summe der Arbeitsschichten untergeht.
+// Ein einzelnes Band einer Zelle - spart den find() an jeder Aufrufstelle.
+function matrixBand(zelle, id){
+  return (zelle && zelle.baender || []).find(b => b.id === id) || null;
+}
+
+// Besetzung eines Tages, je Band eine Zahl - die Fussleiste zeigt sie
+// uebereinander, so wie die Zellen darueber. Unterbesetzung wird je Band
+// gemeldet, damit eine fehlende Rufbereitschaft nicht in der Summe der
+// Arbeitsschichten untergeht.
 function matrixFuss(slot, key, soll){
-  const tag = slot || {};
-  const zahl = s => (tag[s] || []).length;
+  const tag   = slot || {};
   const fehlt = fehlbesetzung(tag, key, soll).map(f => f.schicht);
-  return {
-    arbeit:      ARBEITSSCHICHTEN.reduce((n, s) => n + zahl(s), 0),
-    ruf:         zahl('rufbereitschaft'),
-    arbeitFehlt: fehlt.some(s => ARBEITSSCHICHTEN.includes(s)),
-    rufFehlt:    fehlt.includes('rufbereitschaft'),
-  };
+  return MATRIX_BAENDER.map(band => ({
+    id:    band.id,
+    zahl:  band.schichten.reduce((n, s) => n + (tag[s] || []).length, 0),
+    fehlt: band.schichten.some(s => fehlt.includes(s)),
+  }));
+}
+
+// Reihenfolge der Zeilen in der Monatsuebersicht.
+//
+// zeilen sind {name, team, zaehl:{schicht: anzahl}}. Nach Name und Team
+// aufsteigend, nach einer Schicht absteigend - wer am meisten hat, steht
+// oben, denn danach sucht man. Gleichstand entscheidet immer der Name,
+// damit dieselbe Eingabe immer dieselbe Liste ergibt.
+//
+// Ohne Kriterium bleibt die Reihenfolge der Mitarbeiterliste stehen.
+// Die Eingabe wird nicht veraendert.
+function sortiereMatrix(zeilen, kriterium){
+  const liste = [...(zeilen || [])];
+  if(!kriterium) return liste;
+  const text     = w => String(w == null ? '' : w);
+  const nachName = (a, b) => text(a.name).localeCompare(text(b.name), 'de');
+  if(kriterium === 'name') return liste.sort(nachName);
+  if(kriterium === 'team')
+    return liste.sort((a, b) => text(a.team).localeCompare(text(b.team), 'de') || nachName(a, b));
+  if(SCHICHTEN.includes(kriterium)){
+    const zahl = z => Number((z && z.zaehl || {})[kriterium]) || 0;
+    return liste.sort((a, b) => zahl(b) - zahl(a) || nachName(a, b));
+  }
+  return liste;
 }
 
 global.Regelkern = {
-  SCHICHTEN, ARBEITSSCHICHTEN, MAX_TAGE,
+  SCHICHTEN, ARBEITSSCHICHTEN, MATRIX_BAENDER, MAX_TAGE,
   tagKey, alsDatum, isoWoche, tageImZeitraum, monatsRaster,
   sollAmTag, fehlbesetzung, unterSoll, tageUnterSoll,
   konflikte, naechsteAktion, zeitraumKlasse, kurzName, popupPlatz,
-  matrixZelle, matrixFuss,
+  matrixZelle, matrixBand, matrixFuss, sortiereMatrix,
 };
 })(globalThis);
 </script>
@@ -2172,6 +2228,7 @@ async function init(){
   bindEvents();
   ladeZoom();
   ladeSidebar();
+  ladeMatrixWahl();
 
   // Daten mit Wiederholung laden - beim Start der EXE steht der Server
   // manchmal noch nicht bereit
@@ -3745,20 +3802,45 @@ function renderCoverageNote(){
 // Rufbereitschaft hatte, sah eine grüne Zelle mit "FR" darin. Die
 // Rufbereitschaft war damit praktisch unsichtbar, obwohl sie der Grund ist,
 // warum es diese Ansicht gibt.
+// Welcher Zeitraum in der Übersicht steht: null = ganzer Monat, sonst die
+// laufende Nummer der Woche im Monatsraster. Eine Nummer statt eines
+// KW-Schlüssels, damit die Wahl den Monatswechsel überlebt - "die zweite
+// Woche" gibt es in jedem Monat, "KW 41" nicht.
+let mxWoche=null, mxSortierung='';
+
+// Die Tage, die die Tabelle zeigt. In der Wochenansicht volle Wochen von
+// Montag bis Sonntag, auch über den Monatsrand hinweg - eine Woche
+// Rufbereitschaft endet nicht am Monatsersten.
+function matrixTage(){
+  if(mxWoche===null) return daysOfMonth(curYear,curMonth);
+  const wochen=RK.monatsRaster(curYear,curMonth).wochen;
+  const w=wochen[Math.min(mxWoche,wochen.length-1)];
+  return w.keys.map(tagInfo);
+}
+
 function renderMatrix(){
   const tbl=document.getElementById('mx-table');
   if(!tbl) return;
-  const tage=daysOfMonth(curYear,curMonth);
-  const leute=visibleMembers();
+  const tage=matrixTage();
   const heute=(()=>{const n=new Date();return dk(n.getFullYear(),n.getMonth()+1,n.getDate());})();
 
   document.getElementById('mx-titel').textContent=`${MONTHS[curMonth-1]} ${curYear}`;
+  fuelleMatrixWahl();
 
   const lg=document.getElementById('mx-legend');
   lg.innerHTML=RK.ARBEITSSCHICHTEN.map(s=>
-    `<span><i class="mx-a ${s}">${SHIFT_SHORT[s][0]}</i>${esc(SHIFT_LABEL[s])}</span>`).join('')
-    +`<span><i class="mx-a doppelt">!</i>doppelt eingeteilt</span>`
-    +`<span><i class="mx-r an" style="height:auto">R</i>Rufbereitschaft</span>`;
+    `<span><i class="mx-band ${s}">${SHIFT_SHORT[s][0]}</i>${esc(SHIFT_LABEL[s])}</span>`).join('')
+    +`<span><i class="mx-band doppelt">!</i>doppelt eingeteilt</span>`
+    +`<span><i class="mx-band rufbereitschaft" style="height:auto;border-top:none">R</i>Rufbereitschaft</span>`;
+
+  // Erst zählen, dann sortieren: die Reihenfolge kann an den Zahlen hängen.
+  const gezaehlt=visibleMembers().map(m=>{
+    const zaehl=Object.fromEntries(ALL_SHIFTS.map(s=>[s,0]));
+    tage.forEach(t=>RK.matrixZelle(schichten[t.key],m.name).baender
+      .forEach(b=>b.alle.forEach(s=>zaehl[s]++)));
+    return {name:m.name, team:m.team||'', zaehl, m};
+  });
+  const leute=RK.sortiereMatrix(gezaehlt,mxSortierung);
 
   if(!leute.length){
     document.getElementById('mx-zahl').textContent='';
@@ -3772,63 +3854,193 @@ function renderMatrix(){
   const spalten='<colgroup><col style="width:196px">'+
     tage.map(()=>'<col>').join('')+'<col style="width:96px"></colgroup>';
 
+  // Klassen, die am Tag hängen - Kopf und Zellen brauchen dieselben.
+  const tagKlasse=t=>[t.we?'we':'', holidays[t.key]&&!holidays[t.key].bridge?'hol':'',
+    t.fremd?'fremd':''].filter(Boolean).join(' ');
+
   const kopf=['<thead><tr><th class="mx-name">Mitarbeiter</th>'];
   tage.forEach(t=>{
-    const feiertag=holidays[t.key]&&!holidays[t.key].bridge;
-    const cls=[t.we?'we':'', feiertag?'hol':'', t.key===heute?'heute':''].filter(Boolean).join(' ');
+    const cls=[tagKlasse(t), t.key===heute?'heute':''].filter(Boolean).join(' ');
     const titel=holidays[t.key]?`${t.lang} · ${esc(holidays[t.key].name)}`:t.lang;
     kopf.push(`<th class="${cls}" title="${titel}">${t.tag}<span class="mx-wd">${t.kurz}</span></th>`);
   });
   kopf.push('<th class="mx-sum" title="Summe je Schicht: Früh, Normaldienst, Spät, Rufbereitschaft">F&nbsp;N&nbsp;S&nbsp;R</th></tr></thead>');
 
   let gesamtRuf=0, gesamtArbeit=0;
-  const zeilen=leute.map(m=>{
-    const zellen=[], zaehl={frueh:0,normal:0,spaet:0,rufbereitschaft:0};
-    tage.forEach(t=>{
-      const z=RK.matrixZelle(schichten[t.key],m.name);
-      z.alleArbeit.forEach(s=>zaehl[s]++);
-      if(z.ruf) zaehl.rufbereitschaft++;
-      gesamtArbeit+=z.alleArbeit.length; gesamtRuf+=z.ruf?1:0;
-
-      const oben=z.doppelt?'doppelt':(z.arbeit||'');
-      const obenTxt=z.doppelt?'!':(z.arbeit?SHIFT_SHORT[z.arbeit][0]:'');
-      const teile=z.alleArbeit.map(s=>SHIFT_LABEL[s]).concat(z.ruf?[SHIFT_LABEL.rufbereitschaft]:[]);
-      const titel=`${esc(m.name)} · ${t.lang}${teile.length?' · '+teile.join(' + '):' · nicht eingeteilt'}`;
-      const zellKlasse=['mx-cell',t.we?'we':'',holidays[t.key]&&!holidays[t.key].bridge?'hol':''].filter(Boolean).join(' ');
-      zellen.push(`<td class="${zellKlasse}" title="${titel}">`+
-        `<div class="mx-split${z.leer?'':' belegt'}">`+
-          `<div class="mx-a ${oben}" data-key="${t.key}" data-name="${esc(m.name)}" data-band="arbeit">${obenTxt}</div>`+
-          `<div class="mx-r${z.ruf?' an':''}" data-key="${t.key}" data-name="${esc(m.name)}" data-band="ruf">R</div>`+
-        `</div></td>`);
+  const zeilen=leute.map(({name,zaehl,m})=>{
+    const zellen=tage.map(t=>{
+      const z=RK.matrixZelle(schichten[t.key],name);
+      const teile=[];
+      const felder=z.baender.map((b,i)=>{
+        b.alle.forEach(s=>teile.push(SHIFT_LABEL[s]));
+        if(b.id==='arbeit') gesamtArbeit+=b.alle.length; else gesamtRuf+=b.alle.length;
+        const klasse=b.doppelt?'doppelt':(b.schicht||'');
+        // Ein leerer Streifen bleibt beschriftet, aber durchsichtig - so ist
+        // er als Fläche anklickbar, ohne die Zeile zu beunruhigen. Das obere
+        // Band bleibt leer: dort wäre ein Platzhalter nur Unruhe.
+        const platzhalter=i===0?'':(SHIFT_SHORT[RK.MATRIX_BAENDER[i].schichten[0]]||[''])[0];
+        const txt=b.doppelt?'!':(b.schicht?SHIFT_SHORT[b.schicht][0]:platzhalter);
+        return `<div class="mx-band ${klasse}" data-key="${t.key}" data-name="${esc(name)}"`+
+          ` data-band="${b.id}"${b.schicht?` data-schicht="${b.schicht}" draggable="true"`:''}>${txt}</div>`;
+      }).join('');
+      const titel=`${esc(name)} · ${t.lang}${teile.length?' · '+teile.join(' + '):' · nicht eingeteilt'}`;
+      return `<td class="mx-cell ${tagKlasse(t)}" title="${titel}">`+
+        `<div class="mx-split${z.leer?'':' belegt'}" data-key="${t.key}" data-name="${esc(name)}">${felder}</div></td>`;
     });
-    const av=`<span class="avatar" style="background:${m.color};width:15px;height:15px;font-size:8px;display:inline-flex;vertical-align:-3px;margin-right:6px">${m.icon||initials(m.name)}</span>`;
+    const av=`<span class="avatar" style="background:${m.color};width:15px;height:15px;font-size:8px;display:inline-flex;vertical-align:-3px;margin-right:6px">${m.icon||initials(name)}</span>`;
     const summe=['frueh','normal','spaet','rufbereitschaft'].map((s,i)=>
       `<b class="s-${['f','n','s','r'][i]}${zaehl[s]?' hat':''}">${zaehl[s]}</b>`).join('');
-    return `<tr><td class="mx-name" title="${esc(m.name)}">${av}${esc(m.name)}<span class="mx-team">${esc(m.team||'')}</span></td>`+
+    return `<tr><td class="mx-name" title="${esc(name)}">${av}${esc(name)}<span class="mx-team">${esc(m.team||'')}</span></td>`+
       zellen.join('')+
       `<td class="mx-sum">${summe}</td></tr>`;
   });
 
-  // Fußzeile: Besetzung je Tag - genauso geteilt wie die Zellen darüber,
-  // damit eine fehlende Rufbereitschaft nicht in einer Zahlenkette untergeht.
+  // Fußzeile: Besetzung je Tag - genauso in Bänder geteilt wie die Zellen
+  // darüber, damit eine fehlende Rufbereitschaft nicht in einer Zahlenkette
+  // untergeht.
   const fuss=['<tr class="mx-foot"><td class="mx-name">Besetzung</td>'];
   tage.forEach(t=>{
-    const f=RK.matrixFuss(schichten[t.key],t.key,soll);
     const detail=ALL_SHIFTS.map(s=>`${SHIFT_LABEL[s]} ${(schichten[t.key]?.[s]||[]).length}/${sollFor(s,t.key)}`).join(' · ');
-    fuss.push(`<td title="${t.lang} · ${detail}"><div class="mx-split">`+
-      `<div class="mx-a${f.arbeitFehlt?' unter':''}">${f.arbeit}</div>`+
-      `<div class="mx-r${f.rufFehlt?' unter':''}">${f.ruf}</div></div></td>`);
+    const felder=RK.matrixFuss(schichten[t.key],t.key,soll)
+      .map(b=>`<div class="mx-band${b.fehlt?' unter':''}" data-band="${b.id}">${b.zahl}</div>`).join('');
+    fuss.push(`<td class="${tagKlasse(t)}" title="${t.lang} · ${detail}"><div class="mx-split">${felder}</div></td>`);
   });
   fuss.push('<td class="mx-sum"></td></tr>');
 
   tbl.innerHTML=spalten+kopf.join('')+'<tbody>'+zeilen.join('')+fuss.join('')+'</tbody>';
+  const zeitraum=mxWoche===null?'':' · '+(tage[0]?.kurzDatum||'')+'–'+(tage.at(-1)?.kurzDatum||'');
   document.getElementById('mx-zahl').textContent=
-    `${leute.length} Mitarbeiter · ${gesamtArbeit} Arbeitstage · ${gesamtRuf} Tage Rufbereitschaft`;
+    `${leute.length} Mitarbeiter · ${gesamtArbeit} Arbeitstage · ${gesamtRuf} Tage Rufbereitschaft${zeitraum}`;
 
   tbl.querySelectorAll('[data-band][data-key]').forEach(el=>{
     el.addEventListener('click',ev=>matrixKlick(el.dataset.key,el.dataset.name,el.dataset.band,ev.shiftKey));
   });
+  bindeMatrixZiehen(tbl);
   zeigeAnker();
+}
+
+// ── ZIEHEN IN DER ÜBERSICHT ───────────────────────────────────
+// Ein belegtes Band lässt sich auf einen anderen Tag ziehen. Nur innerhalb
+// derselben Zeile und desselben Bandes: eine Person, eine Schichtart. Wer
+// jemand anderem einen Dienst geben will, trägt aus und ein - das ist eine
+// andere Entscheidung und soll auch anders aussehen.
+let mxDrag=null;
+
+function bindeMatrixZiehen(tbl){
+  tbl.querySelectorAll('.mx-band[draggable=true]').forEach(el=>{
+    el.addEventListener('dragstart',ev=>{
+      // Die Schicht, die dort wirklich steht - nicht die gewaehlte. Sonst
+      // wuerde eine gezogene Spaetschicht als Frueh am Zieltag landen.
+      mxDrag={key:el.dataset.key,name:el.dataset.name,schicht:el.dataset.schicht};
+      if(ev.dataTransfer) ev.dataTransfer.effectAllowed='move';
+      setTimeout(()=>el.classList.add('zieht'),0);
+    });
+    el.addEventListener('dragend',()=>{
+      el.classList.remove('zieht'); mxDrag=null;
+      tbl.querySelectorAll('.mx-split.ziel').forEach(z=>z.classList.remove('ziel'));
+    });
+  });
+
+  tbl.querySelectorAll('.mx-split[data-key]').forEach(split=>{
+    const passt=()=>mxDrag&&mxDrag.name===split.dataset.name&&mxDrag.key!==split.dataset.key;
+    split.addEventListener('dragover',ev=>{
+      if(!passt()) return;          // fremde Zeile: kein gültiges Ziel
+      ev.preventDefault();
+      split.classList.add('ziel');
+    });
+    split.addEventListener('dragleave',()=>split.classList.remove('ziel'));
+    split.addEventListener('drop',ev=>{
+      split.classList.remove('ziel');
+      if(!passt()) return;
+      ev.preventDefault();
+      const {key:vonKey,name,schicht}=mxDrag;
+      mxDrag=null;
+      matrixZiehen(vonKey,split.dataset.key,name,schicht);
+    });
+  });
+}
+
+// Verschieben heißt: erst den Zieltag klären, dann den Ausgangstag räumen.
+// Andersherum wäre der Eintrag bei einer Rückfrage schon weg und käme am
+// Zieltag nie an - derselbe Fehler, der im Kalender schon einmal steckte.
+async function matrixZiehen(vonKey,nachKey,name,schicht){
+  if(vonKey===nachKey) return;
+  pushUndo();
+  let res=await postSchicht([nachKey],'add',schicht,name);
+  let r=res?.results?.[nachKey];
+
+  if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
+    const ersetzen=r.error==='needs_confirm';
+    const ok=ersetzen?await confirmReplaceShift(name,r.blocking,schicht)
+                     :await confirmHolidayEntry(name,[[nachKey,r]],schicht);
+    if(!ok){ undoStack.pop(); updateUndoBtns(); return; }   // Ausgangstag bleibt
+    res=await postSchicht([nachKey],'add',schicht,name,true,ersetzen);
+    r=res?.results?.[nachKey];
+    showHolWarnings(res.hol_warnings);
+  }
+  if(r?.error){ undoStack.pop(); updateUndoBtns(); toast('Verschieben nicht möglich'); return; }
+
+  applyResults(res.results);
+  await applySchicht([vonKey],'remove',schicht,name);
+  renderMatrix();
+  toast(`${RK.kurzName(name)} verschoben`);
+}
+
+// Die beiden Auswahlfelder im Kopf. Die Wochenliste hängt am Monat und wird
+// deshalb bei jedem Aufbau neu gefüllt.
+function fuelleMatrixWahl(){
+  const zr=document.getElementById('mx-zeitraum');
+  if(zr){
+    const wochen=RK.monatsRaster(curYear,curMonth).wochen;
+    zr.innerHTML='<option value="">Ganzer Monat</option>'+wochen.map((w,i)=>{
+      const von=tagInfo(w.keys[0]), bis=tagInfo(w.keys[6]);
+      return `<option value="${i}">KW ${String(w.kw).padStart(2,'0')} · ${von.kurzDatum}–${bis.kurzDatum}</option>`;
+    }).join('');
+    // Die Woche überlebt den Monatswechsel als Nummer; hat der neue Monat
+    // weniger Wochen, rückt die Wahl auf die letzte.
+    if(mxWoche!==null) mxWoche=Math.min(mxWoche,wochen.length-1);
+    zr.value=mxWoche===null?'':String(mxWoche);
+    if(!zr._wired){
+      zr.addEventListener('change',()=>{
+        mxWoche=zr.value===''?null:parseInt(zr.value,10);
+        merkeMatrixWahl(); renderMatrix();
+      });
+      zr._wired=true;
+    }
+  }
+  const so=document.getElementById('mx-sort');
+  if(so){
+    if(!so.options.length){
+      so.innerHTML='<option value="">Reihenfolge der Liste</option>'+
+        '<option value="name">Name A–Z</option><option value="team">Team</option>'+
+        ALL_SHIFTS.map(s=>`<option value="${s}">Meiste ${esc(SHIFT_LABEL[s])}</option>`).join('');
+    }
+    so.value=mxSortierung;
+    if(!so._wired){
+      so.addEventListener('change',()=>{
+        mxSortierung=so.value; merkeMatrixWahl(); renderMatrix();
+      });
+      so._wired=true;
+    }
+  }
+}
+
+// Zeitraum und Sortierung überleben den Neustart - wie Anzeigegröße und
+// Theme. localStorage kann fehlschlagen (privates Fenster, gesperrte
+// Seitendaten); dann bleibt es eben bei der Vorgabe.
+function merkeMatrixWahl(){
+  try{
+    localStorage.setItem('schichtplaner-mx-woche',mxWoche===null?'':String(mxWoche));
+    localStorage.setItem('schichtplaner-mx-sort',mxSortierung);
+  }catch(e){}
+}
+function ladeMatrixWahl(){
+  try{
+    const w=localStorage.getItem('schichtplaner-mx-woche');
+    if(w!==null&&w!=='') { const n=parseInt(w,10); if(Number.isInteger(n)&&n>=0) mxWoche=n; }
+    const s=localStorage.getItem('schichtplaner-mx-sort');
+    if(s!==null&&(s===''||s==='name'||s==='team'||ALL_SHIFTS.includes(s))) mxSortierung=s;
+  }catch(e){}
 }
 
 // Ring um den zuletzt geklickten Tag - von dort spannt Shift+Klick auf.
@@ -3896,15 +4108,24 @@ async function matrixEinzelklick(key,name,schicht){
   else { applyResults(res.results);showHolWarnings(res.hol_warnings); }
 }
 
+// Ein Tag in der Form, die die Spaltenköpfe brauchen. fremd heißt: gehört
+// nicht zum offenen Monat - kommt nur in der Wochenansicht vor, wenn eine
+// Woche über den Monatsrand reicht.
+function tagInfo(key){
+  const dt=RK.alsDatum(key), wd=dt.getDay();
+  return {
+    key, tag:dt.getDate(), kurz:['So','Mo','Di','Mi','Do','Fr','Sa'][wd],
+    we:wd===0||wd===6,
+    fremd:dt.getMonth()+1!==curMonth||dt.getFullYear()!==curYear,
+    kurzDatum:dt.toLocaleDateString('de-DE',{day:'numeric',month:'short'}),
+    lang:dt.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'}),
+  };
+}
+
 // Tage des Monats mit Kurzform für die Spaltenköpfe
 function daysOfMonth(jahr,monat){
   const out=[], letzter=new Date(jahr,monat,0).getDate();
-  for(let d=1;d<=letzter;d++){
-    const dt=new Date(jahr,monat-1,d), wd=dt.getDay();
-    out.push({key:dk(jahr,monat,d), tag:d, kurz:['So','Mo','Di','Mi','Do','Fr','Sa'][wd],
-      we:wd===0||wd===6,
-      lang:dt.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})});
-  }
+  for(let d=1;d<=letzter;d++) out.push(tagInfo(dk(jahr,monat,d)));
   return out;
 }
 

@@ -82,7 +82,7 @@ describe('Monatsübersicht', () => {
   // Oberes Band (Arbeitsschicht) bzw. unterer Streifen (Rufbereitschaft)
   // einer bestimmten Person an einem bestimmten Tag.
   const band = (o, key, name, welches) =>
-    o.$$(`#mx-table .mx-${welches === 'ruf' ? 'r' : 'a'}[data-key="${key}"]`)
+    o.$$(`#mx-table [data-band="${welches}"][data-key="${key}"]`)
       .find(el => el.dataset.name === name);
 
   async function oeffneUebersicht(vorgabe, jahr = 2026, monat = 9) {
@@ -104,9 +104,9 @@ describe('Monatsübersicht', () => {
     assert.ok(namen.at(-1).includes('Besetzung'));
 
     // Jede Zelle hat zwei Felder - oben Arbeit, unten Rufbereitschaft.
-    assert.equal(o.$$('#mx-table .mx-a[data-key]').length, 30 * 3,
+    assert.equal(o.$$('#mx-table [data-band="arbeit"][data-key]').length, 30 * 3,
       'September hat 30 Tage mal 3 Personen');
-    assert.equal(o.$$('#mx-table .mx-r[data-key]').length, 30 * 3,
+    assert.equal(o.$$('#mx-table [data-band="ruf"][data-key]').length, 30 * 3,
       'der Streifen für die Rufbereitschaft fehlt an manchen Tagen');
   });
 
@@ -128,11 +128,11 @@ describe('Monatsübersicht', () => {
     const unten = band(o, '2026-09-03', 'Bauer, Martin', 'ruf');
     assert.ok(oben.classList.contains('frueh'), 'die Frühschicht fehlt oben');
     assert.equal(oben.textContent, 'F');
-    assert.ok(unten.classList.contains('an'), 'die Rufbereitschaft fehlt unten');
+    assert.ok(unten.classList.contains('rufbereitschaft'), 'die Rufbereitschaft fehlt unten');
 
     // Und die Gegenprobe: ein Tag ohne Rufbereitschaft trägt den Streifen
     // zwar, aber unmarkiert.
-    assert.ok(!band(o, '2026-09-04', 'Bauer, Martin', 'ruf').classList.contains('an'));
+    assert.ok(!band(o, '2026-09-04', 'Bauer, Martin', 'ruf').classList.contains('rufbereitschaft'));
   });
 
   test('ein Klick oben trägt für die Person dieser Zeile ein', async () => {
@@ -358,6 +358,189 @@ describe('Monatsübersicht', () => {
     assert.equal(o.$$('#mx-table .anker').length, 1);
   });
 
+  test('ein drittes Band ist ein Eintrag, kein Umbau', async () => {
+    // Der offene Punkt aus dem letzten Durchgang: käme eine weitere Schichtart
+    // dazu, die neben den anderen herläuft, soll die Zelle sie zeigen, ohne
+    // dass Zellen, Fußzeile und Legende einzeln angefasst werden.
+    //
+    // Jedes Fenster bekommt einen eigenen Regelkern, die Ergänzung hier
+    // bleibt also in diesem Test. Eine echte dritte Schichtart gibt es in
+    // diesem Zweig nicht - geprüft wird die Mechanik, nicht ein Produkt.
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-07': { frueh: [], normal: ['Nair, Anita'], spaet: [], rufbereitschaft: [] },
+      },
+    });
+    o.fenster.Regelkern.MATRIX_BAENDER.push({
+      id: 'probe', schichten: ['normal'], exklusiv: false,
+    });
+    o.fenster.renderMatrix();
+
+    const zelle = band(o, '2026-09-07', 'Nair, Anita', 'probe');
+    assert.ok(zelle, 'das dritte Band fehlt in den Zellen');
+    assert.ok(zelle.classList.contains('normal'), 'es trägt die Farbe seiner Schicht nicht');
+    // Die Fußzeile zieht mit, ohne eigenes Zutun.
+    assert.equal(o.$$('#mx-table .mx-foot [data-band]').length, 3 * 30,
+      'die Fußzeile kennt das dritte Band nicht');
+  });
+
+  // ── Reihenfolge der Zeilen ──
+  const zeilenNamen = o => o.$$('#mx-table tbody tr:not(.mx-foot) .mx-name')
+    .map(td => td.title);
+
+  async function waehle(o, id, wert) {
+    const el = o.$(id);
+    el.value = wert;
+    el.dispatchEvent(new o.fenster.Event('change'));
+    await ruhe();
+  }
+
+  test('ohne Wahl bleibt die Reihenfolge der Mitarbeiterliste', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    assert.deepEqual(zeilenNamen(o), ['Bauer, Martin', 'Krüger, Sina', 'Nair, Anita']);
+  });
+
+  test('nach Rufbereitschaft sortiert steht oben, wer am meisten hat', async () => {
+    const schichten = {};
+    // Nair 3 Tage, Krüger 1 Tag, Bauer keinen.
+    for (const [t, wer] of [[7, 'Nair, Anita'], [8, 'Nair, Anita'], [9, 'Nair, Anita'],
+      [10, 'Krüger, Sina']]) {
+      schichten[`2026-09-${String(t).padStart(2, '0')}`] =
+        { frueh: [], normal: [], spaet: [], rufbereitschaft: [wer] };
+    }
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM, schichten });
+    await waehle(o, '#mx-sort', 'rufbereitschaft');
+    assert.deepEqual(zeilenNamen(o), ['Nair, Anita', 'Krüger, Sina', 'Bauer, Martin']);
+  });
+
+  test('nach Namen sortiert, und die Wahl überlebt den Monatswechsel', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    await waehle(o, '#mx-sort', 'name');
+    assert.deepEqual(zeilenNamen(o), ['Bauer, Martin', 'Krüger, Sina', 'Nair, Anita']);
+
+    klick(o.$('#btn-next'));
+    await ruhe();
+    assert.equal(o.$('#mx-sort').value, 'name', 'die Sortierung ist verloren gegangen');
+  });
+
+  // ── Woche statt Monat ──
+  const spaltenZahl = o => o.$$('#mx-table thead th').length - 2; // ohne Name und Summe
+
+  test('eine einzelne Woche zeigt sieben Spalten', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    assert.equal(spaltenZahl(o), 30, 'September hat 30 Tage');
+
+    await waehle(o, '#mx-zeitraum', '0');
+    assert.equal(spaltenZahl(o), 7, 'eine Woche hat sieben Tage');
+
+    await waehle(o, '#mx-zeitraum', '');
+    assert.equal(spaltenZahl(o), 30, 'zurück auf den ganzen Monat');
+  });
+
+  test('eine Woche läuft über den Monatsrand, der Nachbarmonat ist markiert', async () => {
+    // Die erste Woche des September 2026 beginnt am Montag, dem 31. August.
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    await waehle(o, '#mx-zeitraum', '0');
+
+    const koepfe = o.$$('#mx-table thead th').slice(1, -1);
+    assert.equal(koepfe.length, 7);
+    assert.ok(koepfe[0].classList.contains('fremd'),
+      'der 31. August ist nicht als Nachbarmonat markiert');
+    assert.ok(!koepfe[1].classList.contains('fremd'), 'der 1. September ist kein Nachbarmonat');
+    // Und er ist trotzdem bedienbar - eine Woche Rufbereitschaft endet nicht
+    // am Monatsersten.
+    assert.ok(band(o, '2026-08-31', 'Bauer, Martin', 'ruf'), 'der 31.8. fehlt ganz');
+  });
+
+  test('die gewählte Woche überlebt den Monatswechsel als Nummer', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    await waehle(o, '#mx-zeitraum', '2');
+    klick(o.$('#btn-next'));
+    await ruhe();
+    assert.equal(o.$('#mx-zeitraum').value, '2', 'die Woche ist verloren gegangen');
+    assert.equal(spaltenZahl(o), 7);
+  });
+
+  // ── Ziehen ──
+  function ziehe(o, feld, zielSplit) {
+    const start = new o.fenster.Event('dragstart', { bubbles: true });
+    start.dataTransfer = { effectAllowed: '' };
+    feld.dispatchEvent(start);
+    const drop = new o.fenster.Event('drop', { bubbles: true });
+    drop.dataTransfer = { effectAllowed: '' };
+    zielSplit.dispatchEvent(drop);
+  }
+  const splitVon = (o, key, name) => o.$$(`#mx-table .mx-split[data-key="${key}"]`)
+    .find(el => el.dataset.name === name);
+
+  test('ein Eintrag lässt sich auf einen anderen Tag ziehen', async () => {
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-07': { frueh: [], normal: [], spaet: [], rufbereitschaft: ['Nair, Anita'] },
+      },
+    });
+    ziehe(o, band(o, '2026-09-07', 'Nair, Anita', 'ruf'), splitVon(o, '2026-09-14', 'Nair, Anita'));
+    await warteBis(() => rufAn(o, [14]).length === 1, 'den Zieltag');
+    await warteBis(() => rufAn(o, [7]).length === 0, 'den geräumten Ausgangstag');
+  });
+
+  test('gezogen wird die Schicht, die dort steht - nicht die gewählte', async () => {
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-07': { frueh: [], normal: [], spaet: ['Nair, Anita'], rufbereitschaft: [] },
+      },
+    });
+    o.fenster.waehleSchicht('frueh');   // etwas anderes ist gewählt
+    ziehe(o, band(o, '2026-09-07', 'Nair, Anita', 'arbeit'), splitVon(o, '2026-09-08', 'Nair, Anita'));
+    await warteBis(() => tagVon(o, 8, 'spaet').includes('Nair, Anita'), 'die Spätschicht am Zieltag');
+    assert.deepEqual(tagVon(o, 8, 'frueh'), [], 'die gewählte Frühschicht wurde eingetragen');
+    assert.deepEqual(tagVon(o, 7, 'spaet'), [], 'der Ausgangstag wurde nicht geräumt');
+  });
+
+  test('in eine fremde Zeile gezogen passiert nichts', async () => {
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-07': { frueh: [], normal: [], spaet: [], rufbereitschaft: ['Nair, Anita'] },
+      },
+    });
+    ziehe(o, band(o, '2026-09-07', 'Nair, Anita', 'ruf'),
+      splitVon(o, '2026-09-14', 'Bauer, Martin'));
+    await ruhe(); await ruhe();
+    assert.equal(rufAn(o, [7]).length, 1, 'der Ausgangstag wurde geräumt');
+    assert.deepEqual(tagVon(o, 14, 'rufbereitschaft'), [],
+      'der Dienst ist in einer fremden Zeile gelandet');
+  });
+
+  test('ein Eintrag geht beim Ziehen in einen Konflikt nicht verloren', async () => {
+    // Nair hat am 7. Früh und am 8. bereits Spät. Die Frühschicht auf den 8.
+    // gezogen löst dieselbe Rückfrage aus wie ein Klick. Was nicht passieren
+    // darf: der Eintrag verschwindet vom 7. und taucht am 8. nie auf.
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-07': { frueh: ['Nair, Anita'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-08': { frueh: [], normal: [], spaet: ['Nair, Anita'], rufbereitschaft: [] },
+      },
+    });
+    ziehe(o, band(o, '2026-09-07', 'Nair, Anita', 'arbeit'), splitVon(o, '2026-09-08', 'Nair, Anita'));
+    await warteBis(() => o.$('#_cdlg'), 'die Rückfrage');
+
+    // Solange die Rückfrage offen steht, ist nichts verschoben.
+    assert.deepEqual(tagVon(o, 7, 'frueh'), ['Nair, Anita'],
+      'der Ausgangstag wurde geräumt, bevor der Zieltag geklärt war');
+    assert.deepEqual(tagVon(o, 8, 'frueh'), [], 'am Zieltag steht die Schicht ohne Bestätigung');
+
+    // Abbrechen lässt beide Tage, wie sie waren.
+    klick(o.$('#_cdlg-no'));
+    await ruhe(); await ruhe();
+    assert.deepEqual(tagVon(o, 7, 'frueh'), ['Nair, Anita'], 'der Ausgangstag ging verloren');
+    assert.deepEqual(tagVon(o, 8, 'spaet'), ['Nair, Anita'], 'der Zieltag wurde verändert');
+  });
+
   test('die Fußzeile meldet fehlende Rufbereitschaft getrennt', async () => {
     const o = await oeffneUebersicht({
       mitarbeiter: TEAM,
@@ -369,9 +552,9 @@ describe('Monatsübersicht', () => {
     });
     const fuss = o.$('#mx-table .mx-foot');
     const spalte = [...fuss.children][3]; // Name + 1.9. + 2.9. + 3.9.
-    assert.ok(!spalte.querySelector('.mx-a').classList.contains('unter'),
+    assert.ok(!spalte.querySelector('[data-band="arbeit"]').classList.contains('unter'),
       'die Arbeitsschicht ist besetzt, wird aber bemängelt');
-    assert.ok(spalte.querySelector('.mx-r').classList.contains('unter'),
+    assert.ok(spalte.querySelector('[data-band="ruf"]').classList.contains('unter'),
       'die fehlende Rufbereitschaft wird nicht gemeldet');
   });
 });

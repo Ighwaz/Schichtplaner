@@ -23,9 +23,13 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   Rufbereitschaft. **Shift+Klick** zieht vom zuletzt geklickten Tag bis hierher
   auf – nur innerhalb derselben Zeile und desselben Bandes, also eine ganze
   Woche Rufbereitschaft in zwei Klicks, ohne je eine fremde Zeile zu treffen.
-  Rechts die Summen F/N/S/R je Person, unten die Besetzung je
-  Tag – ebenfalls getrennt, damit eine fehlende Rufbereitschaft nicht in der
-  Summe der Arbeitsschichten untergeht
+  Ein belegtes Feld lässt sich auf einen anderen Tag **ziehen**, ebenfalls nur
+  in derselben Zeile. Die Zeilen lassen sich **sortieren** (Name, Team oder
+  „meiste Spätschichten“), und statt des ganzen Monats lässt sich eine
+  **einzelne Woche** zeigen – Montag bis Sonntag, auch über den Monatsrand
+  hinweg. Beides wird gemerkt. Rechts die Summen F/N/S/R je Person, unten die
+  Besetzung je Tag – ebenfalls getrennt, damit eine fehlende Rufbereitschaft
+  nicht in der Summe der Arbeitsschichten untergeht
 - **Feiertage** DE (BW) und IN inkl. Brückentagen und eigenen Feiertagen.
   Ein Eintrag am Feiertag des eigenen Teams wird abgefragt, nicht verhindert
 - **Konfliktprüfung**: wer schon in einer anderen Schicht steht, wird nur nach
