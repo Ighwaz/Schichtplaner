@@ -47,6 +47,9 @@ func (srv *Server) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 		Year     int    `json:"year"`
 		Month    int    `json:"month"`
 		Template string `json:"template"`
+		// Modus "angleichen" passt bestehende Einträge dem Template an;
+		// ohne Angabe wird nur ergänzt.
+		Modus string `json:"modus"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -82,11 +85,22 @@ func (srv *Server) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	tmpl = geplant
+	modus := domain.NurErgaenzen
+	if body.Modus == domain.Angleichen {
+		modus = domain.Angleichen
+	}
 	plan := domain.ApplyTemplate(tmpl, body.Year, body.Month, d.Schichten,
-		domain.AllHolidays(body.Year, d.CustomHolidays), teams)
+		domain.AllHolidays(body.Year, d.CustomHolidays), teams, modus)
 
 	s, ok := srv.requireStore(w)
 	if !ok {
+		return
+	}
+	// Erst abgeben, dann eintragen - sonst stünde jemand kurzzeitig in zwei
+	// Arbeitsschichten desselben Tages.
+	removed, err := s.RemoveShifts(r.Context(), "autoplan:"+body.Template, plan.Removes)
+	if err != nil {
+		fail(w, err)
 		return
 	}
 	planned, err := s.AddShifts(r.Context(), "autoplan:"+body.Template, plan.Changes)
@@ -99,6 +113,7 @@ func (srv *Server) handleAutoplan(w http.ResponseWriter, r *http.Request) {
 		"planned":          planned,
 		"skipped_holiday":  plan.SkippedHoliday,
 		"skipped_conflict": plan.SkippedConflict,
+		"ersetzt":          removed,
 		"unbekannt":        sortiert(fehlend),
 	})
 }

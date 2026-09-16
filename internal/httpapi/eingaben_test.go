@@ -437,3 +437,67 @@ func TestAutoplanUebergehtGeloeschteMitarbeiter(t *testing.T) {
 		t.Fatalf("Montag des Gelöschten geplant: %v", got)
 	}
 }
+
+// ── Template angleichen ───────────────────────────────────────────────────────
+
+func TestAutoplanAngleichenTauschtBestehendeEintraege(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Bauer", "DE")
+	// Montag, 5.10.2026: Bauer steht in Früh, zusätzlich in Rufbereitschaft.
+	addShift(t, a, "2026-10-05", "frueh", "Bauer")
+	addShift(t, a, "2026-10-05", "rufbereitschaft", "Bauer")
+
+	// Im Template steht der Montag jetzt auf Spät.
+	call(t, a, http.MethodPost, "/api/templates", `{"name":"t","template":{"Bauer":{"0":"spaet"}}}`)
+	res := call(t, a, http.MethodPost, "/api/autoplan",
+		`{"year":2026,"month":10,"template":"t","modus":"angleichen"}`)
+
+	if res["ersetzt"] == 0.0 {
+		t.Fatalf("nichts ersetzt: %v", res)
+	}
+	if got := entered(t, a, "2026-10-05", "frueh"); len(got) != 0 {
+		t.Fatalf("Früh steht noch: %v", got)
+	}
+	if got := entered(t, a, "2026-10-05", "spaet"); len(got) != 1 {
+		t.Fatalf("Spät fehlt: %v", got)
+	}
+	if got := entered(t, a, "2026-10-05", "rufbereitschaft"); len(got) != 1 {
+		t.Fatalf("die Rufbereitschaft wurde mitgerissen: %v", got)
+	}
+}
+
+func TestAutoplanOhneModusErgaenztNur(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Bauer", "DE")
+	addShift(t, a, "2026-10-05", "frueh", "Bauer")
+
+	call(t, a, http.MethodPost, "/api/templates", `{"name":"t","template":{"Bauer":{"0":"spaet"}}}`)
+	res := call(t, a, http.MethodPost, "/api/autoplan", `{"year":2026,"month":10,"template":"t"}`)
+
+	if res["ersetzt"] != 0.0 {
+		t.Fatalf("ohne Modus wurde ersetzt: %v", res)
+	}
+	if got := entered(t, a, "2026-10-05", "frueh"); len(got) != 1 {
+		t.Fatalf("der bestehende Eintrag wurde angetastet: %v", got)
+	}
+}
+
+func TestAngleichenWirktAbDemGewaehltenMonat(t *testing.T) {
+	a := newTestApp(t)
+	addEmployee(t, a, "Bauer", "DE")
+	// Zwei Montage: einer im September, einer im Oktober.
+	addShift(t, a, "2026-09-07", "frueh", "Bauer")
+	addShift(t, a, "2026-10-05", "frueh", "Bauer")
+
+	call(t, a, http.MethodPost, "/api/templates", `{"name":"t","template":{"Bauer":{"0":"spaet"}}}`)
+	call(t, a, http.MethodPost, "/api/autoplan",
+		`{"year":2026,"month":10,"template":"t","modus":"angleichen"}`)
+
+	// Der Oktober folgt dem Template, der September bleibt unangetastet.
+	if got := entered(t, a, "2026-10-05", "spaet"); len(got) != 1 {
+		t.Fatalf("Oktober nicht angeglichen: %v", got)
+	}
+	if got := entered(t, a, "2026-09-07", "frueh"); len(got) != 1 {
+		t.Fatalf("September wurde mitverändert: %v", got)
+	}
+}

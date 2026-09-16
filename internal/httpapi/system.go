@@ -26,7 +26,25 @@ func (srv *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]bool{"ok": true})
 		return
 	}
-	if srv.write(w, func(s *store.Store) error { return s.ReplaceAllShifts(r.Context(), body.Schichten) }) {
+	s, ok := srv.requireStore(w)
+	if !ok {
+		return
+	}
+	namen, err := srv.bekannteNamen(r.Context(), s)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	// Ein Rückgängig-Sprung schickt einen älteren Stand des ganzen Plans -
+	// darin können Namen stehen, die inzwischen umbenannt oder gelöscht sind.
+	sauber := make(map[string]domain.DaySlot, len(body.Schichten))
+	for datum, slot := range body.Schichten {
+		if domain.IstTagesschluessel(datum) {
+			sauber[datum] = domain.NurBekannte(slot, namen)
+		}
+	}
+
+	if srv.write(w, func(s *store.Store) error { return s.ReplaceAllShifts(r.Context(), sauber) }) {
 		writeJSON(w, map[string]bool{"ok": true})
 	}
 }

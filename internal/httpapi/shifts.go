@@ -214,7 +214,20 @@ func (srv *Server) handlePaste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Dates = domain.NurEchteTage(body.Dates)
-	ok := srv.write(w, func(s *store.Store) error {
+
+	s, ok := srv.requireStore(w)
+	if !ok {
+		return
+	}
+	namen, err := srv.bekannteNamen(r.Context(), s)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	// Ein kopierter Tag kann von vor einer Umbenennung stammen.
+	body.Slot = domain.NurBekannte(body.Slot, namen)
+
+	ok = srv.write(w, func(s *store.Store) error {
 		if body.Mode == "replace" {
 			return s.ReplaceDays(r.Context(), body.Dates, body.Slot)
 		}

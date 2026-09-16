@@ -263,3 +263,77 @@ describe('Rufbereitschaft aus dem Kalender lesen', () => {
       `ein Tag wurde zur ganzen Woche: ${JSON.stringify(o.api.zustand.ruf_kw)}`);
   });
 });
+
+describe('Austragen im Kalender', () => {
+  const mitEintraegen = () => starteOberflaeche({
+    mitarbeiter: TEAM,
+    schichten: {
+      '2026-09-03': {
+        frueh: ['Bauer, Martin'], normal: [], spaet: ['Krüger, Sina'],
+        rufbereitschaft: ['Nair, Anita'],
+      },
+      '2026-09-09': {
+        frueh: ['Krüger, Sina'], normal: [], spaet: [], rufbereitschaft: [],
+      },
+    },
+  });
+
+  test('jeder Chip trägt ein eigenes Kreuz zum Austragen', async () => {
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    const chip = o.$('.day-cell[data-key="2026-09-03"] .chip');
+    const kreuz = chip.querySelector('[data-weg]');
+    assert.ok(kreuz, 'kein Kreuz am Chip');
+    assert.match(kreuz.title, /austragen/i);
+
+    klick(kreuz);
+    await warteBis(() => frueh(o, '2026-09-03').length === 0, 'das Austragen');
+    assert.deepEqual(o.api.zustand.schichten['2026-09-03'].spaet, ['Krüger, Sina'],
+      'die anderen Schichten wurden mitgenommen');
+  });
+
+  test('ein Klick auf den Chip selbst trägt nicht mehr aus', async () => {
+    // Früher entfernte jeder Klick auf einen Chip den Eintrag - unsichtbar für
+    // den, der es nicht wusste, und ein Stolperstein beim Aufziehen.
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    const chip = o.$('.day-cell[data-key="2026-09-03"] .chip .chip-name');
+    klick(chip);
+    await ruhe();
+    assert.equal(frueh(o, '2026-09-03').length, 1, 'der Eintrag ist weg');
+  });
+
+  test('ein Zeitraum über fremde Chips löscht nichts', async () => {
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.selectPerson('Bauer, Martin');
+    o.fenster.waehleSchicht('frueh');
+
+    klick(o.$('.day-cell[data-key="2026-09-07"]'));
+    await ruhe();
+    // Der zweite Klick landet auf dem Kreuz eines fremden Chips - mit Shift
+    // zählt er trotzdem als Klick auf den Tag.
+    const fremdesKreuz = o.$('.day-cell[data-key="2026-09-09"] .chip [data-weg]');
+    assert.ok(fremdesKreuz, 'kein fremder Chip zum Danebenklicken');
+    klick(fremdesKreuz, { shiftKey: true });
+    await warteBis(() => frueh(o, '2026-09-08').includes('Bauer, Martin'), 'den Zeitraum');
+
+    assert.ok(frueh(o, '2026-09-09').includes('Krüger, Sina'),
+      'der fremde Eintrag wurde beim Aufziehen gelöscht');
+    assert.ok(frueh(o, '2026-09-09').includes('Bauer, Martin'),
+      'der Zeitraum endet nicht am gewählten Tag');
+  });
+
+  test('auch Strg+Klick auf ein Kreuz löscht nicht', async () => {
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.selectPerson('Bauer, Martin');
+    o.fenster.waehleSchicht('frueh');
+
+    const kreuz = o.$('.day-cell[data-key="2026-09-09"] .chip [data-weg]');
+    klick(kreuz, { ctrlKey: true });
+    await ruhe();
+    assert.ok(frueh(o, '2026-09-09').includes('Krüger, Sina'), 'Eintrag gelöscht');
+    assert.equal(o.$$('.day-cell.multi-day').length, 1, 'der Tag wurde nicht gesammelt');
+  });
+});

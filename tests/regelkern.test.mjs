@@ -516,3 +516,69 @@ describe('Gegenproben', () => {
     }
   });
 });
+
+describe('popupPlatz', () => {
+  const fenster = { breite: 1400, hoehe: 900 };
+  const liste = { breite: 260, hoehe: 400 };
+
+  test('unter dem Anker, wenn dort Platz ist', () => {
+    const p = RK.popupPlatz({ left: 300, right: 340, top: 100, bottom: 120 }, liste, fenster);
+    assert.equal(p.nachOben, false);
+    assert.equal(p.top, 124);
+    assert.equal(p.left, 300);
+    assert.equal(p.maxHoehe, 400, 'ohne Not darf nicht gedeckelt werden');
+  });
+
+  test('über dem Anker, wenn unten zu wenig Platz ist', () => {
+    // Anker am unteren Rand: unter ihm bleiben 80 px, über ihm 792.
+    const p = RK.popupPlatz({ left: 300, right: 340, top: 800, bottom: 812 }, liste, fenster);
+    assert.equal(p.nachOben, true);
+    assert.equal(p.top, 800 - 400 - 4);
+    assert.ok(p.top >= 8, 'ragt oben heraus');
+  });
+
+  test('gedeckelt und scrollbar, wenn es nirgends passt', () => {
+    const klein = { breite: 800, hoehe: 300 };
+    const p = RK.popupPlatz({ left: 10, right: 40, top: 140, bottom: 160 }, liste, klein);
+    // Unter dem Anker 132 px, darüber 132 px - die Liste muss gedeckelt werden.
+    assert.ok(p.maxHoehe < liste.hoehe, `nicht gedeckelt: ${p.maxHoehe}`);
+    assert.ok(p.top >= 8 && p.top + p.maxHoehe <= klein.hoehe - 8 + 1,
+      `liegt nicht im Fenster: top=${p.top} hoehe=${p.maxHoehe}`);
+  });
+
+  test('bleibt am rechten Rand im Fenster', () => {
+    const p = RK.popupPlatz({ left: 1380, right: 1395, top: 100, bottom: 120 }, liste, fenster);
+    assert.equal(p.left, fenster.breite - liste.breite - 8);
+  });
+
+  test('bleibt am linken Rand im Fenster', () => {
+    const p = RK.popupPlatz({ left: -40, right: 0, top: 100, bottom: 120 }, liste, fenster);
+    assert.equal(p.left, 8);
+  });
+
+  test('eine lange Liste ganz unten bleibt vollständig erreichbar', () => {
+    // Genau der gemeldete Fall: viele Mitarbeiter, letzte Woche der Tabelle.
+    const langeListe = { breite: 260, hoehe: 700 };
+    const p = RK.popupPlatz({ left: 400, right: 440, top: 850, bottom: 870 }, langeListe, fenster);
+    assert.ok(p.top >= 8, `oben abgeschnitten: ${p.top}`);
+    assert.ok(p.top + p.maxHoehe <= fenster.hoehe - 8 + 1,
+      `unten abgeschnitten: ${p.top}+${p.maxHoehe} > ${fenster.hoehe}`);
+    assert.ok(p.maxHoehe >= 400, `unnötig klein: ${p.maxHoehe}`);
+  });
+
+  test('behält eine Mindesthöhe, auch in einem winzigen Fenster', () => {
+    const p = RK.popupPlatz({ left: 0, right: 10, top: 50, bottom: 60 }, liste, { breite: 300, hoehe: 120 });
+    assert.ok(p.maxHoehe >= 80, `zu klein zum Bedienen: ${p.maxHoehe}`);
+  });
+});
+
+describe('popupPlatz ohne Fenstermaße', () => {
+  test('setzt einfach unter den Anker, statt auf 0 zu rechnen', () => {
+    // Kommt vor, solange die Seite noch nicht ausgelegt ist.
+    const p = RK.popupPlatz({ left: 120, right: 160, top: 40, bottom: 60 },
+      { breite: 260, hoehe: 400 }, { breite: 0, hoehe: 0 });
+    assert.equal(p.left, 120);
+    assert.equal(p.top, 64);
+    assert.equal(p.maxHoehe, 400);
+  });
+});
