@@ -20,7 +20,10 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   geteilt – oben die Arbeitsschicht, unten die Rufbereitschaft, weil beides am
   selben Tag nebeneinander läuft. Ein Klick auf das obere Feld trägt die
   gewählte Arbeitsschicht ein oder aus, ein Klick auf den unteren Streifen die
-  Rufbereitschaft. Rechts die Summen F/N/S/R je Person, unten die Besetzung je
+  Rufbereitschaft. **Shift+Klick** zieht vom zuletzt geklickten Tag bis hierher
+  auf – nur innerhalb derselben Zeile und desselben Bandes, also eine ganze
+  Woche Rufbereitschaft in zwei Klicks, ohne je eine fremde Zeile zu treffen.
+  Rechts die Summen F/N/S/R je Person, unten die Besetzung je
   Tag – ebenfalls getrennt, damit eine fehlende Rufbereitschaft nicht in der
   Summe der Arbeitsschichten untergeht
 - **Feiertage** DE (BW) und IN inkl. Brückentagen und eigenen Feiertagen.

@@ -391,6 +391,8 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .mx-r{height:11px;flex:none;font-size:8px;letter-spacing:.5px;color:transparent;
   border-top:1px solid var(--border)}
 .mx-a:hover,.mx-r:hover{outline:2px solid var(--blue);outline-offset:-2px;border-radius:3px}
+/* Ausgangspunkt fuer Shift+Klick. Immer hoechstens einer. */
+.mx-a.anker,.mx-r.anker{box-shadow:inset 0 0 0 2px var(--blue)}
 .mx-a.frueh{background:var(--frueh-bg);color:var(--frueh-text)}
 .mx-a.normal{background:var(--normal-bg);color:var(--normal-text)}
 .mx-a.spaet{background:var(--spaet-bg);color:var(--spaet-text)}
@@ -916,7 +918,9 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
       </div>
       <p class="mx-hinweis">Jeder Tag ist geteilt: <b>oben die Arbeitsschicht</b>, <b>unten die Rufbereitschaft</b> –
         beides läuft am selben Tag nebeneinander. Ein Klick auf das obere Feld trägt die gewählte
-        Arbeitsschicht ein oder aus, ein Klick auf den unteren Streifen die Rufbereitschaft.</p>
+        Arbeitsschicht ein oder aus, ein Klick auf den unteren Streifen die Rufbereitschaft.
+        Mit <b>Shift+Klick</b> geht es vom zuletzt geklickten Tag (blau umrandet) bis hierher –
+        innerhalb derselben Zeile, also eine ganze Woche Rufbereitschaft in zwei Klicks.</p>
       <div class="mx-scroll"><table class="mx-table" id="mx-table"></table></div>
     </div>
   </div>
@@ -3168,13 +3172,16 @@ async function handleDayClick(key,ctrl,namen){
 // Eintragen oder entfernen - je nachdem, ob schon alle Genannten an allen
 // Tagen in der gewählten Schicht stehen. Ein einzelner Klick verhält sich
 // damit genauso wie einer auf eine Mehrfachauswahl oder einen Zeitraum.
-async function schichtAufTagen(tage,namen,modus){
-  const aktion=modus||RK.naechsteAktion(tage,namen,schichten,selectedShift);
+// schicht ist ausdruecklich, weil die Monatsuebersicht das untere Band
+// immer als Rufbereitschaft eintraegt - unabhaengig davon, was in der
+// Leiste gewaehlt ist. Ohne Angabe gilt weiter die gewaehlte Schicht.
+async function schichtAufTagen(tage,namen,modus,schicht=selectedShift){
+  const aktion=modus||RK.naechsteAktion(tage,namen,schichten,schicht);
   if(!aktion) return;
-  if(aktion==='add'){ await applyToDateList(tage,namen,'add'); return 'add'; }
+  if(aktion==='add'){ await applyToDateList(tage,namen,'add',schicht); return 'add'; }
   pushUndo();
   for(const name of namen){
-    const res=await postSchicht(tage,'remove',selectedShift,name);
+    const res=await postSchicht(tage,'remove',schicht,name);
     applyResults(res.results);
   }
   renderStats();
@@ -3184,32 +3191,32 @@ async function schichtAufTagen(tage,namen,modus){
 }
 
 // Beide Konfliktdialoge - vom Einzelklick und vom Bereich gemeinsam genutzt.
-function confirmReplaceShift(name,blocking){
+function confirmReplaceShift(name,blocking,schicht=selectedShift){
   const blockNames=[...new Set(blocking)].map(s=>SHIFT_LABEL[s]).join(', ');
-  return confirmDialog('Schicht ersetzen?',`<strong>${esc(name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`,'Ja, ersetzen');
+  return confirmDialog('Schicht ersetzen?',`<strong>${esc(name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[schicht])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`,'Ja, ersetzen');
 }
-function confirmHolidayEntry(name,holDays){
+function confirmHolidayEntry(name,holDays,schicht=selectedShift){
   const h=holDays[0][1],flag=h.country==='DE'?'🇩🇪':h.country==='IN'?'🇮🇳':'🌍';
   return confirmDialog('Feiertag – trotzdem eintragen?',
-    `${flag} <strong>${esc(h.holiday)}</strong> ist ein Feiertag für das Team von <strong>${esc(name)}</strong> (${holDays.length} Tag(e)).<br>Trotzdem als <strong>${esc(SHIFT_LABEL[selectedShift])}</strong> eintragen?`,'Ja, eintragen');
+    `${flag} <strong>${esc(h.holiday)}</strong> ist ein Feiertag für das Team von <strong>${esc(name)}</strong> (${holDays.length} Tag(e)).<br>Trotzdem als <strong>${esc(SHIFT_LABEL[schicht])}</strong> eintragen?`,'Ja, eintragen');
 }
 
-async function applyToDateList(dates,names,action){
+async function applyToDateList(dates,names,action,schicht=selectedShift){
   pushUndo();let entered=0,replaced=0,skipped=0;
   for(const name of names){
-    const res=await postSchicht(dates,action,selectedShift,name);
+    const res=await postSchicht(dates,action,schicht,name);
     const holDays=Object.entries(res.results).filter(([,r])=>r.error==='holiday_conflict');
     const confirmDays=Object.entries(res.results).filter(([,r])=>r.error==='needs_confirm');
     const okR=Object.fromEntries(Object.entries(res.results).filter(([,r])=>!r.error));
     applyResults(okR);showHolWarnings(res.hol_warnings);entered+=Object.keys(okR).length;
     if(holDays.length>0){
-      const ok=await confirmHolidayEntry(name,holDays);
-      if(ok){const r2=await postSchicht(holDays.map(([d])=>d),'add',selectedShift,name,true);applyResults(r2.results);replaced+=holDays.length;}
+      const ok=await confirmHolidayEntry(name,holDays,schicht);
+      if(ok){const r2=await postSchicht(holDays.map(([d])=>d),'add',schicht,name,true);applyResults(r2.results);replaced+=holDays.length;}
       else skipped+=holDays.length;
     }
     if(confirmDays.length>0){
-      const ok=await confirmReplaceShift(name,confirmDays.flatMap(([,r])=>r.blocking));
-      if(ok){const r2=await postSchicht(confirmDays.map(([d])=>d),'add',selectedShift,name,true,true);applyResults(r2.results);showHolWarnings(r2.hol_warnings);replaced+=confirmDays.length;}
+      const ok=await confirmReplaceShift(name,confirmDays.flatMap(([,r])=>r.blocking),schicht);
+      if(ok){const r2=await postSchicht(confirmDays.map(([d])=>d),'add',schicht,name,true,true);applyResults(r2.results);showHolWarnings(r2.hol_warnings);replaced+=confirmDays.length;}
       else skipped+=confirmDays.length;
     }
   }
@@ -3819,9 +3826,22 @@ function renderMatrix(){
     `${leute.length} Mitarbeiter · ${gesamtArbeit} Arbeitstage · ${gesamtRuf} Tage Rufbereitschaft`;
 
   tbl.querySelectorAll('[data-band][data-key]').forEach(el=>{
-    el.addEventListener('click',()=>matrixKlick(el.dataset.key,el.dataset.name,
-      el.dataset.band==='ruf'?'rufbereitschaft':arbeitsschichtWahl()));
+    el.addEventListener('click',ev=>matrixKlick(el.dataset.key,el.dataset.name,el.dataset.band,ev.shiftKey));
   });
+  zeigeAnker();
+}
+
+// Ring um den zuletzt geklickten Tag - von dort spannt Shift+Klick auf.
+// Eigene Funktion, damit ein Klick ohne Datenaenderung die Tabelle nicht
+// neu bauen muss.
+function zeigeAnker(){
+  const tbl=document.getElementById('mx-table');
+  if(!tbl) return;
+  tbl.querySelectorAll('.anker').forEach(el=>el.classList.remove('anker'));
+  if(!mxAnker) return;
+  const el=[...tbl.querySelectorAll(`[data-band="${mxAnker.band}"][data-key="${mxAnker.key}"]`)]
+    .find(e=>e.dataset.name===mxAnker.name);
+  if(el) el.classList.add('anker');
 }
 
 // Welche Arbeitsschicht das obere Feld einträgt. Ist gerade Rufbereitschaft
@@ -3831,24 +3851,49 @@ let letzteArbeitsschicht='frueh';
 function arbeitsschichtWahl(){
   return RK.ARBEITSSCHICHTEN.includes(selectedShift)?selectedShift:letzteArbeitsschicht;
 }
+const schichtVonBand=band=>band==='ruf'?'rufbereitschaft':arbeitsschichtWahl();
+
+// Ausgangspunkt für Shift+Klick: der zuletzt geklickte Tag, samt Person,
+// Band und dem, was der Klick dort getan hat.
+let mxAnker=null;
 
 // Ein Klick in der Monatsübersicht - derselbe Weg wie im Kalender, samt
 // Rückfrage bei einer zweiten Arbeitsschicht oder einem eigenen Feiertag.
-async function matrixKlick(key,name,schicht){
+//
+// Mit Shift wird vom letzten Klick bis hierher aufgezogen. Das geht nur
+// innerhalb derselben Zeile und desselben Bandes: eine Person, eine
+// Schichtart. Ein Shift-Klick kann damit nie fremde Einträge treffen.
+async function matrixKlick(key,name,band,mitShift){
+  const schicht=schichtVonBand(band);
+  const strecke=(mitShift && mxAnker && mxAnker.name===name && mxAnker.band===band)
+    ? RK.tageImZeitraum(mxAnker.key,key) : null;
+  // Die Absicht des ersten Klicks zieht durch die Strecke. Sonst liesse sich
+  // ein Zeitraum nie leeren: der Ankertag waere ja schon ausgetragen, und die
+  // Mehrheitsregel entschiede auf Eintragen.
+  const aktion=strecke ? mxAnker.aktion
+    : RK.naechsteAktion([key],[name],schichten,schicht);
+  mxAnker={key,name,band,aktion};
+
+  if(strecke && strecke.length>1) await schichtAufTagen(strecke,[name],aktion,schicht);
+  else await matrixEinzelklick(key,name,schicht);
+  zeigeAnker();
+}
+
+async function matrixEinzelklick(key,name,schicht){
   pushUndo();
   const res=await postSchicht([key],'toggle',schicht,name);
   const r=res?.results?.[key];
   if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
     undoStack.pop();updateUndoBtns();
     const replace=r.error==='needs_confirm';
-    const ok=replace?await confirmReplaceShift(name,r.blocking):await confirmHolidayEntry(name,[[key,r]]);
+    const ok=replace?await confirmReplaceShift(name,r.blocking,schicht)
+                    :await confirmHolidayEntry(name,[[key,r]],schicht);
     if(!ok) return;
     pushUndo();
     const r2=await postSchicht([key],'add',schicht,name,true,replace);
     applyResults(r2.results);showHolWarnings(r2.hol_warnings);
   }else if(r?.error){ undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich'); }
   else { applyResults(res.results);showHolWarnings(res.hol_warnings); }
-  renderMatrix();
 }
 
 // Tage des Monats mit Kurzform für die Spaltenköpfe

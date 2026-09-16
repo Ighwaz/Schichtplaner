@@ -123,8 +123,13 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
         const drin = t[schicht] && t[schicht].includes(name);
 
         if ((action === 'add' || action === 'toggle') && !drin) {
-          const blockierend = ARBEITSSCHICHTEN
-            .filter(s => s !== schicht && (t[s] || []).includes(name));
+          // Die Rufbereitschaft laeuft daneben her: sie wird nicht blockiert
+          // und blockiert selbst nichts. Genau wie blockingShifts in
+          // internal/domain/slot.go. Ohne diese Ausnahme meldet die Attrappe
+          // eine Rueckfrage, die es in Wirklichkeit nicht gibt - und ein Test
+          // haengt an einem Dialog, den das Programm nie oeffnet.
+          const blockierend = schicht === 'rufbereitschaft' ? []
+            : ARBEITSSCHICHTEN.filter(s => s !== schicht && (t[s] || []).includes(name));
           if (blockierend.length && !force) {
             results[d] = { error: 'needs_confirm', blocking: blockierend };
             continue;

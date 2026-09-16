@@ -223,6 +223,141 @@ describe('Monatsübersicht', () => {
     assert.deepEqual(zahlen, ['0', '2', '0', '0'], 'F/N/S/R stimmt nicht');
   });
 
+  // Rufbereitschaft geht wochenweise. Sieben Klicks je Woche waren der
+  // Grund für diese Geste.
+  // Die Attrappe legt einen Tag erst an, wenn ihn etwas beruehrt hat -
+  // ein unberuehrter Tag ist also schlicht leer.
+  const tagVon = (o, t, schicht) =>
+    o.api.zustand.schichten[`2026-09-${String(t).padStart(2, '0')}`]?.[schicht] || [];
+  const rufAn = (o, tage) => tage.filter(t => tagVon(o, t, 'rufbereitschaft').includes('Nair, Anita'));
+
+  test('Rufbereitschaft neben einer Arbeitsschicht fragt nicht nach', async () => {
+    // Die Attrappe meldete hier lange eine Rückfrage, die es nicht gibt
+    // (blockingShifts in internal/domain/slot.go nimmt die Rufbereitschaft
+    // aus). Die Tests darüber standen dann an einem Dialog still.
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-07': { frueh: ['Nair, Anita'], normal: [], spaet: [], rufbereitschaft: [] },
+      },
+    });
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'ruf'));
+    await warteBis(() => rufAn(o, [7]).length === 1, 'die Rufbereitschaft');
+    assert.ok(!o.$('.modal-bg:not(.hidden)'), 'es stand eine Rückfrage im Weg');
+    assert.deepEqual(tagVon(o, 7, 'frueh'), ['Nair, Anita'], 'die Frühschicht ging verloren');
+  });
+
+  test('auch eine ganze Strecke Rufbereitschaft fragt nicht nach', async () => {
+    const belegt = {};
+    for (let t = 7; t <= 11; t++) {
+      belegt[`2026-09-${String(t).padStart(2, '0')}`] =
+        { frueh: ['Nair, Anita'], normal: [], spaet: [], rufbereitschaft: [] };
+    }
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM, schichten: belegt });
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'ruf'));
+    await warteBis(() => rufAn(o, [7]).length === 1, 'den Ankertag');
+    klick(band(o, '2026-09-11', 'Nair, Anita', 'ruf'), { shiftKey: true });
+    await warteBis(() => rufAn(o, [7, 8, 9, 10, 11]).length === 5, 'die Strecke');
+    assert.ok(!o.$('.modal-bg:not(.hidden)'), 'es stand eine Rückfrage im Weg');
+    assert.deepEqual(tagVon(o, 9, 'frueh'), ['Nair, Anita'], 'die Frühschicht ging verloren');
+  });
+
+  test('Shift+Klick trägt eine ganze Woche in einem Zug ein', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'ruf'));
+    await warteBis(() => rufAn(o, [7]).length === 1, 'den Ankertag');
+    klick(band(o, '2026-09-13', 'Nair, Anita', 'ruf'), { shiftKey: true });
+    await warteBis(() => rufAn(o, [8, 9, 10, 11, 12, 13]).length === 6, 'die Woche');
+    assert.deepEqual(rufAn(o, [6, 14]), [], 'die Strecke ist übergelaufen');
+  });
+
+  test('rückwärts aufziehen geht genauso', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    klick(band(o, '2026-09-13', 'Nair, Anita', 'ruf'));
+    await warteBis(() => rufAn(o, [13]).length === 1, 'den Ankertag');
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'ruf'), { shiftKey: true });
+    await warteBis(() => rufAn(o, [7, 8, 9, 10, 11, 12, 13]).length === 7, 'die Woche');
+  });
+
+  test('die Absicht des ersten Klicks zieht durch die Strecke', async () => {
+    // Sonst liesse sich ein Zeitraum nie leeren: der Ankertag ist schon
+    // ausgetragen, und die Mehrheitsregel entschiede auf Eintragen.
+    const voll = {};
+    for (let t = 7; t <= 13; t++) {
+      voll[`2026-09-${String(t).padStart(2, '0')}`] =
+        { frueh: [], normal: [], spaet: [], rufbereitschaft: ['Nair, Anita'] };
+    }
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM, schichten: voll });
+
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'ruf'));         // trägt aus
+    await warteBis(() => rufAn(o, [7]).length === 0, 'das Austragen');
+    klick(band(o, '2026-09-13', 'Nair, Anita', 'ruf'), { shiftKey: true });
+    await warteBis(() => rufAn(o, [7, 8, 9, 10, 11, 12, 13]).length === 0,
+      'die geleerte Woche');
+  });
+
+  test('eine Strecke trifft nie eine fremde Zeile', async () => {
+    // Genau die Sorge aus dem Kalender: beim Aufziehen keine fremden
+    // Einträge anfassen. Hier kann das gar nicht passieren - stimmt die
+    // Person nicht, ist es ein gewöhnlicher Klick.
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    klick(band(o, '2026-09-07', 'Bauer, Martin', 'ruf'));
+    await warteBis(() => tagVon(o, 7, 'rufbereitschaft').includes('Bauer, Martin'),
+      'den Ankertag');
+
+    klick(band(o, '2026-09-11', 'Nair, Anita', 'ruf'), { shiftKey: true });
+    await warteBis(() => rufAn(o, [11]).length === 1, 'den einzelnen Tag');
+    assert.deepEqual(rufAn(o, [7, 8, 9, 10]), [],
+      'der Shift-Klick hat eine Strecke in der fremden Zeile gezogen');
+    assert.deepEqual(tagVon(o, 8, 'rufbereitschaft'), [],
+      'die Zeile von Bauer wurde mitgezogen');
+  });
+
+  test('eine Strecke bleibt im selben Band', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    o.fenster.waehleSchicht('frueh');
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'ruf'));          // Anker unten
+    await warteBis(() => rufAn(o, [7]).length === 1, 'den Ankertag');
+
+    klick(band(o, '2026-09-11', 'Nair, Anita', 'arbeit'), { shiftKey: true });
+    await warteBis(() => tagVon(o, 11, 'frueh').includes('Nair, Anita'), 'den einzelnen Tag');
+    assert.deepEqual(tagVon(o, 9, 'frueh'), [],
+      'der Shift-Klick ist vom unteren ins obere Band gesprungen');
+  });
+
+  test('eine Strecke oben nimmt die Arbeitsschicht, nicht die gewählte', async () => {
+    // Die Strecke laeuft ueber die gemeinsamen Wege (schichtAufTagen,
+    // applyToDateList). Die haben die gewaehlte Schicht frueher fest
+    // verdrahtet - dann waere hier Rufbereitschaft eingetragen worden.
+    const o = await starteOberflaeche({ mitarbeiter: TEAM });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.waehleSchicht('spaet');
+    o.fenster.waehleSchicht('rufbereitschaft');
+    klick(o.$('.vtab[data-view="matrix"]'));
+    await ruhe();
+
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'arbeit'));
+    await warteBis(() => tagVon(o, 7, 'spaet').includes('Nair, Anita'), 'den Ankertag');
+    klick(band(o, '2026-09-09', 'Nair, Anita', 'arbeit'), { shiftKey: true });
+    await warteBis(() => [8, 9].every(t => tagVon(o, t, 'spaet').includes('Nair, Anita')),
+      'die Strecke in der Spätschicht');
+    assert.deepEqual(rufAn(o, [7, 8, 9]), [], 'die Strecke landete in der Rufbereitschaft');
+  });
+
+  test('der Ankertag ist zu sehen', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
+    klick(band(o, '2026-09-07', 'Nair, Anita', 'ruf'));
+    await warteBis(() => o.$$('#mx-table .anker').length === 1, 'den Ring');
+    const ring = o.$('#mx-table .anker');
+    assert.equal(ring.dataset.key, '2026-09-07');
+    assert.equal(ring.dataset.name, 'Nair, Anita');
+
+    // Immer höchstens einer - der nächste Klick nimmt den Ring mit.
+    klick(band(o, '2026-09-20', 'Nair, Anita', 'ruf'));
+    await warteBis(() => o.$('#mx-table .anker')?.dataset.key === '2026-09-20', 'den Umzug');
+    assert.equal(o.$$('#mx-table .anker').length, 1);
+  });
+
   test('die Fußzeile meldet fehlende Rufbereitschaft getrennt', async () => {
     const o = await oeffneUebersicht({
       mitarbeiter: TEAM,
