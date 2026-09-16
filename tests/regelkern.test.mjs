@@ -582,3 +582,103 @@ describe('popupPlatz ohne Fenstermaße', () => {
     assert.equal(p.maxHoehe, 400);
   });
 });
+
+describe('matrixZelle', () => {
+  const tag = {
+    frueh: ['Bauer, Martin'],
+    normal: [],
+    spaet: ['Wolf, Tim'],
+    rufbereitschaft: ['Bauer, Martin', 'Nair, Anita'],
+  };
+
+  test('meldet Arbeitsschicht und Rufbereitschaft getrennt', () => {
+    // Der gemeldete Fall: beides am selben Tag. Eine Zelle kann dafuer nicht
+    // eine Farbe haben - sie braucht zwei Felder.
+    const z = RK.matrixZelle(tag, 'Bauer, Martin');
+    assert.equal(z.arbeit, 'frueh');
+    assert.equal(z.ruf, true);
+    assert.equal(z.doppelt, false);
+    assert.equal(z.leer, false);
+  });
+
+  test('Rufbereitschaft allein ist keine Arbeitsschicht', () => {
+    const z = RK.matrixZelle(tag, 'Nair, Anita');
+    assert.equal(z.arbeit, null);
+    assert.equal(z.ruf, true);
+    assert.equal(z.leer, false, 'ein Tag mit Rufbereitschaft ist nicht leer');
+  });
+
+  test('Arbeit allein bleibt ohne Rufbereitschaft', () => {
+    const z = RK.matrixZelle(tag, 'Wolf, Tim');
+    assert.equal(z.arbeit, 'spaet');
+    assert.equal(z.ruf, false);
+  });
+
+  test('zwei Arbeitsschichten sind ein Fehler, keine zwei Farben', () => {
+    const z = RK.matrixZelle({ frueh: ['A'], normal: [], spaet: ['A'], rufbereitschaft: [] }, 'A');
+    assert.equal(z.doppelt, true);
+    assert.deepEqual(z.alleArbeit, ['frueh', 'spaet']);
+    assert.equal(z.arbeit, 'frueh', 'die erste Schicht bleibt die angezeigte');
+  });
+
+  test('doppelt zaehlt nur Arbeitsschichten - Rufbereitschaft laeuft daneben', () => {
+    const z = RK.matrixZelle({ frueh: ['A'], normal: [], spaet: [], rufbereitschaft: ['A'] }, 'A');
+    assert.equal(z.doppelt, false, 'Frueh + Rufbereitschaft ist erlaubt');
+  });
+
+  test('ein unbekannter Tag ist leer statt ein Absturz', () => {
+    for (const nichts of [undefined, null, {}, { frueh: null }]) {
+      const z = RK.matrixZelle(nichts, 'A');
+      assert.equal(z.leer, true, String(nichts));
+      assert.equal(z.arbeit, null);
+      assert.equal(z.ruf, false);
+    }
+  });
+
+  test('haelt kaputte Listen aus', () => {
+    const z = RK.matrixZelle({ frueh: 'Bauer', spaet: 42, rufbereitschaft: ['Bauer'] }, 'Bauer');
+    assert.equal(z.arbeit, null, 'eine Zeichenkette ist keine Namensliste');
+    assert.equal(z.ruf, true);
+  });
+
+  test('ein Name wie constructor faellt nicht durch', () => {
+    const z = RK.matrixZelle(
+      { frueh: ['constructor'], normal: [], spaet: [], rufbereitschaft: [] }, 'constructor');
+    assert.equal(z.arbeit, 'frueh');
+  });
+});
+
+describe('matrixFuss', () => {
+  const SOLL_TAG = { frueh: 1, normal: 0, spaet: 1, rufbereitschaft: 1 };
+
+  test('zaehlt Arbeit und Rufbereitschaft getrennt', () => {
+    const f = RK.matrixFuss(vollerTag(), '2026-09-03', SOLL_TAG);
+    assert.equal(f.arbeit, 2, 'Frueh + Spaet');
+    assert.equal(f.ruf, 1);
+    assert.equal(f.arbeitFehlt, false);
+    assert.equal(f.rufFehlt, false);
+  });
+
+  test('meldet eine fehlende Rufbereitschaft, auch wenn die Arbeit steht', () => {
+    const f = RK.matrixFuss(
+      { frueh: ['A'], normal: [], spaet: ['B'], rufbereitschaft: [] }, '2026-09-03', SOLL_TAG);
+    assert.equal(f.arbeitFehlt, false);
+    assert.equal(f.rufFehlt, true, 'sonst geht sie in der Summe unter');
+  });
+
+  test('am Wochenende wird nur die Rufbereitschaft angemahnt', () => {
+    // 2026-09-05 ist ein Samstag.
+    const f = RK.matrixFuss({ frueh: [], normal: [], spaet: [], rufbereitschaft: ['A'] },
+      '2026-09-05', SOLL_TAG);
+    assert.equal(f.arbeitFehlt, false);
+    assert.equal(f.rufFehlt, false);
+  });
+
+  test('ein leerer Tag meldet beides', () => {
+    const f = RK.matrixFuss(null, '2026-09-03', SOLL_TAG);
+    assert.equal(f.arbeit, 0);
+    assert.equal(f.ruf, 0);
+    assert.equal(f.arbeitFehlt, true);
+    assert.equal(f.rufFehlt, true);
+  });
+});

@@ -79,11 +79,22 @@ describe('Monatsnavigation', () => {
 });
 
 describe('Monatsübersicht', () => {
-  test('eine Zeile je Mitarbeiter, eine Spalte je Tag', async () => {
-    const o = await starteOberflaeche({ mitarbeiter: TEAM });
-    await zeigeMonat(o, 2026, 9);
+  // Oberes Band (Arbeitsschicht) bzw. unterer Streifen (Rufbereitschaft)
+  // einer bestimmten Person an einem bestimmten Tag.
+  const band = (o, key, name, welches) =>
+    o.$$(`#mx-table .mx-${welches === 'ruf' ? 'r' : 'a'}[data-key="${key}"]`)
+      .find(el => el.dataset.name === name);
+
+  async function oeffneUebersicht(vorgabe, jahr = 2026, monat = 9) {
+    const o = await starteOberflaeche(vorgabe);
+    await zeigeMonat(o, jahr, monat);
     klick(o.$('.vtab[data-view="matrix"]'));
     await ruhe();
+    return o;
+  }
+
+  test('eine Zeile je Mitarbeiter, eine Spalte je Tag', async () => {
+    const o = await oeffneUebersicht({ mitarbeiter: TEAM });
 
     const namen = o.$$('#mx-table .mx-name').map(td => td.textContent);
     // Spaltenkopf, drei Mitarbeiter, Fußzeile "Besetzung".
@@ -92,28 +103,98 @@ describe('Monatsübersicht', () => {
     assert.ok(namen[1].includes('Bauer'));
     assert.ok(namen.at(-1).includes('Besetzung'));
 
-    const zellen = o.$$('#mx-table .mx-cell[data-key]');
-    assert.equal(zellen.length, 30 * 3, 'September hat 30 Tage mal 3 Personen');
+    // Jede Zelle hat zwei Felder - oben Arbeit, unten Rufbereitschaft.
+    assert.equal(o.$$('#mx-table .mx-a[data-key]').length, 30 * 3,
+      'September hat 30 Tage mal 3 Personen');
+    assert.equal(o.$$('#mx-table .mx-r[data-key]').length, 30 * 3,
+      'der Streifen für die Rufbereitschaft fehlt an manchen Tagen');
   });
 
-  test('ein Klick auf eine Zelle trägt für die Person dieser Zeile ein', async () => {
+  test('Rufbereitschaft neben der Arbeitsschicht bleibt sichtbar', async () => {
+    // Genau der gemeldete Fall: beides am selben Tag. Vorher gewann die
+    // Arbeitsschicht die Farbe und die Rufbereitschaft war nur noch ein
+    // zweiter Buchstabe im Kürzel.
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': {
+          frueh: ['Bauer, Martin'], normal: [], spaet: [],
+          rufbereitschaft: ['Bauer, Martin'],
+        },
+      },
+    });
+
+    const oben = band(o, '2026-09-03', 'Bauer, Martin', 'arbeit');
+    const unten = band(o, '2026-09-03', 'Bauer, Martin', 'ruf');
+    assert.ok(oben.classList.contains('frueh'), 'die Frühschicht fehlt oben');
+    assert.equal(oben.textContent, 'F');
+    assert.ok(unten.classList.contains('an'), 'die Rufbereitschaft fehlt unten');
+
+    // Und die Gegenprobe: ein Tag ohne Rufbereitschaft trägt den Streifen
+    // zwar, aber unmarkiert.
+    assert.ok(!band(o, '2026-09-04', 'Bauer, Martin', 'ruf').classList.contains('an'));
+  });
+
+  test('ein Klick oben trägt für die Person dieser Zeile ein', async () => {
     const o = await starteOberflaeche({ mitarbeiter: TEAM });
     await zeigeMonat(o, 2026, 9);
     o.fenster.waehleSchicht('spaet');
     klick(o.$('.vtab[data-view="matrix"]'));
     await ruhe();
 
-    // Zelle von Krüger am 3.9. - ohne dass jemand ausgewählt sein muss.
-    const zelle = o.$$('#mx-table .mx-cell[data-key="2026-09-03"]')
-      .find(td => td.dataset.name === 'Krüger, Sina');
-    assert.ok(zelle, 'Zelle nicht gefunden');
-    klick(zelle);
+    // Ohne dass jemand in der Seitenleiste ausgewählt sein muss.
+    klick(band(o, '2026-09-03', 'Krüger, Sina', 'arbeit'));
     await warteBis(() => o.api.zustand.schichten['2026-09-03']?.spaet.includes('Krüger, Sina'),
       'den Eintrag');
   });
 
+  test('ein Klick unten trägt Rufbereitschaft ein, egal welche Schicht gewählt ist', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: TEAM });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.waehleSchicht('spaet');
+    klick(o.$('.vtab[data-view="matrix"]'));
+    await ruhe();
+
+    klick(band(o, '2026-09-03', 'Nair, Anita', 'ruf'));
+    await warteBis(
+      () => o.api.zustand.schichten['2026-09-03']?.rufbereitschaft.includes('Nair, Anita'),
+      'die Rufbereitschaft');
+    assert.deepEqual(o.api.zustand.schichten['2026-09-03'].spaet, [],
+      'die gewählte Spätschicht wurde mit eingetragen');
+  });
+
+  test('ein zweiter Klick unten trägt die Rufbereitschaft wieder aus', async () => {
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': {
+          frueh: [], normal: [], spaet: [], rufbereitschaft: ['Nair, Anita'],
+        },
+      },
+    });
+    klick(band(o, '2026-09-03', 'Nair, Anita', 'ruf'));
+    await warteBis(
+      () => !o.api.zustand.schichten['2026-09-03'].rufbereitschaft.includes('Nair, Anita'),
+      'das Austragen');
+  });
+
+  test('oben trägt eine Arbeitsschicht ein, auch wenn Rufbereitschaft gewählt ist', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: TEAM });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.waehleSchicht('spaet');          // zuletzt gewählte Arbeitsschicht
+    o.fenster.waehleSchicht('rufbereitschaft'); // oben wäre das sinnlos
+    klick(o.$('.vtab[data-view="matrix"]'));
+    await ruhe();
+
+    klick(band(o, '2026-09-07', 'Krüger, Sina', 'arbeit'));
+    await warteBis(() => o.api.zustand.schichten['2026-09-07']?.spaet.includes('Krüger, Sina'),
+      'die zuletzt gewählte Arbeitsschicht');
+    assert.deepEqual(o.api.zustand.schichten['2026-09-07'].rufbereitschaft, [],
+      'oben wurde Rufbereitschaft eingetragen');
+  });
+
   test('doppelt Eingeteilte werden markiert', async () => {
-    const o = await starteOberflaeche({
+    const o = await oeffneUebersicht({
       mitarbeiter: TEAM,
       schichten: {
         '2026-09-03': {
@@ -121,13 +202,42 @@ describe('Monatsübersicht', () => {
         },
       },
     });
-    await zeigeMonat(o, 2026, 9);
-    klick(o.$('.vtab[data-view="matrix"]'));
-    await ruhe();
-    const zelle = o.$$('#mx-table .mx-cell[data-key="2026-09-03"]')
-      .find(td => td.dataset.name === 'Bauer, Martin');
-    assert.ok(zelle.classList.contains('doppelt'), 'nicht als doppelt markiert');
-    assert.equal(zelle.textContent, '!');
+    const oben = band(o, '2026-09-03', 'Bauer, Martin', 'arbeit');
+    assert.ok(oben.classList.contains('doppelt'), 'nicht als doppelt markiert');
+    assert.equal(oben.textContent, '!');
+  });
+
+  test('die Summenspalte zählt auch den Normaldienst', async () => {
+    // Vorher lief der Normaldienst in ein Feld, das es im Zähler nicht gab,
+    // und tauchte in keiner Summe auf.
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: [], normal: ['Bauer, Martin'], spaet: [], rufbereitschaft: [] },
+        '2026-09-04': { frueh: [], normal: ['Bauer, Martin'], spaet: [], rufbereitschaft: [] },
+      },
+    });
+    const zeile = o.$$('#mx-table tbody tr')
+      .find(tr => tr.querySelector('.mx-name')?.textContent.includes('Bauer'));
+    const zahlen = [...zeile.querySelectorAll('.mx-sum b')].map(b => b.textContent);
+    assert.deepEqual(zahlen, ['0', '2', '0', '0'], 'F/N/S/R stimmt nicht');
+  });
+
+  test('die Fußzeile meldet fehlende Rufbereitschaft getrennt', async () => {
+    const o = await oeffneUebersicht({
+      mitarbeiter: TEAM,
+      soll: { frueh: 1, normal: 0, spaet: 0, rufbereitschaft: 1 },
+      schichten: {
+        // Frühschicht besetzt, Rufbereitschaft fehlt.
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+      },
+    });
+    const fuss = o.$('#mx-table .mx-foot');
+    const spalte = [...fuss.children][3]; // Name + 1.9. + 2.9. + 3.9.
+    assert.ok(!spalte.querySelector('.mx-a').classList.contains('unter'),
+      'die Arbeitsschicht ist besetzt, wird aber bemängelt');
+    assert.ok(spalte.querySelector('.mx-r').classList.contains('unter'),
+      'die fehlende Rufbereitschaft wird nicht gemeldet');
   });
 });
 

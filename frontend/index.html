@@ -343,36 +343,88 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 
 /* ── RUFBEREITSCHAFT OVERVIEW ── */
 .ruf-wrap{overflow-y:auto;flex:1;padding:14px;background:var(--bg);height:100%}
-/* Monatsuebersicht: Zeilen = Personen, Spalten = Tage */
-.mx-scroll{overflow:auto;max-height:calc(100vh - 190px);border:2px solid var(--border);border-radius:11px;background:var(--surface)}
-.mx-table{border-collapse:separate;border-spacing:0;font-size:11px;width:max-content;min-width:100%}
-.mx-table th,.mx-table td{border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:0;text-align:center}
+/* ── MONATSUEBERSICHT ──
+   Zeilen = Personen, Spalten = Tage. Jede Zelle ist zweigeteilt: oben die
+   Arbeitsschicht, unten die Rufbereitschaft. Beides laeuft am selben Tag
+   nebeneinander und muss deshalb auch nebeneinander zu sehen sein.
+   Das untere Band steht immer da, auch leer - so bildet eine Woche
+   Rufbereitschaft einen durchgehenden Streifen durch die Zeile. */
+.mx-wrap{display:flex;flex-direction:column;flex:1;min-height:0;padding:14px;gap:10px;background:var(--bg)}
+.mx-kopf{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.mx-kopf h3{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;white-space:nowrap}
+.mx-kopf .mx-zahl{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);white-space:nowrap}
+.mx-kopf .mx-zahl b{color:var(--text2)}
+.mx-scroll{overflow:auto;flex:1;min-height:0;border:2px solid var(--border);border-radius:11px;background:var(--surface)}
+.mx-table{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;table-layout:fixed;min-width:860px}
+.mx-table th,.mx-table td{padding:0;text-align:center}
 .mx-table thead th{position:sticky;top:0;z-index:3;background:var(--surface2);font-family:'JetBrains Mono',monospace;
-  font-size:10px;font-weight:700;color:var(--text2);padding:4px 0;min-width:24px}
-.mx-table thead th.we{color:var(--text3);background:var(--surface3)}
+  font-size:10px;font-weight:700;color:var(--text2);padding:5px 0 6px;line-height:1.35;
+  border-bottom:1px solid var(--border)}
+.mx-table thead th .mx-wd{display:block;font-size:8.5px;font-weight:600;color:var(--text3);letter-spacing:.3px}
+.mx-table thead th.we{background:var(--surface3)}
+.mx-table thead th.we .mx-wd{color:var(--text3)}
 .mx-table thead th.hol{color:var(--spaet)}
+.mx-table thead th.hol .mx-wd{color:var(--spaet)}
+.mx-table thead th.heute{color:var(--blue);box-shadow:inset 0 -2px 0 var(--blue)}
 .mx-name{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left!important;
-  padding:3px 9px!important;white-space:nowrap;font-weight:600;min-width:150px}
+  padding:3px 10px!important;white-space:nowrap;font-weight:600;width:196px;
+  overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--border)}
 .mx-table thead .mx-name{z-index:4;background:var(--surface2)}
 .mx-name .mx-team{font-size:9px;color:var(--text3);margin-left:5px;font-family:'JetBrains Mono',monospace}
-.mx-cell{cursor:pointer;height:24px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;color:var(--text3)}
-.mx-cell:hover{outline:2px solid var(--blue);outline-offset:-2px}
-.mx-cell.we{background:var(--surface3)}
-.mx-cell.frueh{background:var(--frueh-bg);color:var(--frueh-text)}
-.mx-cell.normal{background:var(--normal-bg);color:var(--normal-text)}
-.mx-cell.spaet{background:var(--spaet-bg);color:var(--spaet-text)}
-.mx-cell.rufbereitschaft{background:var(--ruf-bg);color:var(--ruf-text)}
-.mx-cell.doppelt{background:var(--krank-bg);color:var(--krank-text);outline:1px solid var(--krank)}
-.mx-sum{position:sticky;right:0;background:var(--surface2);font-family:'JetBrains Mono',monospace;
-  font-size:10px;color:var(--text2);padding:0 8px!important;white-space:nowrap;border-left:2px solid var(--border)}
-.mx-foot td{background:var(--surface2);font-family:'JetBrains Mono',monospace;font-size:9.5px;
-  color:var(--text2);height:20px;position:sticky;bottom:0;z-index:2}
-.mx-foot td.unter{color:var(--krank);font-weight:800;background:var(--krank-bg)}
-.mx-legend{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:11.5px;color:var(--text2);
-  margin-bottom:9px;padding:0 2px}
+/* Ueber 31 Spalten verliert man die Zeile. Der Zeiger faerbt deshalb die
+   ganze Zeile, nicht nur die Zelle darunter. */
+.mx-table tbody tr:hover .mx-name{background:var(--surface3)}
+.mx-table tbody tr:hover .mx-split{background:color-mix(in srgb,var(--blue) 9%,var(--surface2))}
+.mx-cell{padding:2px!important;vertical-align:middle}
+/* Wochenende und Feiertag faerben die Kachel selbst, nicht die Zelle
+   darunter - sonst deckt die Kachel den Unterschied wieder zu und man
+   zaehlt sich durch 31 gleich aussehende Spalten. */
+.mx-cell.we .mx-split{background:var(--surface3)}
+.mx-cell.hol .mx-split{background:color-mix(in srgb,var(--spaet) 13%,var(--surface2))}
+
+/* Der Trenner: oben die Arbeitsschicht, unten die Rufbereitschaft. */
+.mx-split{display:flex;flex-direction:column;height:34px;border-radius:5px;overflow:hidden;
+  background:var(--surface2);border:1px solid transparent}
+.mx-a,.mx-r{display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;
+  font-weight:700;cursor:pointer;transition:filter .1s}
+.mx-a{flex:1;font-size:11px;color:var(--text3)}
+.mx-r{height:11px;flex:none;font-size:8px;letter-spacing:.5px;color:transparent;
+  border-top:1px solid var(--border)}
+.mx-a:hover,.mx-r:hover{outline:2px solid var(--blue);outline-offset:-2px;border-radius:3px}
+.mx-a.frueh{background:var(--frueh-bg);color:var(--frueh-text)}
+.mx-a.normal{background:var(--normal-bg);color:var(--normal-text)}
+.mx-a.spaet{background:var(--spaet-bg);color:var(--spaet-text)}
+.mx-a.doppelt{background:var(--krank-bg);color:var(--krank-text)}
+.mx-r.an{background:var(--ruf-bg);color:var(--ruf-text);
+  border-top-color:color-mix(in srgb,var(--ruf) 40%,transparent)}
+.mx-split.belegt{border-color:var(--border)}
+
+/* Summenspalte: vier Zahlen in den Schichtfarben statt einer Kette. */
+.mx-sum{position:sticky;right:0;background:var(--surface2);width:96px;
+  padding:0 8px!important;white-space:nowrap;border-left:1px solid var(--border)}
+.mx-table thead .mx-sum{z-index:4}
+.mx-sum b{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;
+  min-width:19px;color:var(--text3)}
+.mx-sum b.hat{color:var(--text)}
+.mx-sum b.s-f.hat{color:var(--frueh)}
+.mx-sum b.s-n.hat{color:var(--normal)}
+.mx-sum b.s-s.hat{color:var(--spaet)}
+.mx-sum b.s-r.hat{color:var(--ruf)}
+
+.mx-foot td{background:var(--surface2);position:sticky;bottom:0;z-index:2;border-top:1px solid var(--border)}
+.mx-foot .mx-split{background:transparent;height:30px}
+.mx-foot .mx-a,.mx-foot .mx-r{cursor:default;color:var(--text3);font-size:10px}
+.mx-foot .mx-r{font-size:8.5px}
+.mx-foot .mx-a:hover,.mx-foot .mx-r:hover{outline:none}
+.mx-foot .mx-a.unter,.mx-foot .mx-r.unter{background:var(--krank-bg);color:var(--krank-text);font-weight:800}
+
+.mx-legend{display:flex;flex-wrap:wrap;gap:13px;align-items:center;font-size:11.5px;color:var(--text2);
+  margin-left:auto}
 .mx-legend span{display:inline-flex;align-items:center;gap:5px}
-.mx-legend i{font-style:normal;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;
-  padding:1px 5px;border-radius:4px}
+.mx-legend i{font-style:normal;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:9.5px;
+  padding:2px 6px;border-radius:4px;line-height:1}
+.mx-hinweis{font-size:11.5px;color:var(--text3);line-height:1.5;margin:0}
+.mx-hinweis b{color:var(--text2);font-weight:600}
 .ruf-col-hdr{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
 .reihum-liste{display:flex;flex-direction:column;gap:4px;max-height:230px;overflow-y:auto}
 .reihum-zeile{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--border);
@@ -646,12 +698,16 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
      KW-Plan, Template und Feiertage als Extraseiten mit im Ausdruck. */
   .view-panel{display:none!important}
   .view-panel.active{display:block!important}
-  .cal-wrap,.ruf-wrap{overflow:visible!important;padding:0!important;background:#fff!important}
+  .cal-wrap,.ruf-wrap,.mx-wrap{overflow:visible!important;padding:0!important;background:#fff!important}
   /* Monatsuebersicht: Deckel und Klebespalten aufheben, sonst wird die
-     Tabelle im Ausdruck abgeschnitten. */
-  .mx-scroll{max-height:none!important;overflow:visible!important;border:none!important}
+     Tabelle im Ausdruck abgeschnitten. Der Trenner bleibt - auf Papier ist
+     er genauso noetig wie im Fenster. */
+  .mx-scroll{max-height:none!important;overflow:visible!important;border:none!important;flex:none!important}
   .mx-name,.mx-sum,.mx-table thead th,.mx-foot td{position:static!important}
-  .mx-cell{height:auto!important;padding:2px 0!important}
+  .mx-table{min-width:0!important}
+  .mx-split{height:22px!important;border:1px solid var(--border)!important}
+  .mx-r{height:8px!important}
+  .mx-hinweis{display:none!important}
   .ruf-col-body{max-height:none!important;overflow:visible!important}
   .ruf-split{display:block!important}
   .ruf-col{border:none!important;padding:0!important;margin-bottom:14px}
@@ -852,8 +908,15 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 
   <!-- MONATSÜBERSICHT: Personen über die Tage des Monats -->
   <div class="view-panel" data-panel="matrix">
-    <div class="cal-wrap">
-      <div class="mx-legend" id="mx-legend"></div>
+    <div class="mx-wrap">
+      <div class="mx-kopf">
+        <h3 id="mx-titel">Monatsübersicht</h3>
+        <span class="mx-zahl" id="mx-zahl"></span>
+        <div class="mx-legend" id="mx-legend"></div>
+      </div>
+      <p class="mx-hinweis">Jeder Tag ist geteilt: <b>oben die Arbeitsschicht</b>, <b>unten die Rufbereitschaft</b> –
+        beides läuft am selben Tag nebeneinander. Ein Klick auf das obere Feld trägt die gewählte
+        Arbeitsschicht ein oder aus, ein Klick auf den unteren Streifen die Rufbereitschaft.</p>
       <div class="mx-scroll"><table class="mx-table" id="mx-table"></table></div>
     </div>
   </div>
@@ -1179,6 +1242,10 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 'use strict';
 
 const SCHICHTEN = ['frueh','normal','spaet','rufbereitschaft'];
+// Diese drei schliessen einander aus - wer frueh eingeteilt ist, kann am
+// selben Tag nicht spaet. Die Rufbereitschaft laeuft daneben her und ist
+// deshalb hier bewusst nicht dabei.
+const ARBEITSSCHICHTEN = ['frueh','normal','spaet'];
 // Für den Feiertagskonflikt zählen nur diese drei - der Normaldienst ist
 // Gleitzeit und wurde nie mitgeprüft. Verhalten unverändert übernommen,
 // siehe tests/regelkern.test.mjs ("Normaldienst am Feiertag").
@@ -1409,11 +1476,52 @@ function kurzName(name){
   return erstes.replace(/[,;]+$/, '');
 }
 
+// Was eine Zelle der Monatsuebersicht zeigt.
+//
+// Arbeitsschicht und Rufbereitschaft schliessen einander nicht aus, also
+// kann eine Zelle nicht eine Farbe haben - sie braucht zwei Felder. Vorher
+// gewann schlicht die erste gefundene Schicht; wer frueh arbeitete UND
+// Rufbereitschaft hatte, sah eine gruene Zelle, und die Rufbereitschaft
+// verriet nur noch ein zweiter Buchstabe im Kuerzel.
+//
+// doppelt heisst: zwei einander ausschliessende Arbeitsschichten am selben
+// Tag. Das ist ein Fehler im Plan und wird oben angezeigt, nicht unten.
+function matrixZelle(slot, name){
+  const tag  = slot || {};
+  const drin = s => Array.isArray(tag[s]) && tag[s].includes(name);
+  const arbeit = ARBEITSSCHICHTEN.filter(drin);
+  const ruf    = drin('rufbereitschaft');
+  return {
+    arbeit:     arbeit[0] || null,
+    alleArbeit: arbeit,
+    doppelt:    arbeit.length > 1,
+    ruf,
+    leer:       arbeit.length === 0 && !ruf,
+  };
+}
+
+// Besetzung eines Tages, getrennt nach Arbeit und Rufbereitschaft - die
+// Fussleiste der Monatsuebersicht zeigt beides uebereinander, so wie die
+// Zellen darueber. Unterbesetzung wird je Band gemeldet, damit eine fehlende
+// Rufbereitschaft nicht in der Summe der Arbeitsschichten untergeht.
+function matrixFuss(slot, key, soll){
+  const tag = slot || {};
+  const zahl = s => (tag[s] || []).length;
+  const fehlt = fehlbesetzung(tag, key, soll).map(f => f.schicht);
+  return {
+    arbeit:      ARBEITSSCHICHTEN.reduce((n, s) => n + zahl(s), 0),
+    ruf:         zahl('rufbereitschaft'),
+    arbeitFehlt: fehlt.some(s => ARBEITSSCHICHTEN.includes(s)),
+    rufFehlt:    fehlt.includes('rufbereitschaft'),
+  };
+}
+
 global.Regelkern = {
-  SCHICHTEN, MAX_TAGE,
+  SCHICHTEN, ARBEITSSCHICHTEN, MAX_TAGE,
   tagKey, alsDatum, isoWoche, tageImZeitraum, monatsRaster,
   sollAmTag, fehlbesetzung, unterSoll, tageUnterSoll,
   konflikte, naechsteAktion, zeitraumKlasse, kurzName, popupPlatz,
+  matrixZelle, matrixFuss,
 };
 })(globalThis);
 </script>
@@ -2735,6 +2843,9 @@ const getISOWeek = RK.isoWoche;
 function waehleSchicht(shift){
   if(!ALL_SHIFTS.includes(shift)) return;
   selectedShift=shift;
+  // Die Monatsübersicht braucht oben eine Arbeitsschicht, auch wenn gerade
+  // Rufbereitschaft gewählt ist.
+  if(RK.ARBEITSSCHICHTEN.includes(shift)) letzteArbeitsschicht=shift;
   document.querySelectorAll('#modebar .pill').forEach(p=>p.classList.toggle('active',p.dataset.shift===shift));
   updateSelInfo();
 }
@@ -3621,77 +3732,123 @@ function renderCoverageNote(){
 // ══════════════════════════════════════════════════════════════
 // Eine Zeile je Person, eine Spalte je Tag. Zeigt auf einen Blick, wer wann
 // arbeitet, wo Lücken sind und wer an einem Tag doppelt eingeteilt ist.
+//
+// Jede Zelle ist geteilt: oben die Arbeitsschicht, unten die Rufbereitschaft.
+// Vorher trug die Zelle nur eine Farbe - wer früh arbeitete und daneben
+// Rufbereitschaft hatte, sah eine grüne Zelle mit "FR" darin. Die
+// Rufbereitschaft war damit praktisch unsichtbar, obwohl sie der Grund ist,
+// warum es diese Ansicht gibt.
 function renderMatrix(){
   const tbl=document.getElementById('mx-table');
   if(!tbl) return;
   const tage=daysOfMonth(curYear,curMonth);
   const leute=visibleMembers();
+  const heute=(()=>{const n=new Date();return dk(n.getFullYear(),n.getMonth()+1,n.getDate());})();
+
+  document.getElementById('mx-titel').textContent=`${MONTHS[curMonth-1]} ${curYear}`;
 
   const lg=document.getElementById('mx-legend');
-  lg.innerHTML=ALL_SHIFTS.map(s=>
-    `<span><i class="mx-cell ${s}" style="display:inline-block;min-width:18px">${SHIFT_SHORT[s][0]}</i>${esc(SHIFT_LABEL[s])}</span>`).join('')
-    +`<span><i class="mx-cell doppelt" style="display:inline-block;min-width:18px">!</i>doppelt eingeteilt</span>`
-    +`<span style="color:var(--text3)">Klick auf eine Zelle wechselt die gewählte Schicht</span>`;
+  lg.innerHTML=RK.ARBEITSSCHICHTEN.map(s=>
+    `<span><i class="mx-a ${s}">${SHIFT_SHORT[s][0]}</i>${esc(SHIFT_LABEL[s])}</span>`).join('')
+    +`<span><i class="mx-a doppelt">!</i>doppelt eingeteilt</span>`
+    +`<span><i class="mx-r an" style="height:auto">R</i>Rufbereitschaft</span>`;
 
-  if(!leute.length){ tbl.innerHTML='<tbody><tr><td class="mx-name">Keine Mitarbeiter</td></tr></tbody>'; return; }
+  if(!leute.length){
+    document.getElementById('mx-zahl').textContent='';
+    tbl.innerHTML='<tbody><tr><td class="mx-name">Keine Mitarbeiter</td></tr></tbody>';
+    return;
+  }
+
+  // Spaltenbreiten: Name und Summe stehen fest, die Tage teilen sich den
+  // Rest. Ohne <col> verteilt table-layout:fixed nach der ersten Zeile und
+  // die Tagesspalten fielen unterschiedlich breit aus.
+  const spalten='<colgroup><col style="width:196px">'+
+    tage.map(()=>'<col>').join('')+'<col style="width:96px"></colgroup>';
 
   const kopf=['<thead><tr><th class="mx-name">Mitarbeiter</th>'];
   tage.forEach(t=>{
-    const cls=[t.we?'we':'', holidays[t.key]&&!holidays[t.key].bridge?'hol':''].filter(Boolean).join(' ');
-    const titel=holidays[t.key]?esc(holidays[t.key].name):t.lang;
-    kopf.push(`<th class="${cls}" title="${titel}">${t.tag}<br>${t.kurz}</th>`);
+    const feiertag=holidays[t.key]&&!holidays[t.key].bridge;
+    const cls=[t.we?'we':'', feiertag?'hol':'', t.key===heute?'heute':''].filter(Boolean).join(' ');
+    const titel=holidays[t.key]?`${t.lang} · ${esc(holidays[t.key].name)}`:t.lang;
+    kopf.push(`<th class="${cls}" title="${titel}">${t.tag}<span class="mx-wd">${t.kurz}</span></th>`);
   });
-  kopf.push('<th class="mx-sum">F/S/R</th></tr></thead>');
+  kopf.push('<th class="mx-sum" title="Summe je Schicht: Früh, Normaldienst, Spät, Rufbereitschaft">F&nbsp;N&nbsp;S&nbsp;R</th></tr></thead>');
 
+  let gesamtRuf=0, gesamtArbeit=0;
   const zeilen=leute.map(m=>{
-    const zellen=[], zaehl={frueh:0,spaet:0,rufbereitschaft:0};
+    const zellen=[], zaehl={frueh:0,normal:0,spaet:0,rufbereitschaft:0};
     tage.forEach(t=>{
-      const slot=schichten[t.key]||{};
-      const seine=ALL_SHIFTS.filter(s=>(slot[s]||[]).includes(m.name));
-      seine.forEach(s=>zaehl[s]++);
-      const doppelt=seine.filter(s=>s!=='rufbereitschaft').length>1;
-      const cls=doppelt?'doppelt':(seine[0]||(t.we?'we':''));
-      const txt=doppelt?'!':seine.map(s=>SHIFT_SHORT[s][0]).join('');
-      zellen.push(`<td class="mx-cell ${cls}" data-key="${t.key}" data-name="${esc(m.name)}"`+
-        ` title="${esc(m.name)} · ${t.lang}${seine.length?' · '+seine.map(s=>SHIFT_LABEL[s]).join(' + '):''}">${txt||''}</td>`);
+      const z=RK.matrixZelle(schichten[t.key],m.name);
+      z.alleArbeit.forEach(s=>zaehl[s]++);
+      if(z.ruf) zaehl.rufbereitschaft++;
+      gesamtArbeit+=z.alleArbeit.length; gesamtRuf+=z.ruf?1:0;
+
+      const oben=z.doppelt?'doppelt':(z.arbeit||'');
+      const obenTxt=z.doppelt?'!':(z.arbeit?SHIFT_SHORT[z.arbeit][0]:'');
+      const teile=z.alleArbeit.map(s=>SHIFT_LABEL[s]).concat(z.ruf?[SHIFT_LABEL.rufbereitschaft]:[]);
+      const titel=`${esc(m.name)} · ${t.lang}${teile.length?' · '+teile.join(' + '):' · nicht eingeteilt'}`;
+      const zellKlasse=['mx-cell',t.we?'we':'',holidays[t.key]&&!holidays[t.key].bridge?'hol':''].filter(Boolean).join(' ');
+      zellen.push(`<td class="${zellKlasse}" title="${titel}">`+
+        `<div class="mx-split${z.leer?'':' belegt'}">`+
+          `<div class="mx-a ${oben}" data-key="${t.key}" data-name="${esc(m.name)}" data-band="arbeit">${obenTxt}</div>`+
+          `<div class="mx-r${z.ruf?' an':''}" data-key="${t.key}" data-name="${esc(m.name)}" data-band="ruf">R</div>`+
+        `</div></td>`);
     });
     const av=`<span class="avatar" style="background:${m.color};width:15px;height:15px;font-size:8px;display:inline-flex;vertical-align:-3px;margin-right:6px">${m.icon||initials(m.name)}</span>`;
-    return `<tr><td class="mx-name">${av}${esc(m.name)}<span class="mx-team">${esc(m.team||'')}</span></td>`+
+    const summe=['frueh','normal','spaet','rufbereitschaft'].map((s,i)=>
+      `<b class="s-${['f','n','s','r'][i]}${zaehl[s]?' hat':''}">${zaehl[s]}</b>`).join('');
+    return `<tr><td class="mx-name" title="${esc(m.name)}">${av}${esc(m.name)}<span class="mx-team">${esc(m.team||'')}</span></td>`+
       zellen.join('')+
-      `<td class="mx-sum">${zaehl.frueh}/${zaehl.spaet}/${zaehl.rufbereitschaft}</td></tr>`;
+      `<td class="mx-sum">${summe}</td></tr>`;
   });
 
-  // Fußzeile: Besetzung je Tag, rot wenn unter Soll
-  const fuss=['<tr class="mx-foot"><td class="mx-name">Besetzung F/S/R</td>'];
+  // Fußzeile: Besetzung je Tag - genauso geteilt wie die Zellen darüber,
+  // damit eine fehlende Rufbereitschaft nicht in einer Zahlenkette untergeht.
+  const fuss=['<tr class="mx-foot"><td class="mx-name">Besetzung</td>'];
   tage.forEach(t=>{
-    const slot=schichten[t.key]||{};
-    const zahlen=ALL_SHIFTS.map(s=>(slot[s]||[]).length);
-    const unter=ALL_SHIFTS.some((s,i)=>zahlen[i]<sollFor(s,t.key));
-    fuss.push(`<td class="${unter?'unter':''}" title="${t.lang}">${zahlen.join('/')}</td>`);
+    const f=RK.matrixFuss(schichten[t.key],t.key,soll);
+    const detail=ALL_SHIFTS.map(s=>`${SHIFT_LABEL[s]} ${(schichten[t.key]?.[s]||[]).length}/${sollFor(s,t.key)}`).join(' · ');
+    fuss.push(`<td title="${t.lang} · ${detail}"><div class="mx-split">`+
+      `<div class="mx-a${f.arbeitFehlt?' unter':''}">${f.arbeit}</div>`+
+      `<div class="mx-r${f.rufFehlt?' unter':''}">${f.ruf}</div></div></td>`);
   });
   fuss.push('<td class="mx-sum"></td></tr>');
 
-  tbl.innerHTML=kopf.join('')+'<tbody>'+zeilen.join('')+fuss.join('')+'</tbody>';
+  tbl.innerHTML=spalten+kopf.join('')+'<tbody>'+zeilen.join('')+fuss.join('')+'</tbody>';
+  document.getElementById('mx-zahl').textContent=
+    `${leute.length} Mitarbeiter · ${gesamtArbeit} Arbeitstage · ${gesamtRuf} Tage Rufbereitschaft`;
 
-  tbl.querySelectorAll('.mx-cell[data-key]').forEach(td=>{
-    td.addEventListener('click',async()=>{
-      const name=td.dataset.name;
-      pushUndo();
-      const res=await postSchicht([td.dataset.key],'toggle',selectedShift,name);
-      const r=res?.results?.[td.dataset.key];
-      if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
-        undoStack.pop();updateUndoBtns();
-        const replace=r.error==='needs_confirm';
-        const ok=replace?await confirmReplaceShift(name,r.blocking):await confirmHolidayEntry(name,[[td.dataset.key,r]]);
-        if(!ok) return;
-        pushUndo();
-        const r2=await postSchicht([td.dataset.key],'add',selectedShift,name,true,replace);
-        applyResults(r2.results);showHolWarnings(r2.hol_warnings);
-      }else if(r?.error){ undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich'); }
-      else { applyResults(res.results);showHolWarnings(res.hol_warnings); }
-      renderMatrix();
-    });
+  tbl.querySelectorAll('[data-band][data-key]').forEach(el=>{
+    el.addEventListener('click',()=>matrixKlick(el.dataset.key,el.dataset.name,
+      el.dataset.band==='ruf'?'rufbereitschaft':arbeitsschichtWahl()));
   });
+}
+
+// Welche Arbeitsschicht das obere Feld einträgt. Ist gerade Rufbereitschaft
+// gewählt, wäre "die gewählte Schicht" oben sinnlos - dann gilt die zuletzt
+// gewählte Arbeitsschicht.
+let letzteArbeitsschicht='frueh';
+function arbeitsschichtWahl(){
+  return RK.ARBEITSSCHICHTEN.includes(selectedShift)?selectedShift:letzteArbeitsschicht;
+}
+
+// Ein Klick in der Monatsübersicht - derselbe Weg wie im Kalender, samt
+// Rückfrage bei einer zweiten Arbeitsschicht oder einem eigenen Feiertag.
+async function matrixKlick(key,name,schicht){
+  pushUndo();
+  const res=await postSchicht([key],'toggle',schicht,name);
+  const r=res?.results?.[key];
+  if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
+    undoStack.pop();updateUndoBtns();
+    const replace=r.error==='needs_confirm';
+    const ok=replace?await confirmReplaceShift(name,r.blocking):await confirmHolidayEntry(name,[[key,r]]);
+    if(!ok) return;
+    pushUndo();
+    const r2=await postSchicht([key],'add',schicht,name,true,replace);
+    applyResults(r2.results);showHolWarnings(r2.hol_warnings);
+  }else if(r?.error){ undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich'); }
+  else { applyResults(res.results);showHolWarnings(res.hol_warnings); }
+  renderMatrix();
 }
 
 // Tage des Monats mit Kurzform für die Spaltenköpfe

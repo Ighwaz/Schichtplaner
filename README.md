@@ -16,9 +16,13 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   die immer zusätzlich dazu läuft und nie nachfragt
 - **Kalender**: jeder Tag zeigt immer alle Schichten in derselben
   Reihenfolge, mit Besetzung als `1/1` je Zeile – rot, sobald das Soll fehlt
-- **Monatsübersicht**: eine Zeile je Person, eine Spalte je Tag. Zeigt Lücken,
-  Häufungen und Doppelbelegungen auf einen Blick; Klick auf eine Zelle trägt
-  die gewählte Schicht ein
+- **Monatsübersicht**: eine Zeile je Person, eine Spalte je Tag. Jeder Tag ist
+  geteilt – oben die Arbeitsschicht, unten die Rufbereitschaft, weil beides am
+  selben Tag nebeneinander läuft. Ein Klick auf das obere Feld trägt die
+  gewählte Arbeitsschicht ein oder aus, ein Klick auf den unteren Streifen die
+  Rufbereitschaft. Rechts die Summen F/N/S/R je Person, unten die Besetzung je
+  Tag – ebenfalls getrennt, damit eine fehlende Rufbereitschaft nicht in der
+  Summe der Arbeitsschichten untergeht
 - **Feiertage** DE (BW) und IN inkl. Brückentagen und eigenen Feiertagen.
   Ein Eintrag am Feiertag des eigenen Teams wird abgefragt, nicht verhindert
 - **Konfliktprüfung**: wer schon in einer anderen Schicht steht, wird nur nach
