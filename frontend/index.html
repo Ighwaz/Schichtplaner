@@ -3117,7 +3117,38 @@ async function applySchicht(dates,action,schicht,name){const res=await postSchic
 function applyResults(results){if(!results)return;Object.entries(results).forEach(([k,v])=>{if(!v.error)schichten[k]=v;});renderCalendar();renderStats();}
 async function clearDay(key){pushUndo();const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:emptyDay(),dates:[key],mode:'replace'})});if(r.ok){schichten[key]=emptyDay();renderCalendar();toast('Tag geleert');}}
 async function pasteDay(dates,mode){if(!copiedDay)return;const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:copiedDay.slot,dates,mode})});if(r.ok){await reloadSchichten();renderCalendar();toast(dates.length+' Tag(e) eingefügt');}}
-async function handleDrop(toKey){if(!dragState)return;const{name,fromKey,fromShift}=dragState;dragState=null;if(fromKey===toKey)return;pushUndo();await applySchicht([fromKey],'remove',fromShift,name);await applySchicht([toKey],'add',fromShift,name);toast(name+' verschoben');}
+// Einen Chip auf einen anderen Tag ziehen.
+//
+// Der Zieltag kann belegt sein - dann kommt dieselbe Rückfrage wie beim Klick.
+// Vorher wurde erst ausgetragen und dann blind eingetragen: sagte der Server
+// "needs_confirm", war der Eintrag am Ausgangstag weg und kam am Zieltag nie
+// an. Deshalb wird jetzt zuerst der Zieltag geklärt und erst danach der
+// Ausgangstag geräumt.
+async function handleDrop(toKey){
+  if(!dragState) return;
+  const {name,fromKey,fromShift}=dragState;
+  dragState=null;
+  if(fromKey===toKey) return;
+
+  pushUndo();
+  let res=await postSchicht([toKey],'add',fromShift,name);
+  let r=res?.results?.[toKey];
+
+  if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
+    const ersetzen=r.error==='needs_confirm';
+    const ok=ersetzen?await confirmReplaceShift(name,r.blocking)
+                     :await confirmHolidayEntry(name,[[toKey,r]]);
+    if(!ok){ undoStack.pop(); updateUndoBtns(); return; }   // Ausgangstag bleibt
+    res=await postSchicht([toKey],'add',fromShift,name,true,ersetzen);
+    r=res?.results?.[toKey];
+    showHolWarnings(res.hol_warnings);
+  }
+  if(r?.error){ undoStack.pop(); updateUndoBtns(); toast('Verschieben nicht möglich'); return; }
+
+  applyResults(res.results);
+  await applySchicht([fromKey],'remove',fromShift,name);
+  toast(name+' verschoben');
+}
 
 // ══════════════════════════════════════════════════════════════
 // RANGE

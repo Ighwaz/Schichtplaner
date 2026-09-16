@@ -337,3 +337,58 @@ describe('Austragen im Kalender', () => {
     assert.equal(o.$$('.day-cell.multi-day').length, 1, 'der Tag wurde nicht gesammelt');
   });
 });
+
+describe('Ziehen auf einen belegten Tag', () => {
+  function ziehe(o, chip, zielZelle) {
+    const start = new o.fenster.Event('dragstart', { bubbles: true });
+    start.dataTransfer = { effectAllowed: '' };
+    chip.dispatchEvent(start);
+    const drop = new o.fenster.Event('drop', { bubbles: true });
+    drop.dataTransfer = { effectAllowed: '' };
+    zielZelle.dispatchEvent(drop);
+  }
+
+  test('ein Chip geht beim Ziehen in einen Konflikt nicht verloren', async () => {
+    // Bauer hat am 3.9. Früh und am 10.9. bereits Spät. Wird die Frühschicht
+    // auf den 10. gezogen, stünde er in zwei Arbeitsschichten - dieselbe
+    // Rückfrage wie beim Klick. Was nicht passieren darf: der Eintrag
+    // verschwindet vom 3. und taucht am 10. nie auf.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await ruhe();
+    await ruhe();
+
+    // Ohne Bestätigung bleibt alles, wie es war.
+    assert.deepEqual(frueh(o, '2026-09-03'), ['Bauer, Martin'],
+      'der Eintrag ist vom Ausgangstag verschwunden, ohne am Zieltag anzukommen');
+    assert.equal(frueh(o, '2026-09-10').length, 0, 'am Zieltag wurde ohne Rückfrage eingetragen');
+    assert.ok(o.$('#_cdlg-yes'), 'es kam keine Rückfrage');
+  });
+
+  test('nach dem Bestätigen liegt der Eintrag am Zieltag', async () => {
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await warteBis(() => o.$('#_cdlg-yes'), 'die Rückfrage');
+
+    klick(o.$('#_cdlg-yes'));
+    await warteBis(() => frueh(o, '2026-09-10').includes('Bauer, Martin'), 'den Zieltag');
+    await warteBis(() => frueh(o, '2026-09-03').length === 0, 'den Ausgangstag');
+    // Die abgegebene Spätschicht ist die, die ersetzt wurde.
+    assert.equal((o.api.zustand.schichten['2026-09-10'].spaet || []).length, 0);
+  });
+});

@@ -19,6 +19,9 @@ const html = readFileSync(join(hier, '..', 'frontend', 'index.html'), 'utf8');
 // Ein leerer Tag - dieselbe Form, die der Go-Teil liefert.
 const leererTag = () => ({ frueh: [], normal: [], spaet: [], rufbereitschaft: [] });
 
+// Diese drei schliessen einander aus; die Rufbereitschaft laeuft daneben her.
+const ARBEITSSCHICHTEN = ['frueh', 'normal', 'spaet'];
+
 // Schluessel einer Kalenderwoche, gleiche Schreibweise wie isoWeekKey in Go.
 export function isoWochenSchluessel(d) {
   const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -110,17 +113,30 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
     }
 
     if (pfad === '/api/schicht') {
-      // Dieselben vier Aktionen wie im Go-Teil - sonst prüfen die Tests einen
-      // Weg, den es in Wirklichkeit nicht gibt.
-      const { dates, schicht, name, action } = koerper;
+      // Dieselben vier Aktionen wie im Go-Teil - und dieselbe Rückfrage bei
+      // einer zweiten Arbeitsschicht am selben Tag. Ohne die prüfen Tests
+      // einen Weg, den es in Wirklichkeit nicht gibt.
+      const { dates, schicht, name, action, force, replace } = koerper;
       const results = {};
       for (const d of dates) {
         const t = tag(d);
         const drin = t[schicht] && t[schicht].includes(name);
-        if ((action === 'add' || (action === 'toggle' && !drin)) && !drin) t[schicht].push(name);
-        else if (action === 'remove' || (action === 'toggle' && drin))
+
+        if ((action === 'add' || action === 'toggle') && !drin) {
+          const blockierend = ARBEITSSCHICHTEN
+            .filter(s => s !== schicht && (t[s] || []).includes(name));
+          if (blockierend.length && !force) {
+            results[d] = { error: 'needs_confirm', blocking: blockierend };
+            continue;
+          }
+          if (blockierend.length && replace)
+            for (const s of blockierend) t[s] = t[s].filter(n => n !== name);
+          t[schicht].push(name);
+        } else if (action === 'remove' || (action === 'toggle' && drin)) {
           t[schicht] = t[schicht].filter(n => n !== name);
-        else if (action === 'clear_shift') t[schicht] = [];
+        } else if (action === 'clear_shift') {
+          t[schicht] = [];
+        }
         results[d] = kopie(t);
       }
       return { results, hol_warnings: {} };
