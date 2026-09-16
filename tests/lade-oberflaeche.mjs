@@ -67,8 +67,25 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
     if (pfad === '/api/datadir') return { folder: '/testordner', file: '/testordner/schichtplan.db' };
     if (pfad === '/api/holiday_coverage') return { in_movable_from: 2020, in_movable_to: 2030 };
     if (pfad.startsWith('/api/holidays/')) return kopie(feiertage);
-    if (pfad === '/api/templates') return kopie(zustand.templates);
-    if (pfad === '/api/custom_holidays') return kopie(zustand.custom_holidays);
+    if (pfad === '/api/templates' && methode === 'GET') return kopie(zustand.templates);
+    if (pfad === '/api/templates' && methode === 'POST') {
+      zustand.templates[koerper.name] = kopie(koerper.template || {});
+      return { ok: true };
+    }
+    if (pfad.startsWith('/api/templates/') && methode === 'DELETE') {
+      delete zustand.templates[decodeURIComponent(pfad.slice('/api/templates/'.length))];
+      return { ok: true };
+    }
+    if (pfad === '/api/custom_holidays' && methode === 'GET') return kopie(zustand.custom_holidays);
+    if (pfad === '/api/custom_holidays' && methode === 'POST') {
+      zustand.custom_holidays.push(kopie(koerper));
+      return { ok: true };
+    }
+    if (pfad.startsWith('/api/custom_holidays/') && methode === 'DELETE') {
+      const [datum, name] = decodeURIComponent(pfad.slice('/api/custom_holidays/'.length)).split('|');
+      zustand.custom_holidays = zustand.custom_holidays.filter(h => !(h.date === datum && h.name === name));
+      return { ok: true };
+    }
     if (pfad.startsWith('/api/history')) return [];
 
     if (pfad === '/api/ruf_kw' && methode === 'GET') return kopie(zustand.ruf_kw);
@@ -93,13 +110,18 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
     }
 
     if (pfad === '/api/schicht') {
+      // Dieselben vier Aktionen wie im Go-Teil - sonst prüfen die Tests einen
+      // Weg, den es in Wirklichkeit nicht gibt.
       const { dates, schicht, name, action } = koerper;
       const results = {};
       for (const d of dates) {
         const t = tag(d);
-        if (action === 'add' && !t[schicht].includes(name)) t[schicht].push(name);
-        if (action === 'remove') t[schicht] = t[schicht].filter(n => n !== name);
-        results[d] = JSON.parse(JSON.stringify(t));
+        const drin = t[schicht] && t[schicht].includes(name);
+        if ((action === 'add' || (action === 'toggle' && !drin)) && !drin) t[schicht].push(name);
+        else if (action === 'remove' || (action === 'toggle' && drin))
+          t[schicht] = t[schicht].filter(n => n !== name);
+        else if (action === 'clear_shift') t[schicht] = [];
+        results[d] = kopie(t);
       }
       return { results, hol_warnings: {} };
     }

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"schichtplaner/internal/domain"
 	"schichtplaner/internal/store"
+	"sort"
 	"strings"
 )
 
@@ -91,4 +92,32 @@ func pathSegment(path, prefix string) string {
 	s = strings.TrimPrefix(s, "/")
 	s, _ = url.PathUnescape(s)
 	return s
+}
+
+// bekannteNamen liefert die Namen aller eingetragenen Mitarbeiter.
+//
+// Schichten gibt es nur fuer Leute, die es gibt: ein Eintrag auf einen
+// unbekannten Namen erschiene im Kalender als farbloser Chip, den keine
+// Mitarbeiterliste mehr kennt und den niemand mehr los wird.
+func (srv *Server) bekannteNamen(ctx context.Context, s *store.Store) (map[string]bool, error) {
+	liste, err := s.Employees(ctx)
+	if err != nil {
+		return nil, err
+	}
+	namen := make(map[string]bool, len(liste))
+	for _, m := range liste {
+		namen[m.Name] = true
+	}
+	return namen, nil
+}
+
+// sortiert macht aus einer Menge eine geordnete Liste - fuer Meldungen, die
+// immer gleich aussehen sollen.
+func sortiert(menge map[string]bool) []string {
+	raus := make([]string, 0, len(menge))
+	for s := range menge {
+		raus = append(raus, s)
+	}
+	sort.Strings(raus)
+	return raus
 }

@@ -7,6 +7,12 @@
 // umgekehrt.
 package domain
 
+import (
+	"regexp"
+	"strings"
+	"time"
+)
+
 // ── Data structures ───────────────────────────────────────────────────────────
 
 type Employee struct {
@@ -98,12 +104,37 @@ func Normalize(d *AppData) {
 		d.Soll = SollBesetzung{Frueh: 1, Normal: 0, Spaet: 1, Rufbereitschaft: 1}
 	}
 	d.RufKW = UnwrapRufKW(d.RufKW)
-	for i := range d.Mitarbeiter {
-		if d.Mitarbeiter[i].Color == "" {
-			d.Mitarbeiter[i].Color = "#4a9eff"
+
+	// Namenlose Mitarbeiter und doppelte Namen wieder heraussieben. Eine
+	// eingelesene Sicherung kann von Hand bearbeitet worden sein.
+	gesehen := map[string]bool{}
+	sauber := d.Mitarbeiter[:0]
+	for _, m := range d.Mitarbeiter {
+		m.Name = strings.TrimSpace(m.Name)
+		if m.Name == "" || gesehen[m.Name] {
+			continue
 		}
-		if d.Mitarbeiter[i].Prefs == nil {
-			d.Mitarbeiter[i].Prefs = map[string]string{}
+		gesehen[m.Name] = true
+		if m.Color == "" {
+			m.Color = "#4a9eff"
+		}
+		if m.Prefs == nil {
+			m.Prefs = map[string]string{}
+		}
+		sauber = append(sauber, m)
+	}
+	d.Mitarbeiter = sauber
+
+	// Tage, die es nicht gibt, fliegen raus - sie waeren im Kalender nie
+	// wieder zu sehen.
+	for key := range d.Schichten {
+		if !IstTagesschluessel(key) {
+			delete(d.Schichten, key)
+		}
+	}
+	for key := range d.Notizen {
+		if !IstTagesschluessel(key) {
+			delete(d.Notizen, key)
 		}
 	}
 }
@@ -138,4 +169,49 @@ type ChangeEntry struct {
 	Time   string `json:"time"`
 	Action string `json:"action"`
 	Detail string `json:"detail"`
+}
+
+// datumMuster ist die Schreibweise, in der jeder Tagesschlüssel steht.
+var datumMuster = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// Jahre, in denen ein Schichtplan plausibel ist. Alles davor oder danach ist
+// ein Tippfehler - "0000-01-01" ist für die Zeitrechnung ein gültiger Tag, für
+// einen Dienstplan nicht.
+const (
+	ErstesJahr  = 1970
+	LetztesJahr = 2200
+)
+
+// IstTagesschluessel sagt, ob s ein Tag ist, den es wirklich gibt und den ein
+// Dienstplan meinen kann.
+//
+// Nicht nur die Form zählt: "2026-02-31" hat die richtige Gestalt, meint aber
+// keinen Tag. Ohne diese Prüfung landen solche Schlüssel in der Datenbank und
+// tauchen im Kalender nie wieder auf - unsichtbar und nicht mehr löschbar.
+func IstTagesschluessel(s string) bool {
+	if !datumMuster.MatchString(s) {
+		return false
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil || t.Format("2006-01-02") != s {
+		return false
+	}
+	return IstPlausiblesJahr(t.Year())
+}
+
+// IstPlausiblesJahr grenzt ab, für welche Jahre geplant werden kann.
+func IstPlausiblesJahr(jahr int) bool {
+	return jahr >= ErstesJahr && jahr <= LetztesJahr
+}
+
+// NurEchteTage siebt aus einer Liste die Schlüssel heraus, die keinen Tag
+// meinen, und behält die Reihenfolge.
+func NurEchteTage(dates []string) []string {
+	raus := make([]string, 0, len(dates))
+	for _, d := range dates {
+		if IstTagesschluessel(d) {
+			raus = append(raus, d)
+		}
+	}
+	return raus
 }

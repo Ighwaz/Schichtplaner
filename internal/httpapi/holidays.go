@@ -14,8 +14,8 @@ import (
 
 func (srv *Server) handleHolidays(w http.ResponseWriter, r *http.Request) {
 	year, err := strconv.Atoi(pathSegment(r.URL.Path, "/api/holidays"))
-	if err != nil {
-		http.Error(w, "invalid year", 400)
+	if err != nil || !domain.IstPlausiblesJahr(year) {
+		http.Error(w, "Jahr außerhalb des planbaren Bereichs", 400)
 		return
 	}
 	s, ok := srv.requireStore(w)
@@ -49,6 +49,15 @@ func (srv *Server) handleAddCustomHoliday(w http.ResponseWriter, r *http.Request
 	var body domain.CustomHoliday
 	if err := readJSON(r, &body); err != nil {
 		http.Error(w, err.Error(), 400)
+		return
+	}
+	body.Name = strings.TrimSpace(body.Name)
+	if !domain.IstTagesschluessel(body.Date) {
+		writeJSON(w, map[string]string{"error": "Kein gültiger Tag: " + body.Date})
+		return
+	}
+	if body.Name == "" {
+		writeJSON(w, map[string]string{"error": "Name erforderlich"})
 		return
 	}
 	if srv.write(w, func(s *store.Store) error { return s.AddCustomHoliday(r.Context(), body) }) {

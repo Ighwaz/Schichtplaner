@@ -446,9 +446,10 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 .tmpl-table tr:last-child td{border-bottom:none}
 .tmpl-cell-btn{display:inline-block;padding:5px 10px;border-radius:7px;border:2px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;min-width:54px;text-align:center}
 .tmpl-cell-btn:hover{border-color:var(--border2);color:var(--text)}
-.tmpl-cell-btn.t-f{border-color:var(--frueh);background:rgba(34,197,94,.12);color:var(--frueh)}
-.tmpl-cell-btn.t-s{border-color:var(--spaet);background:rgba(245,158,11,.12);color:var(--spaet)}
-.tmpl-cell-btn.t-r{border-color:var(--ruf);background:rgba(167,139,250,.12);color:var(--ruf)}
+.tmpl-cell-btn.t-f{border-color:var(--frueh);background:color-mix(in srgb,var(--frueh) 12%,transparent);color:var(--frueh)}
+.tmpl-cell-btn.t-n{border-color:var(--normal);background:color-mix(in srgb,var(--normal) 12%,transparent);color:var(--normal)}
+.tmpl-cell-btn.t-s{border-color:var(--spaet);background:color-mix(in srgb,var(--spaet) 12%,transparent);color:var(--spaet)}
+.tmpl-cell-btn.t-r{border-color:var(--ruf);background:color-mix(in srgb,var(--ruf) 12%,transparent);color:var(--ruf)}
 .tmpl-cell-btn.t-frei{border-color:var(--krank);background:rgba(248,113,113,.08);color:var(--krank)}
 .tmpl-person-chip{display:flex;align-items:center;gap:6px}
 .tmpl-hint{font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
@@ -881,7 +882,9 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
       </div>
       <div class="tmpl-hint" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
         <div>Lege pro Mitarbeiter fest, welche Schicht er an welchem Wochentag hat. Der Autoplan übernimmt exakt dieses Muster.<br>
-        <strong>Klick auf eine Zelle</strong> wechselt zwischen Früh → Spät → Ruf → Frei → leer. Wochenenden (Sa/So) nur Rufbereitschaft möglich.</div>
+        <strong>Klick auf eine Zelle</strong> wechselt zwischen Früh → Normaldienst → Spät → Frei → leer.
+        Rufbereitschaft steht hier nicht: sie wird im Reiter <strong>Rufbereitschaft</strong> wochenweise geplant.
+        Wochenenden sind heller dargestellt – eintragen lässt sich dort dasselbe, verlangt wird es nicht.</div>
         <button class="btn-s" onclick="fillTemplateFromPrefs()" style="flex-shrink:0;font-size:11px" title="Präferenzen aus den Mitarbeiter-Profilen in dieses Template übernehmen">↙ Aus Profil-Präferenzen</button>
       </div>
       <div class="tmpl-name-row">
@@ -1240,7 +1243,9 @@ function tageImZeitraum(a, b){
 // Das Raster einer Monatsansicht: volle Wochen von Montag bis Sonntag, vorne
 // und hinten mit den Nachbarmonaten aufgefüllt.
 function monatsRaster(jahr, monat){
-  if(!istGanzzahl(jahr) || !istGanzzahl(monat) || monat < 1 || monat > 12)
+  if(!istGanzzahl(jahr))
+    throw new RangeError('monatsRaster: Jahr erwartet, bekommen: ' + jahr);
+  if(!istGanzzahl(monat) || monat < 1 || monat > 12)
     throw new RangeError('monatsRaster: Monat 1-12 erwartet, bekommen: ' + monat);
   const ersterWochentag = (new Date(jahr, monat-1, 1).getDay() + 6) % 7; // Mo=0
   const tageImMonat     = new Date(jahr, monat, 0).getDate();
@@ -1487,48 +1492,42 @@ function initRufKWYear(){
     MONTH_SHORT.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
 }
 
-function syncRufKWFromCalendar(){
-  // Die eingetragene Rufbereitschaft nach Kalenderwochen bündeln und daraus
-  // den Wochenplan füllen
-  const counts = {};  // {kwKey: {personName: dayCount}}
+// Liest die im Kalender eingetragene Rufbereitschaft in den Wochenplan.
+//
+// Eine Woche gehoert jemandem, wenn er sie ueberwiegend traegt - ein einzelner
+// Vertretungstag macht daraus keinen Wochendienst. Sonst wuerde ein spaeteres
+// "In den Kalender uebertragen" die uebrigen sechs Tage stillschweigend
+// mitfuellen.
+const MIN_TAGE_FUER_WOCHE = 3;
+
+async function syncRufKWFromCalendar(){
+  const tageJeWoche = {};   // {kwKey: {Name: Anzahl Tage}}
   Object.entries(schichten).forEach(([dateKey, slot]) => {
-    const people = slot.rufbereitschaft || [];
-    if(!people.length) return;
-    const d = new Date(dateKey + 'T00:00:00');
-    const kw = isoWeek(d);
-    // ISO-Jahr über den Donnerstag
-    const thu = new Date(d); thu.setDate(d.getDate() + (4 - ((d.getDay()+6)%7 + 1)));
-    // dieselbe Rechnung wie in isoWeek
-    const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    const dayNum = tmp.getUTCDay() || 7;
-    tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
-    const isoYear = tmp.getUTCFullYear();
-    const kwKey = `${isoYear}-W${String(kw).padStart(2,'0')}`;
-    if(!counts[kwKey]) counts[kwKey] = {};
-    people.forEach(name => { counts[kwKey][name] = (counts[kwKey][name]||0) + 1; });
+    const leute = slot.rufbereitschaft || [];
+    if(!leute.length) return;
+    const kwKey = kwSchluessel(new Date(dateKey + 'T00:00:00'));
+    if(!tageJeWoche[kwKey]) tageJeWoche[kwKey] = {};
+    leute.forEach(name => { tageJeWoche[kwKey][name] = (tageJeWoche[kwKey][name] || 0) + 1; });
   });
 
-  // Je Woche zählt, wer die meisten Tage hat - üblicherweise sind das alle
-  // sieben und damit eine Person
-  let imported = 0;
-  Object.entries(counts).forEach(([kwKey, personDays]) => {
-    const maxDays = Math.max(...Object.values(personDays));
-    // Alle mit Einträgen - bei geteilten Wochen sind es mehrere
-    const persons = Object.entries(personDays)
-      .filter(([,d]) => d >= maxDays * 0.5)  // mindestens die Hälfte der Tage
-      .map(([n]) => n);
-    if(persons.length && !rufKW[kwKey]) {
-      rufKW[kwKey] = persons.length === 1 ? persons[0] : persons;
-      imported++;
-    }
+  let uebernommen = 0;
+  Object.entries(tageJeWoche).forEach(([kwKey, jeName]) => {
+    const meiste = Math.max(...Object.values(jeName));
+    if(meiste < MIN_TAGE_FUER_WOCHE) return;
+    // Bei geteilten Wochen zaehlen alle, die einen erheblichen Teil tragen.
+    const leute = Object.entries(jeName).filter(([,tage]) => tage >= meiste * 0.5).map(([n]) => n);
+    if(!leute.length || rufKW[kwKey]) return;
+    rufKW[kwKey] = leute;
+    uebernommen++;
   });
 
-  if(imported === 0){
-    toast('Keine neuen Einträge gefunden (bereits synchronisiert oder keine Rufbereitschaft im Kalender)');
-  } else {
-    renderRufKWTable();
-    toast(imported + ' KW(s) aus Kalender eingelesen – bitte mit 💾 Speichern sichern');
+  if(uebernommen === 0){
+    toast('Nichts zu übernehmen – im Kalender stehen keine ganzen Wochen, die hier fehlen');
+    return;
   }
+  renderRufKWTable();
+  await saveRufKW({still:true});
+  toast(uebernommen + ' Woche(n) aus dem Kalender übernommen');
 }
 
 function showKwRufDialog(kw, weekDates){
@@ -1957,9 +1956,11 @@ async function applyRufKW(){
   if(d.error){resEl.style.cssText='display:block;background:rgba(239,68,68,.1);color:#f87171';resEl.textContent='Fehler: '+d.error;}
   else{
     const wo=month?MONTHS[parseInt(month)-1]+' '+year:'Jahr '+year;
-    const text=d.applied?`${d.applied} Rufbereitschafts-Einträge für ${wo} übertragen.`
+    const fehlend=(d.unbekannt||[]);
+    const weg=fehlend.length?` Nicht mehr im Team und darum übergangen: ${fehlend.join(', ')}.`:'';
+    const text=d.applied?`${d.applied} Rufbereitschafts-Einträge für ${wo} übertragen.`+weg
       :`Für ${wo} gab es nichts zu übertragen – im KW-Plan steht dort niemand, `+
-       `oder die Tage sind bereits eingetragen.`;
+       `oder die Tage sind bereits eingetragen.`+weg;
     resEl.style.cssText='display:block;background:rgba(34,197,94,.1);color:var(--frueh)';
     resEl.textContent=text;
     await reloadSchichten();renderCalendar();renderRufKWTable();
@@ -2292,7 +2293,11 @@ function updateLabel(){
   if(mSel){
     if(!mSel.options.length){
       MONTHS.forEach((m,i)=>{ const o=document.createElement('option'); o.value=i+1; o.textContent=m; mSel.appendChild(o); });
-      mSel.addEventListener('change',()=>{ curMonth=parseInt(mSel.value); renderCalendar(); updateLabel(); });
+      mSel.addEventListener('change',()=>{
+        const neu=parseInt(mSel.value,10);
+        if(!Number.isInteger(neu)||neu<1||neu>12){ mSel.value=curMonth; return; }
+        curMonth=neu; renderCalendar(); updateLabel();
+      });
     }
     mSel.value=curMonth;
   }
@@ -2306,7 +2311,10 @@ function updateLabel(){
       sorted.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y; ySel.appendChild(o); });
       ySel.dataset.built='1';
       ySel.addEventListener('change',async()=>{
-        const newY=parseInt(ySel.value);
+        // Ein Auswahlfeld ohne passenden Eintrag liefert "" - daraus wuerde
+        // NaN, und der Kalender koennte gar nichts mehr zeichnen.
+        const newY=parseInt(ySel.value,10);
+        if(!Number.isInteger(newY)){ ySel.value=curYear; return; }
         if(newY!==curYear){ curYear=newY; await loadHolidays(curYear); }
         updateLabel(); renderCalendar();
       });
@@ -3254,13 +3262,14 @@ async function applyTemplateDirectly(){
 
   pushUndo();
   // Monat für Monat anwenden - jeder Aufruf ist eine eigene Transaktion.
-  const d={planned:0,skipped_conflict:0,skipped_holiday:0};
+  const d={planned:0,skipped_conflict:0,skipped_holiday:0,unbekannt:new Set()};
   for(let t=vonJ*12+vonM-1; t<=bisJ*12+bisM-1; t++){
     const j=Math.floor(t/12), m=t%12+1;
     const r=await api('/api/autoplan',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({year:j,month:m,template:tname})});
     if(r.error){ d.error=r.error; break; }
     d.planned+=r.planned||0; d.skipped_conflict+=r.skipped_conflict||0; d.skipped_holiday+=r.skipped_holiday||0;
+    (r.unbekannt||[]).forEach(n=>d.unbekannt.add(n));
   }
   const monate=bisJ*12+bisM-(vonJ*12+vonM)+1;
   if(d.error) toast('Fehler: '+d.error);
@@ -3273,7 +3282,11 @@ async function applyTemplateDirectly(){
     const uebersprungen=(d.skipped_conflict||0)+(d.skipped_holiday||0);
     const zusatz=uebersprungen?` – ${uebersprungen} übersprungen (${d.skipped_conflict||0}× Konflikt, ${d.skipped_holiday||0}× Feiertag)`:'';
     const zeitraum=monate===1?`${MONTHS[selMonth-1]} ${selYear}`:`${monate} Monate ab ${MONTHS[selMonth-1]} ${selYear}`;
-    toast(`Template "${tname}" auf ${zeitraum}: ${d.planned} Einträge${zusatz}`);
+    // Wer im Template steht, aber nicht mehr in der Mitarbeiterliste, wird
+    // uebergangen - mit Namen, sonst sucht man den Grund vergeblich.
+    const fehlend=[...d.unbekannt];
+    const weg=fehlend.length?` – nicht mehr im Team: ${fehlend.join(', ')}`:'';
+    toast(`Template "${tname}" auf ${zeitraum}: ${d.planned} Einträge${zusatz}${weg}`);
   }
 }
 
@@ -3284,8 +3297,9 @@ async function applyTemplateDirectly(){
 // ══════════════════════════════════════════════════════════════
 // Im Template steht nur die Arbeitsschicht. Rufbereitschaft läuft über den
 // KW-Plan und würde hier nur doppelt gepflegt.
+// Der Reigen einer Template-Zelle. Rufbereitschaft fehlt mit Absicht - die
+// wird wochenweise im eigenen Reiter geplant, nicht je Wochentag.
 const TMPL_CYCLE=['','frueh','normal','spaet','frei'];
-const TMPL_CYCLE_WE=TMPL_CYCLE;
 
 function fillTemplateFromPrefs(){
   // Das Template aus den Wünschen der Mitarbeiter füllen
@@ -3331,8 +3345,10 @@ function renderTemplateTable(){
 
     for(let dow=0;dow<7;dow++){
       const td=document.createElement('td');
+      // Wochenenden werden heller gezeichnet, gelten aber sonst wie jeder
+      // andere Tag: eintragen darf man dort, verlangt wird es nicht.
       const isWE=dow>=5;
-      const cycle=isWE?TMPL_CYCLE_WE:TMPL_CYCLE;
+      const cycle=TMPL_CYCLE;
       const cur=(tmplData[m.name]||{})[dow]||'';
       const btn=document.createElement('div');btn.className='tmpl-cell-btn';
       btn.textContent=cellLabel(cur);btn.className='tmpl-cell-btn '+cellClass(cur);
@@ -3354,15 +3370,12 @@ function renderTemplateTable(){
   loadTemplates();
 }
 
-function cellLabel(val){
-  if(!val||val==='')return '–';
-  if(val==='frueh')return 'Früh';if(val==='spaet')return 'Spät';
-  if(val==='rufbereitschaft')return 'Ruf';if(val==='frei')return 'Frei';return val;
-}
-function cellClass(val){
-  if(!val||val==='')return '';if(val==='frueh')return 't-f';if(val==='spaet')return 't-s';
-  if(val==='rufbereitschaft')return 't-r';if(val==='frei')return 't-frei';return '';
-}
+// Beschriftung und Farbe einer Template-Zelle. Der Normaldienst fehlte hier -
+// er kam als rohes "normal" durch, klein geschrieben und ohne Farbe.
+const TMPL_LABEL={frueh:'Früh',normal:'Normal',spaet:'Spät',rufbereitschaft:'Ruf',frei:'Frei'};
+const TMPL_KLASSE={frueh:'t-f',normal:'t-n',spaet:'t-s',rufbereitschaft:'t-r',frei:'t-frei'};
+function cellLabel(val){ return TMPL_LABEL[val]||'–'; }
+function cellClass(val){ return TMPL_KLASSE[val]||''; }
 
 async function loadTemplates(){
   const d=await api('/api/templates');templates=d||{};
@@ -3724,7 +3737,17 @@ async function doImport(){
   const fd=new FormData();fd.append('file',input.files[0]);
   const d=await fetch('/api/import_ics',{method:'POST',body:fd}).then(r=>r.json());
   if(d.error){resEl.textContent='Fehler: '+d.error;resEl.className='imp-result err';}
-  else{resEl.textContent=d.imported+' importiert'+(d.skipped?', '+d.skipped+' übersprungen':'');resEl.className='imp-result ok';await reloadSchichten();renderCalendar();if(d.imported>0)toast(d.imported+' Einträge importiert');}
+  else{
+    // Wer im Kalender steht, aber nicht in der Mitarbeiterliste, wird
+    // übersprungen - mit Namen, damit man ihn anlegen und erneut einlesen kann.
+    const fehlend=(d.unbekannt||[]);
+    resEl.textContent=d.imported+' importiert'+(d.skipped?', '+d.skipped+' übersprungen':'')+
+      (fehlend.length?' – nicht in der Mitarbeiterliste: '+fehlend.join(', '):'');
+    resEl.className='imp-result ok';
+    await reloadSchichten();renderCalendar();
+    if(d.imported>0)toast(d.imported+' Einträge importiert');
+    else if(fehlend.length)toast('Niemand eingetragen – '+fehlend.length+' unbekannte Namen');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

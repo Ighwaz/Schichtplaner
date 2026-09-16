@@ -8,6 +8,7 @@ import (
 	"schichtplaner/internal/domain"
 	"schichtplaner/internal/store"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,9 +29,33 @@ func (srv *Server) handleSchicht(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
+	body.Name = strings.TrimSpace(body.Name)
+	if body.Name == "" && body.Action != "clear_shift" {
+		writeJSON(w, map[string]string{"error": "Name erforderlich"})
+		return
+	}
+	// Tage, die es nicht gibt, werden aussortiert statt eingetragen. Sonst
+	// legt ein Tippfehler wie "2026-02-31" eine Zeile an, die im Kalender nie
+	// erscheint - unsichtbar und nicht mehr löschbar.
+	body.Dates = domain.NurEchteTage(body.Dates)
+
 	s, ok := srv.requireStore(w)
 	if !ok {
 		return
+	}
+
+	// Nur eingetragene Mitarbeiter dürfen in den Plan. Ein Name, den es nicht
+	// gibt, erschiene als farbloser Chip, den keine Liste mehr kennt.
+	if body.Name != "" {
+		namen, err := srv.bekannteNamen(r.Context(), s)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if !namen[body.Name] {
+			writeJSON(w, map[string]string{"error": "Mitarbeiter nicht gefunden: " + body.Name})
+			return
+		}
 	}
 
 	hols, err := srv.holidaysForDates(r.Context(), s, body.Dates)
@@ -131,9 +156,29 @@ func (srv *Server) handleSoll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
+	// Ein negatives Soll hiesse "immer genug besetzt", ein riesiges "nie".
+	// Beides ist ein Vertipper, kein Wunsch.
+	body.Frueh = imRahmen(body.Frueh)
+	body.Normal = imRahmen(body.Normal)
+	body.Spaet = imRahmen(body.Spaet)
+	body.Rufbereitschaft = imRahmen(body.Rufbereitschaft)
+
 	if srv.write(w, func(s *store.Store) error { return s.SetSoll(r.Context(), body) }) {
 		writeJSON(w, map[string]bool{"ok": true})
 	}
+}
+
+// hoechstesSoll ist die groesste sinnvolle Besetzung einer Schicht.
+const hoechstesSoll = 99
+
+func imRahmen(n int) int {
+	if n < 0 {
+		return 0
+	}
+	if n > hoechstesSoll {
+		return hoechstesSoll
+	}
+	return n
 }
 
 // ── /api/notiz ────────────────────────────────────────────────────────────────
@@ -145,6 +190,10 @@ func (srv *Server) handleNotiz(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := readJSON(r, &body); err != nil {
 		http.Error(w, err.Error(), 400)
+		return
+	}
+	if !domain.IstTagesschluessel(body.Date) {
+		writeJSON(w, map[string]string{"error": "Kein gültiger Tag: " + body.Date})
 		return
 	}
 	if srv.write(w, func(s *store.Store) error { return s.SetNote(r.Context(), body.Date, body.Text) }) {
@@ -164,6 +213,7 @@ func (srv *Server) handlePaste(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
+	body.Dates = domain.NurEchteTage(body.Dates)
 	ok := srv.write(w, func(s *store.Store) error {
 		if body.Mode == "replace" {
 			return s.ReplaceDays(r.Context(), body.Dates, body.Slot)

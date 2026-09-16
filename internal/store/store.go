@@ -480,7 +480,9 @@ func (s *Store) AddShifts(ctx context.Context, action string, changes []domain.S
 	added := 0
 	err := s.tx(ctx, action, plural(len(changes), "Eintrag", "Einträge"), func(t *sql.Tx) error {
 		for _, c := range changes {
-			if domain.SlotField(&domain.DaySlot{}, c.Shift) == nil {
+			// Unbekannte Schicht oder ein Tag, den es nicht gibt: beides
+			// waere eine Zeile, die im Kalender nie auftaucht.
+			if domain.SlotField(&domain.DaySlot{}, c.Shift) == nil || !domain.IstTagesschluessel(c.Date) {
 				continue
 			}
 			res, err := t.Exec(`INSERT OR IGNORE INTO shifts (date, shift, name) VALUES (?, ?, ?)`,

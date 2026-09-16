@@ -191,8 +191,14 @@ describe('monatsRaster', () => {
 
   test('weist einen Monat ausserhalb 1-12 zurueck', () => {
     for (const monat of [0, 13, -1, 1.5, NaN, undefined, null])
-      assert.throws(() => RK.monatsRaster(2026, monat), RangeError, `Monat=${String(monat)}`);
-    assert.throws(() => RK.monatsRaster('2026', 9), RangeError);
+      assert.throws(() => RK.monatsRaster(2026, monat), /Monat 1-12/, `Monat=${String(monat)}`);
+  });
+
+  test('sagt beim Jahr auch, dass es am Jahr liegt', () => {
+    // Ein Auswahlfeld ohne passenden Eintrag lieferte NaN - die Meldung nannte
+    // frueher trotzdem den Monat und schickte die Suche in die falsche Richtung.
+    for (const jahr of ['2026', NaN, undefined, null, 1.5])
+      assert.throws(() => RK.monatsRaster(jahr, 9), /Jahr erwartet/, `Jahr=${String(jahr)}`);
   });
 });
 
