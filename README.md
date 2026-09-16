@@ -27,7 +27,11 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   Monatsübersicht markiert
 - **Templates** pro Wochentag und Person – nur die Arbeitsschicht, ohne
   Rufbereitschaft – und über einen frei gewählten Zeitraum anwendbar,
-  z. B. Januar bis Dezember in einem Zug
+  z. B. Januar bis Dezember in einem Zug. Beim Anwenden wählt man zwischen
+  *Nur ergänzen* (trägt ein, was fehlt) und *Angleichen*: dann folgt der Plan
+  dem Template auch dort, wo schon etwas steht – wer anders eingeteilt ist,
+  gibt die Schicht ab, ein „Frei“ räumt den Tag. Wo das Template nichts sagt,
+  bleibt alles stehen
 - **Rufbereitschaft reihum**: Personen in eine Reihenfolge bringen, Zeitraum
   wählen, und der KW-Plan wird Woche für Woche durchrotiert
 - **Rufbereitschaft** in einer Tabelle: je Kalenderwoche der geplante Name und

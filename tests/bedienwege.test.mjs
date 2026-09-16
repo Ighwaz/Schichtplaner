@@ -263,3 +263,132 @@ describe('Rufbereitschaft aus dem Kalender lesen', () => {
       `ein Tag wurde zur ganzen Woche: ${JSON.stringify(o.api.zustand.ruf_kw)}`);
   });
 });
+
+describe('Austragen im Kalender', () => {
+  const mitEintraegen = () => starteOberflaeche({
+    mitarbeiter: TEAM,
+    schichten: {
+      '2026-09-03': {
+        frueh: ['Bauer, Martin'], normal: [], spaet: ['Krüger, Sina'],
+        rufbereitschaft: ['Nair, Anita'],
+      },
+      '2026-09-09': {
+        frueh: ['Krüger, Sina'], normal: [], spaet: [], rufbereitschaft: [],
+      },
+    },
+  });
+
+  test('jeder Chip trägt ein eigenes Kreuz zum Austragen', async () => {
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    const chip = o.$('.day-cell[data-key="2026-09-03"] .chip');
+    const kreuz = chip.querySelector('[data-weg]');
+    assert.ok(kreuz, 'kein Kreuz am Chip');
+    assert.match(kreuz.title, /austragen/i);
+
+    klick(kreuz);
+    await warteBis(() => frueh(o, '2026-09-03').length === 0, 'das Austragen');
+    assert.deepEqual(o.api.zustand.schichten['2026-09-03'].spaet, ['Krüger, Sina'],
+      'die anderen Schichten wurden mitgenommen');
+  });
+
+  test('ein Klick auf den Chip selbst trägt nicht mehr aus', async () => {
+    // Früher entfernte jeder Klick auf einen Chip den Eintrag - unsichtbar für
+    // den, der es nicht wusste, und ein Stolperstein beim Aufziehen.
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    const chip = o.$('.day-cell[data-key="2026-09-03"] .chip .chip-name');
+    klick(chip);
+    await ruhe();
+    assert.equal(frueh(o, '2026-09-03').length, 1, 'der Eintrag ist weg');
+  });
+
+  test('ein Zeitraum über fremde Chips löscht nichts', async () => {
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.selectPerson('Bauer, Martin');
+    o.fenster.waehleSchicht('frueh');
+
+    klick(o.$('.day-cell[data-key="2026-09-07"]'));
+    await ruhe();
+    // Der zweite Klick landet auf dem Kreuz eines fremden Chips - mit Shift
+    // zählt er trotzdem als Klick auf den Tag.
+    const fremdesKreuz = o.$('.day-cell[data-key="2026-09-09"] .chip [data-weg]');
+    assert.ok(fremdesKreuz, 'kein fremder Chip zum Danebenklicken');
+    klick(fremdesKreuz, { shiftKey: true });
+    await warteBis(() => frueh(o, '2026-09-08').includes('Bauer, Martin'), 'den Zeitraum');
+
+    assert.ok(frueh(o, '2026-09-09').includes('Krüger, Sina'),
+      'der fremde Eintrag wurde beim Aufziehen gelöscht');
+    assert.ok(frueh(o, '2026-09-09').includes('Bauer, Martin'),
+      'der Zeitraum endet nicht am gewählten Tag');
+  });
+
+  test('auch Strg+Klick auf ein Kreuz löscht nicht', async () => {
+    const o = await mitEintraegen();
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.selectPerson('Bauer, Martin');
+    o.fenster.waehleSchicht('frueh');
+
+    const kreuz = o.$('.day-cell[data-key="2026-09-09"] .chip [data-weg]');
+    klick(kreuz, { ctrlKey: true });
+    await ruhe();
+    assert.ok(frueh(o, '2026-09-09').includes('Krüger, Sina'), 'Eintrag gelöscht');
+    assert.equal(o.$$('.day-cell.multi-day').length, 1, 'der Tag wurde nicht gesammelt');
+  });
+});
+
+describe('Ziehen auf einen belegten Tag', () => {
+  function ziehe(o, chip, zielZelle) {
+    const start = new o.fenster.Event('dragstart', { bubbles: true });
+    start.dataTransfer = { effectAllowed: '' };
+    chip.dispatchEvent(start);
+    const drop = new o.fenster.Event('drop', { bubbles: true });
+    drop.dataTransfer = { effectAllowed: '' };
+    zielZelle.dispatchEvent(drop);
+  }
+
+  test('ein Chip geht beim Ziehen in einen Konflikt nicht verloren', async () => {
+    // Bauer hat am 3.9. Früh und am 10.9. bereits Spät. Wird die Frühschicht
+    // auf den 10. gezogen, stünde er in zwei Arbeitsschichten - dieselbe
+    // Rückfrage wie beim Klick. Was nicht passieren darf: der Eintrag
+    // verschwindet vom 3. und taucht am 10. nie auf.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await ruhe();
+    await ruhe();
+
+    // Ohne Bestätigung bleibt alles, wie es war.
+    assert.deepEqual(frueh(o, '2026-09-03'), ['Bauer, Martin'],
+      'der Eintrag ist vom Ausgangstag verschwunden, ohne am Zieltag anzukommen');
+    assert.equal(frueh(o, '2026-09-10').length, 0, 'am Zieltag wurde ohne Rückfrage eingetragen');
+    assert.ok(o.$('#_cdlg-yes'), 'es kam keine Rückfrage');
+  });
+
+  test('nach dem Bestätigen liegt der Eintrag am Zieltag', async () => {
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await warteBis(() => o.$('#_cdlg-yes'), 'die Rückfrage');
+
+    klick(o.$('#_cdlg-yes'));
+    await warteBis(() => frueh(o, '2026-09-10').includes('Bauer, Martin'), 'den Zieltag');
+    await warteBis(() => frueh(o, '2026-09-03').length === 0, 'den Ausgangstag');
+    // Die abgegebene Spätschicht ist die, die ersetzt wurde.
+    assert.equal((o.api.zustand.schichten['2026-09-10'].spaet || []).length, 0);
+  });
+});

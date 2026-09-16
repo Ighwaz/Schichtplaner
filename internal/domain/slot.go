@@ -103,3 +103,23 @@ var workShifts = map[string]bool{
 var allShifts = []string{
 	"frueh", "normal", "spaet", "rufbereitschaft",
 }
+
+// NurBekannte wirft aus einem Tag alle Namen, die es nicht (mehr) gibt.
+//
+// Nötig überall dort, wo ein älterer Stand zurückkommt: ein kopierter Tag, ein
+// Rückgängig-Sprung, eine eingelesene Sicherung. Nach einer Umbenennung trägt
+// so ein Stand noch den alten Namen - ohne diese Siebung stünde er anschließend
+// neben dem neuen im Kalender, ohne dass ihn eine Mitarbeiterliste noch kennt.
+func NurBekannte(slot DaySlot, bekannt map[string]bool) DaySlot {
+	sauber := slot
+	ForEachShift(&sauber, func(_ string, namen *[]string) {
+		behalten := make([]string, 0, len(*namen))
+		for _, n := range *namen {
+			if bekannt[n] {
+				behalten = append(behalten, n)
+			}
+		}
+		*namen = behalten
+	})
+	return sauber
+}

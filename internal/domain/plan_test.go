@@ -164,7 +164,7 @@ func TestTemplateUeberspringtFeiertagUndKonflikt(t *testing.T) {
 	days := map[string]DaySlot{}
 	teams := map[string]string{"Bauer": "DE"}
 
-	plan := ApplyTemplate(tmpl, 2026, 10, days, hols, teams)
+	plan := ApplyTemplate(tmpl, 2026, 10, days, hols, teams, NurErgaenzen)
 	if plan.SkippedHoliday != 1 {
 		t.Fatalf("Feiertag nicht übersprungen: %#v", plan)
 	}
@@ -175,7 +175,7 @@ func TestTemplateUeberspringtFeiertagUndKonflikt(t *testing.T) {
 
 	// Wer an einem Montag schon Spätschicht hat, wird nicht still umgeplant.
 	days2 := map[string]DaySlot{"2026-10-12": tag(nil, []string{"Bauer"}, nil)}
-	plan2 := ApplyTemplate(tmpl, 2026, 10, days2, nil, teams)
+	plan2 := ApplyTemplate(tmpl, 2026, 10, days2, nil, teams, NurErgaenzen)
 	if plan2.SkippedConflict != 1 {
 		t.Fatalf("Konflikt nicht übersprungen: %#v", plan2)
 	}
@@ -295,5 +295,124 @@ func TestUnwrapRufKWHoltDenPlanHeraus(t *testing.T) {
 	}
 	if got := UnwrapRufKW(nil); got == nil {
 		t.Fatal("nil sollte eine leere Karte werden")
+	}
+}
+
+// ── Template angleichen ───────────────────────────────────────────────────────
+
+func TestAngleichenTauschtDieAlteSchicht(t *testing.T) {
+	// Im Template steht Montag = Spät. Im Plan steht dort Früh.
+	tmpl := Template{"Bauer": {"0": "spaet"}}
+	days := map[string]DaySlot{
+		"2026-10-05": tag([]string{"Bauer"}, nil, []string{"Bauer"}), // Ruf läuft daneben
+	}
+	teams := map[string]string{"Bauer": "DE"}
+
+	plan := ApplyTemplate(tmpl, 2026, 10, days, nil, teams, Angleichen)
+
+	if len(plan.Removes) != 1 || plan.Removes[0].Shift != "frueh" {
+		t.Fatalf("die alte Schicht wurde nicht abgegeben: %#v", plan.Removes)
+	}
+	if len(plan.Changes) < 1 || plan.Changes[0].Shift != "spaet" {
+		t.Fatalf("die neue Schicht fehlt: %#v", plan.Changes)
+	}
+	nachher := days["2026-10-05"]
+	if len(nachher.Frueh) != 0 {
+		t.Fatalf("Früh steht noch: %#v", nachher.Frueh)
+	}
+	if len(nachher.Spaet) != 1 {
+		t.Fatalf("Spät fehlt: %#v", nachher.Spaet)
+	}
+	if len(nachher.Rufbereitschaft) != 1 {
+		t.Fatalf("die Rufbereitschaft wurde mitgerissen: %#v", nachher.Rufbereitschaft)
+	}
+}
+
+func TestNurErgaenzenLaesstDenBestehendenEintragStehen(t *testing.T) {
+	tmpl := Template{"Bauer": {"0": "spaet"}}
+	days := map[string]DaySlot{"2026-10-05": tag([]string{"Bauer"}, nil, nil)}
+	teams := map[string]string{"Bauer": "DE"}
+
+	plan := ApplyTemplate(tmpl, 2026, 10, days, nil, teams, NurErgaenzen)
+
+	if len(plan.Removes) != 0 {
+		t.Fatalf("es wurde etwas abgegeben: %#v", plan.Removes)
+	}
+	if plan.SkippedConflict != 1 {
+		t.Fatalf("der Konflikt wurde nicht übersprungen: %#v", plan)
+	}
+	if got := days["2026-10-05"].Frueh; len(got) != 1 {
+		t.Fatalf("der bestehende Eintrag wurde angetastet: %#v", got)
+	}
+}
+
+func TestAngleichenRaeumtDenTagBeiFrei(t *testing.T) {
+	tmpl := Template{"Bauer": {"0": "frei"}}
+	days := map[string]DaySlot{
+		"2026-10-05": tag([]string{"Bauer"}, nil, []string{"Bauer"}),
+	}
+	teams := map[string]string{"Bauer": "DE"}
+
+	plan := ApplyTemplate(tmpl, 2026, 10, days, nil, teams, Angleichen)
+
+	if len(plan.Removes) != 1 || plan.Removes[0].Shift != "frueh" {
+		t.Fatalf("Frei hat nicht ausgetragen: %#v", plan.Removes)
+	}
+	if len(plan.Changes) != 0 {
+		t.Fatalf("Frei hat etwas eingetragen: %#v", plan.Changes)
+	}
+	// Die Rufbereitschaft gehört nicht zum Template und bleibt.
+	if len(days["2026-10-05"].Rufbereitschaft) != 1 {
+		t.Fatal("die Rufbereitschaft wurde mitgeräumt")
+	}
+}
+
+func TestWoDasTemplateNichtsSagtBleibtAllesStehen(t *testing.T) {
+	// Nur Montag ist gesetzt - der Dienstag geht das Template nichts an.
+	tmpl := Template{"Bauer": {"0": "spaet"}}
+	days := map[string]DaySlot{
+		"2026-10-06": tag([]string{"Bauer"}, nil, nil), // ein Dienstag
+	}
+	teams := map[string]string{"Bauer": "DE"}
+
+	plan := ApplyTemplate(tmpl, 2026, 10, days, nil, teams, Angleichen)
+
+	if len(plan.Removes) != 0 {
+		t.Fatalf("ein nicht gesetzter Tag wurde geräumt: %#v", plan.Removes)
+	}
+	if got := days["2026-10-06"].Frueh; len(got) != 1 {
+		t.Fatalf("Dienstag angetastet: %#v", got)
+	}
+}
+
+func TestAngleichenLaesstFremdeEintraegeInRuhe(t *testing.T) {
+	// Das Template spricht nur über Bauer - Nair bleibt unberührt.
+	tmpl := Template{"Bauer": {"0": "spaet"}}
+	days := map[string]DaySlot{
+		"2026-10-05": tag([]string{"Bauer", "Nair"}, nil, nil),
+	}
+	teams := map[string]string{"Bauer": "DE", "Nair": "IN"}
+
+	ApplyTemplate(tmpl, 2026, 10, days, nil, teams, Angleichen)
+
+	if got := days["2026-10-05"].Frueh; len(got) != 1 || got[0] != "Nair" {
+		t.Fatalf("fremder Eintrag angetastet: %#v", got)
+	}
+}
+
+func TestAngleichenUebergehtFeiertageWeiterhin(t *testing.T) {
+	tmpl := Template{"Bauer": {"0": "spaet"}}
+	hols := map[string]Holiday{"2026-10-05": {Name: "Testfeiertag", Country: "DE"}}
+	days := map[string]DaySlot{"2026-10-05": tag([]string{"Bauer"}, nil, nil)}
+	teams := map[string]string{"Bauer": "DE"}
+
+	plan := ApplyTemplate(tmpl, 2026, 10, days, hols, teams, Angleichen)
+
+	if plan.SkippedHoliday != 1 {
+		t.Fatalf("Feiertag nicht übersprungen: %#v", plan)
+	}
+	// Und der Tag bleibt, wie er war - am Feiertag wird nichts umgeräumt.
+	if got := days["2026-10-05"].Frueh; len(got) != 1 {
+		t.Fatalf("am Feiertag geräumt: %#v", got)
 	}
 }

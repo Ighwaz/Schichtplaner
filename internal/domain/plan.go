@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"sort"
 	"strconv"
 	"time"
 )
@@ -161,22 +162,42 @@ func RufKWChanges(plan map[string]any, year, month int) []ShiftChange {
 	return changes
 }
 
+// Wie ein Template auf einen Monat trifft.
+const (
+	// NurErgaenzen traegt ein, was fehlt, und laesst alles Bestehende stehen.
+	NurErgaenzen = "ergaenzen"
+	// Angleichen macht den Plan zum Abbild des Templates: wer laut Template
+	// eine andere Arbeitsschicht hat, wird dort ausgetragen und neu
+	// eingetragen. Damit wirkt eine Aenderung am Template auch auf Tage, die
+	// schon geplant sind.
+	Angleichen = "angleichen"
+)
+
 // TemplatePlan ist das Ergebnis eines Autoplan-Laufs.
 type TemplatePlan struct {
 	Changes         []ShiftChange
+	Removes         []ShiftChange
 	SkippedHoliday  int
 	SkippedConflict int
 }
 
 // ApplyTemplate rechnet aus, was ein Template in einem Monat bedeutet.
 //
-// days ist der aktuelle Stand der betroffenen Tage und wächst beim Rechnen
+// days ist der aktuelle Stand der betroffenen Tage und waechst beim Rechnen
 // mit: wer schon durch dieselbe Runde eingeplant wurde, gilt als eingeplant.
-// Übersprungen wird, wer am Feiertag seines Teams stünde oder an dem Tag
-// bereits in einer anderen Arbeitsschicht steht - der Autoplan darf nicht
-// still tun, was der Handbetrieb nur nach Rückfrage tut.
+// Uebersprungen wird, wer am Feiertag seines Teams stuende.
+//
+// modus NurErgaenzen laesst bestehende Eintraege unangetastet und ueberspringt
+// einen Tag, an dem die Person schon anders eingeteilt ist - der Autoplan darf
+// nicht still tun, was der Handbetrieb nur nach Rueckfrage tut.
+//
+// modus Angleichen ist die Antwort auf "ich aendere den Montag im Template und
+// will, dass der Plan folgt": die andere Arbeitsschicht wird abgegeben, die
+// aus dem Template kommt hinein. Ein "frei" im Template raeumt den Tag fuer
+// diese Person. Wo das Template nichts sagt, bleibt alles, wie es ist - ein
+// Template ist keine Loeschliste.
 func ApplyTemplate(tmpl Template, year, month int, days map[string]DaySlot,
-	hols map[string]Holiday, teams map[string]string) TemplatePlan {
+	hols map[string]Holiday, teams map[string]string, modus string) TemplatePlan {
 
 	var plan TemplatePlan
 	erster := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
@@ -186,20 +207,47 @@ func ApplyTemplate(tmpl Template, year, month int, days map[string]DaySlot,
 		for tag := erster; !tag.After(letzter); tag = tag.AddDate(0, 0, 1) {
 			// Im Template ist Montag 0 und Sonntag 6.
 			shift, gesetzt := wochentage[strconv.Itoa((int(tag.Weekday())+6)%7)]
-			if !gesetzt || shift == "" || shift == "frei" {
-				continue
+			if !gesetzt || shift == "" {
+				continue // das Template sagt zu diesem Tag nichts
 			}
 			date := tag.Format("2006-01-02")
+			slot := days[date]
+
+			if shift == "frei" {
+				if modus == Angleichen {
+					for _, weg := range arbeitsschichtenVon(&slot, name) {
+						if RemoveFromSlot(&slot, weg, name) {
+							plan.Removes = append(plan.Removes,
+								ShiftChange{Date: date, Shift: weg, Name: name})
+						}
+					}
+					days[date] = slot
+				}
+				continue
+			}
+
 			if hol, ok := hols[date]; ok && !hol.Bridge && hol.AppliesTo(teams[name]) {
 				plan.SkippedHoliday++
 				continue
 			}
-			slot := days[date]
-			if len(blockingShifts(&slot, shift, name)) > 0 {
-				plan.SkippedConflict++
-				continue
+
+			blockierend := blockingShifts(&slot, shift, name)
+			if len(blockierend) > 0 {
+				if modus != Angleichen {
+					plan.SkippedConflict++
+					continue
+				}
+				// Angleichen: die alte Arbeitsschicht wird abgegeben.
+				// Rufbereitschaft laeuft daneben weiter.
+				for _, weg := range blockierend {
+					if RemoveFromSlot(&slot, weg, name) {
+						plan.Removes = append(plan.Removes,
+							ShiftChange{Date: date, Shift: weg, Name: name})
+					}
+				}
 			}
 			if !AddToSlot(&slot, shift, name) {
+				days[date] = slot
 				continue
 			}
 			days[date] = slot
@@ -207,4 +255,20 @@ func ApplyTemplate(tmpl Template, year, month int, days map[string]DaySlot,
 		}
 	}
 	return plan
+}
+
+// arbeitsschichtenVon nennt die Arbeitsschichten, in denen name an diesem Tag
+// steht. Die Rufbereitschaft zaehlt nicht dazu - sie laeuft daneben her.
+func arbeitsschichtenVon(slot *DaySlot, name string) []string {
+	var raus []string
+	for s, istArbeit := range workShifts {
+		if !istArbeit || s == "rufbereitschaft" {
+			continue
+		}
+		if feld := SlotField(slot, s); feld != nil && contains(*feld, name) {
+			raus = append(raus, s)
+		}
+	}
+	sort.Strings(raus) // damit die Reihenfolge nicht vom Zufall abhaengt
+	return raus
 }

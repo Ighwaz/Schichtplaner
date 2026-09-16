@@ -25,7 +25,8 @@ async function zeigeMonat(o, jahr, monat) {
 
 const zelle = (o, key) => o.$(`.day-cell[data-key="${key}"]`);
 const zeile = (el, schicht) => el.querySelector(`.chips-row[data-shift="${schicht}"]`);
-const chips = (el, schicht) => [...zeile(el, schicht).querySelectorAll('.chip')].map(c => c.textContent.trim());
+const chips = (el, schicht) =>
+  [...zeile(el, schicht).querySelectorAll('.chip .chip-name')].map(c => c.textContent.trim());
 const taste = (o, key, opts = {}) =>
   o.dokument.body.dispatchEvent(new o.fenster.KeyboardEvent('keydown', { key, bubbles: true, ...opts }));
 

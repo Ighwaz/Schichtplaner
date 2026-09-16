@@ -327,7 +327,13 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .chip-leer{font-size:9px;color:var(--text3);padding-left:2px}
 .chips{display:flex;flex-wrap:wrap;gap:2px;flex:1}
 .chip{font-size:10px;padding:2px 7px 2px 5px;border-radius:var(--radius-chip);font-weight:600;cursor:grab;white-space:nowrap;max-width:82px;transition:opacity .15s,transform .12s;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;line-height:1.4}
-.chip:hover{opacity:.65}
+.chip:hover{filter:brightness(1.06)}
+/* Austragen: sichtbar, sobald der Zeiger auf dem Chip steht */
+.chip-weg{border:none;background:none;color:inherit;font:inherit;font-size:9px;line-height:1;
+  cursor:pointer;padding:0 0 0 4px;margin-left:1px;opacity:0;width:0;overflow:hidden;
+  transition:opacity .1s}
+.chip:hover .chip-weg,.chip:focus-within .chip-weg{opacity:.75;width:auto}
+.chip-weg:hover,.chip-weg:focus-visible{opacity:1}
 /* Vorschau: was der naechste Klick eintragen wuerde */
 .chip.vorschau{background:none;border-style:dashed;opacity:.75;cursor:default}
 .chip.frueh{background:var(--frueh-bg);color:var(--frueh-text);border:1px solid color-mix(in srgb,var(--frueh) 35%,transparent)}
@@ -884,7 +890,9 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
         <div>Lege pro Mitarbeiter fest, welche Schicht er an welchem Wochentag hat. Der Autoplan übernimmt exakt dieses Muster.<br>
         <strong>Klick auf eine Zelle</strong> wechselt zwischen Früh → Normaldienst → Spät → Frei → leer.
         Rufbereitschaft steht hier nicht: sie wird im Reiter <strong>Rufbereitschaft</strong> wochenweise geplant.
-        Wochenenden sind heller dargestellt – eintragen lässt sich dort dasselbe, verlangt wird es nicht.</div>
+        Wochenenden sind heller dargestellt – eintragen lässt sich dort dasselbe, verlangt wird es nicht.<br>
+        Beim Anwenden wählst du, ob nur <strong>ergänzt</strong> oder der Plan dem Template <strong>angeglichen</strong>
+        wird – letzteres ändert auch Tage, die schon geplant sind.</div>
         <button class="btn-s" onclick="fillTemplateFromPrefs()" style="flex-shrink:0;font-size:11px" title="Präferenzen aus den Mitarbeiter-Profilen in dieses Template übernehmen">↙ Aus Profil-Präferenzen</button>
       </div>
       <div class="tmpl-name-row">
@@ -1362,6 +1370,37 @@ function zeitraumKlasse(key, von, bis){
   return '';
 }
 
+// Wohin ein Auswahlfeld gehört, damit es ganz sichtbar bleibt.
+//
+// anker und groesse sind Rechtecke ({left,right,top,bottom} bzw.
+// {breite,hoehe}), fenster ist {breite,hoehe}. Zurück kommen Position und
+// die Höhe, auf die das Feld gedeckelt werden muss - reicht der Platz weder
+// darunter noch darüber, wird gescrollt statt abgeschnitten.
+//
+// Vorher rechneten die Auswahlfelder mit fest verdrahteten Höhen (260 px).
+// Wer viele Mitarbeiter hatte und eine der letzten Wochen anklickte, bekam
+// eine Liste, deren untere Namen aus dem Fenster ragten und nicht mehr
+// anklickbar waren.
+function popupPlatz(anker, groesse, fenster, rand = 8) {
+  // Manche Umgebungen melden waehrend des Aufbaus noch kein Fenster. Dann
+  // wird schlicht unter den Anker gesetzt, statt auf 0 hin zu rechnen.
+  if (!(fenster.hoehe > 0) || !(fenster.breite > 0))
+    return { left: anker.left, top: anker.bottom + 4, maxHoehe: groesse.hoehe, nachOben: false };
+
+  const platzUnten = fenster.hoehe - anker.bottom - rand;
+  const platzOben  = anker.top - rand;
+  const nachOben   = groesse.hoehe > platzUnten && platzOben > platzUnten;
+
+  const maxHoehe = Math.max(80, Math.min(groesse.hoehe, nachOben ? platzOben : platzUnten));
+  const hoehe    = Math.min(groesse.hoehe, maxHoehe);
+
+  let top  = nachOben ? anker.top - hoehe - 4 : anker.bottom + 4;
+  let left = anker.left;
+  left = Math.max(rand, Math.min(left, fenster.breite - groesse.breite - rand));
+  top  = Math.max(rand, Math.min(top,  fenster.hoehe - hoehe - rand));
+  return { left, top, maxHoehe, nachOben };
+}
+
 // Anzeigename auf dem Chip: das erste Wort, ohne hängendes Komma -
 // "Bauer, Martin" wird zu "Bauer".
 function kurzName(name){
@@ -1374,7 +1413,7 @@ global.Regelkern = {
   SCHICHTEN, MAX_TAGE,
   tagKey, alsDatum, isoWoche, tageImZeitraum, monatsRaster,
   sollAmTag, fehlbesetzung, unterSoll, tageUnterSoll,
-  konflikte, naechsteAktion, zeitraumKlasse, kurzName,
+  konflikte, naechsteAktion, zeitraumKlasse, kurzName, popupPlatz,
 };
 })(globalThis);
 </script>
@@ -1880,10 +1919,8 @@ function openRufTagPicker(key,anchor){
       await setzeTagRuf(_rufTagKey,name,!drin.has(name));
     };
   });
-  const r=anchor.getBoundingClientRect();
   picker.classList.remove('hidden');
-  picker.style.left=Math.min(r.left,window.innerWidth-235)+'px';
-  picker.style.top=(r.bottom+4+240>window.innerHeight?r.top-244:r.bottom+4)+'px';
+  platziere(picker,anchor);
 }
 
 // Rufbereitschaft, die für die Tage dieser Woche wirklich im Kalender steht.
@@ -1923,11 +1960,7 @@ function openRufKWPicker(kwKey,anchor){
     });
   });
   picker.classList.remove('hidden');
-  const r=anchor.getBoundingClientRect();
-  let left=r.left, top=r.bottom+4;
-  if(left+290>window.innerWidth) left=window.innerWidth-295;
-  if(top+260>window.innerHeight) top=r.top-265;
-  picker.style.left=left+'px'; picker.style.top=top+'px';
+  platziere(picker,anchor);
 }
 
 async function removeRufKWPerson(kwKey,name){
@@ -2674,7 +2707,20 @@ async function saveProfile(){
   if(d.ok) await api('/api/mitarbeiter/'+encodeURIComponent(newName)+'/prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefs:profPrefs})});
   const m=mitarbeiter.find(x=>x.name===profOldName);
   if(m){m.name=newName;m.team=team;m.color=profColor;m.icon=profEmoji;m.prefs={...profPrefs};}
-  if(newName!==profOldName){for(const k in schichten)for(const s in schichten[k])schichten[k][s]=schichten[k][s].map(n=>n===profOldName?newName:n);if(selectedPerson?.name===profOldName)selectedPerson=m;}
+  if(newName!==profOldName){
+    // Den neuen Namen überall dort einsetzen, wo der alte stand.
+    for(const k in schichten)
+      for(const s in schichten[k])
+        if(Array.isArray(schichten[k][s]))
+          schichten[k][s]=schichten[k][s].map(n=>n===profOldName?newName:n);
+    if(selectedPerson?.name===profOldName)selectedPerson=m;
+    if(selectedPersons.delete(profOldName))selectedPersons.add(newName);
+    // Kopierter Tag und Rückgängig-Stapel stammen aus einer Welt, in der es
+    // den alten Namen noch gab. Würden sie später eingefügt oder
+    // zurückgesprungen, stünde er wieder im Kalender - neben dem neuen und
+    // ohne dass ihn die Mitarbeiterliste noch kennt.
+    copiedDay=null; undoStack=[]; redoStack=[]; updateUndoBtns();
+  }
   closeModal('prof-modal');renderMembers();renderCalendar();renderStats();renderTemplateTable();toast(newName+' gespeichert');
 }
 
@@ -2691,6 +2737,22 @@ function waehleSchicht(shift){
   selectedShift=shift;
   document.querySelectorAll('#modebar .pill').forEach(p=>p.classList.toggle('active',p.dataset.shift===shift));
   updateSelInfo();
+}
+
+// Setzt ein Auswahlfeld so ans Fenster, dass es ganz sichtbar bleibt. Die
+// Rechnung steht im Regelkern (RK.popupPlatz), hier wird nur gemessen und
+// gesetzt.
+function platziere(el, anker){
+  el.style.maxHeight='none';
+  const a=anker.getBoundingClientRect();
+  const p=RK.popupPlatz(
+    {left:a.left, right:a.right, top:a.top, bottom:a.bottom},
+    {breite:el.offsetWidth, hoehe:el.offsetHeight},
+    {breite:window.innerWidth, hoehe:window.innerHeight});
+  el.style.left=p.left+'px';
+  el.style.top=p.top+'px';
+  el.style.maxHeight=p.maxHoehe+'px';
+  el.style.overflowY='auto';
 }
 
 // ── TAGESMENUE ────────────────────────────────────────────────
@@ -2727,12 +2789,12 @@ function openDayMenu(key,anchor,x,y){
   item('✕','Tag leeren',()=>clearDay(key),{rot:true});
   document.body.appendChild(m);
 
-  const r=anchor?anchor.getBoundingClientRect():null;
-  let left=x!=null?x:(r?r.right-m.offsetWidth:0);
-  let top =y!=null?y:(r?r.bottom+4:0);
-  left=Math.max(6,Math.min(left,innerWidth -m.offsetWidth -6));
-  top =Math.max(6,Math.min(top ,innerHeight-m.offsetHeight-6));
-  m.style.left=left+'px'; m.style.top=top+'px';
+  if(anchor){
+    platziere(m,anchor);
+  }else{
+    // Aus dem Rechtsklick: der Zeiger ist der Anker.
+    platziere(m,{getBoundingClientRect:()=>({left:x,right:x,top:y,bottom:y})});
+  }
   dayMenuEl=m;
   setTimeout(()=>document.addEventListener('click',closeDayMenu,{once:true}),0);
 }
@@ -2879,7 +2941,29 @@ function makeCell(key,dayNum,other){
                   :`${SHIFT_LABEL[s]}: ${people.length} (am Wochenende kein Soll)`;
       row.appendChild(lbl);
       const chips=document.createElement('div');chips.className='chips';
-      people.forEach(name=>{const m=mitarbeiter.find(x=>x.name===name);const chip=document.createElement('span');chip.className='chip '+SHIFT_CSS[s];chip.draggable=true;chip.dataset.key=key;chip.dataset.shift=s;chip.dataset.name=name;chip.title=name+' · '+SHIFT_LABEL[s];chip.style.borderLeft='2px solid '+(m?m.color:'#64748b');chip.textContent=(m?.icon?m.icon+' ':'')+RK.kurzName(name);chips.appendChild(chip);});
+      people.forEach(name=>{
+        const m=mitarbeiter.find(x=>x.name===name);
+        const chip=document.createElement('span');
+        chip.className='chip '+SHIFT_CSS[s];
+        chip.draggable=true;
+        chip.dataset.key=key;chip.dataset.shift=s;chip.dataset.name=name;
+        chip.title=name+' · '+SHIFT_LABEL[s]+' – ziehen zum Verschieben, ✕ zum Austragen';
+        chip.style.borderLeft='2px solid '+(m?m.color:'#64748b');
+        const beschriftung=document.createElement('span');
+        beschriftung.className='chip-name';
+        beschriftung.textContent=(m?.icon?m.icon+' ':'')+RK.kurzName(name);
+        chip.appendChild(beschriftung);
+        // Austragen hat jetzt ein eigenes Ziel. Vorher trug jeder Klick auf
+        // den Chip aus - unsichtbar fuer den, der es nicht wusste, und ein
+        // Stolperstein beim Aufziehen eines Zeitraums.
+        const weg=document.createElement('button');
+        weg.className='chip-weg';weg.type='button';
+        weg.dataset.weg='1';weg.dataset.key=key;weg.dataset.shift=s;weg.dataset.name=name;
+        weg.title=name+' aus '+SHIFT_LABEL[s]+' austragen';
+        weg.textContent='✕';
+        chip.appendChild(weg);
+        chips.appendChild(chip);
+      });
       if(!people.length){const leer=document.createElement('span');leer.className='chip-leer';leer.textContent='–';chips.appendChild(leer);}
       row.appendChild(chips);ca.appendChild(row);
     });
@@ -2908,8 +2992,16 @@ async function handleCellClick(e,key){
     if(btn.dataset.action==='menu') openDayMenu(btn.dataset.key,btn);
     return;
   }
-  const chip=e.target.closest('.chip:not(.vorschau)');
-  if(chip){pushUndo();await applySchicht([chip.dataset.key],'remove',chip.dataset.shift,chip.dataset.name);return;}
+  // Das Kreuz am Chip traegt aus. Mit Shift oder Strg zaehlt auch das als
+  // Klick auf den Tag - sonst loescht ein Zeitraum, der ueber einen Chip
+  // fuehrt, versehentlich fremde Eintraege.
+  const weg=e.target.closest('[data-weg]');
+  if(weg&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey){
+    e.stopPropagation();
+    pushUndo();
+    await applySchicht([weg.dataset.key],'remove',weg.dataset.shift,weg.dataset.name);
+    return;
+  }
 
   const namen=selectedPersons.size>0?[...selectedPersons]:selectedPerson?[selectedPerson.name]:[];
   const shift=e.shiftKey, ctrl=e.ctrlKey||e.metaKey;
@@ -3025,7 +3117,38 @@ async function applySchicht(dates,action,schicht,name){const res=await postSchic
 function applyResults(results){if(!results)return;Object.entries(results).forEach(([k,v])=>{if(!v.error)schichten[k]=v;});renderCalendar();renderStats();}
 async function clearDay(key){pushUndo();const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:emptyDay(),dates:[key],mode:'replace'})});if(r.ok){schichten[key]=emptyDay();renderCalendar();toast('Tag geleert');}}
 async function pasteDay(dates,mode){if(!copiedDay)return;const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:copiedDay.slot,dates,mode})});if(r.ok){await reloadSchichten();renderCalendar();toast(dates.length+' Tag(e) eingefügt');}}
-async function handleDrop(toKey){if(!dragState)return;const{name,fromKey,fromShift}=dragState;dragState=null;if(fromKey===toKey)return;pushUndo();await applySchicht([fromKey],'remove',fromShift,name);await applySchicht([toKey],'add',fromShift,name);toast(name+' verschoben');}
+// Einen Chip auf einen anderen Tag ziehen.
+//
+// Der Zieltag kann belegt sein - dann kommt dieselbe Rückfrage wie beim Klick.
+// Vorher wurde erst ausgetragen und dann blind eingetragen: sagte der Server
+// "needs_confirm", war der Eintrag am Ausgangstag weg und kam am Zieltag nie
+// an. Deshalb wird jetzt zuerst der Zieltag geklärt und erst danach der
+// Ausgangstag geräumt.
+async function handleDrop(toKey){
+  if(!dragState) return;
+  const {name,fromKey,fromShift}=dragState;
+  dragState=null;
+  if(fromKey===toKey) return;
+
+  pushUndo();
+  let res=await postSchicht([toKey],'add',fromShift,name);
+  let r=res?.results?.[toKey];
+
+  if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
+    const ersetzen=r.error==='needs_confirm';
+    const ok=ersetzen?await confirmReplaceShift(name,r.blocking)
+                     :await confirmHolidayEntry(name,[[toKey,r]]);
+    if(!ok){ undoStack.pop(); updateUndoBtns(); return; }   // Ausgangstag bleibt
+    res=await postSchicht([toKey],'add',fromShift,name,true,ersetzen);
+    r=res?.results?.[toKey];
+    showHolWarnings(res.hol_warnings);
+  }
+  if(r?.error){ undoStack.pop(); updateUndoBtns(); toast('Verschieben nicht möglich'); return; }
+
+  applyResults(res.results);
+  await applySchicht([fromKey],'remove',fromShift,name);
+  toast(name+' verschoben');
+}
 
 // ══════════════════════════════════════════════════════════════
 // RANGE
@@ -3247,12 +3370,24 @@ async function applyTemplateDirectly(){
        <select id="_tmpl-month2" style="${selStyle}">${monthOpts}</select>
        <select id="_tmpl-year2"  style="${selStyle}">${yearOpts}</select>
      </div>
-     <div style="font-size:12px;color:var(--text3)">Bereits vorhandene Einträge bleiben erhalten;
-     Tage mit einer anderen Schicht werden übersprungen.</div>`,
+     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+       <label style="display:flex;gap:7px;align-items:flex-start;font-size:12px;cursor:pointer">
+         <input type="radio" name="_tmpl-modus" value="ergaenzen" checked style="margin-top:2px;accent-color:var(--blue)">
+         <span><strong>Nur ergänzen</strong><br>
+         <span style="color:var(--text3)">Trägt ein, was fehlt. Tage mit einer anderen Schicht bleiben, wie sie sind.</span></span>
+       </label>
+       <label style="display:flex;gap:7px;align-items:flex-start;font-size:12px;cursor:pointer">
+         <input type="radio" name="_tmpl-modus" value="angleichen" style="margin-top:2px;accent-color:var(--blue)">
+         <span><strong>Angleichen</strong><br>
+         <span style="color:var(--text3)">Macht den Plan zum Abbild des Templates: wer dort anders eingeteilt ist,
+         gibt die Schicht ab. „Frei“ räumt den Tag. Wo das Template nichts sagt, bleibt alles stehen.</span></span>
+       </label>
+     </div>`,
     'Anwenden'
   );
   if(!ok) return;
 
+  const modus=document.querySelector('input[name="_tmpl-modus"]:checked')?.value||'ergaenzen';
   const vonM=parseInt(document.getElementById('_tmpl-month')?.value||curMonth);
   const vonJ=parseInt(document.getElementById('_tmpl-year')?.value||curYear);
   const bisM=parseInt(document.getElementById('_tmpl-month2')?.value||vonM);
@@ -3262,13 +3397,14 @@ async function applyTemplateDirectly(){
 
   pushUndo();
   // Monat für Monat anwenden - jeder Aufruf ist eine eigene Transaktion.
-  const d={planned:0,skipped_conflict:0,skipped_holiday:0,unbekannt:new Set()};
+  const d={planned:0,ersetzt:0,skipped_conflict:0,skipped_holiday:0,unbekannt:new Set()};
   for(let t=vonJ*12+vonM-1; t<=bisJ*12+bisM-1; t++){
     const j=Math.floor(t/12), m=t%12+1;
     const r=await api('/api/autoplan',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({year:j,month:m,template:tname})});
+      body:JSON.stringify({year:j,month:m,template:tname,modus})});
     if(r.error){ d.error=r.error; break; }
-    d.planned+=r.planned||0; d.skipped_conflict+=r.skipped_conflict||0; d.skipped_holiday+=r.skipped_holiday||0;
+    d.planned+=r.planned||0; d.ersetzt+=r.ersetzt||0;
+    d.skipped_conflict+=r.skipped_conflict||0; d.skipped_holiday+=r.skipped_holiday||0;
     (r.unbekannt||[]).forEach(n=>d.unbekannt.add(n));
   }
   const monate=bisJ*12+bisM-(vonJ*12+vonM)+1;
@@ -3281,12 +3417,13 @@ async function applyTemplateDirectly(){
     showCalendarView();
     const uebersprungen=(d.skipped_conflict||0)+(d.skipped_holiday||0);
     const zusatz=uebersprungen?` – ${uebersprungen} übersprungen (${d.skipped_conflict||0}× Konflikt, ${d.skipped_holiday||0}× Feiertag)`:'';
+    const getauscht=d.ersetzt?`, ${d.ersetzt} ersetzt`:'';
     const zeitraum=monate===1?`${MONTHS[selMonth-1]} ${selYear}`:`${monate} Monate ab ${MONTHS[selMonth-1]} ${selYear}`;
     // Wer im Template steht, aber nicht mehr in der Mitarbeiterliste, wird
     // uebergangen - mit Namen, sonst sucht man den Grund vergeblich.
     const fehlend=[...d.unbekannt];
     const weg=fehlend.length?` – nicht mehr im Team: ${fehlend.join(', ')}`:'';
-    toast(`Template "${tname}" auf ${zeitraum}: ${d.planned} Einträge${zusatz}${weg}`);
+    toast(`Template "${tname}" auf ${zeitraum}: ${d.planned} Einträge${getauscht}${zusatz}${weg}`);
   }
 }
 
@@ -3759,9 +3896,8 @@ function showTooltip(cellEl,key){
   const row=(lbl,ppl,clr)=>ppl?.length?`<div class="tt-row"><span class="tt-lbl" style="color:${clr}">${lbl}</span><span class="tt-names">${ppl.map(esc).join(', ')}</span></div>`:'';
   const siRows=['frueh','spaet','rufbereitschaft'].map(s=>{const ist=(slot[s]||[]).length,tgt=soll[s]||1;const cls=ist===0?'tt-si-low':ist<tgt?'tt-si-low':ist===tgt?'tt-si-ok':'tt-si-over';return `<span class="${cls}">${SHIFT_SHORT[s][0]}: ${ist}/${tgt}</span>`;}).join(' · ');
   tt.innerHTML=`<div class="tt-date">${d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${hol?'<br>'+(hol.bridge?'🌉 Brückentag':hol.custom?'★ '+hol.name:'🎉 '+hol.name):''}</div>`+row('Früh',slot.frueh,'var(--frueh)')+row('Spät',slot.spaet,'var(--spaet)')+row('Ruf',slot.rufbereitschaft,'var(--ruf)')+row('Urlaub',slot.urlaub,'var(--urlaub)')+row('Krank',slot.krank,'var(--krank)')+row('Elternz.',slot.elternzeit,'var(--eltern)')+row('Sonder.',slot.sonderurlaub,'var(--sonder)')+(schichtC.length?`<div class="tt-warn">⚠ ${schichtC.map(esc).join(', ')}</div>`:''  )+(holC.length?`<div class="tt-hol-warn">${holidays[key]?.country==='DE'?'🇩🇪':'🇮🇳'} Feiertag, eingeteilt: ${holC.map(esc).join(', ')}</div>`:'')+(isUnderstaffed(slot,key)?'<div class="tt-under">⚠ Unterbesetzt</div>':'')+(note?`<div class="tt-note">📝 ${esc(note)}</div>`:'')+`<div class="tt-soll">${siRows}</div>`;
-  const r=cellEl.getBoundingClientRect();let left=r.right+8,top=r.top;
-  if(left+255>window.innerWidth)left=r.left-263;if(top+300>window.innerHeight)top=window.innerHeight-308;
-  tt.style.left=left+'px';tt.style.top=top+'px';tt.classList.add('show');
+  tt.classList.add('show');
+  platziere(tt,cellEl);
 }
 function hideTooltip(){document.getElementById('tooltip').classList.remove('show');}
 
