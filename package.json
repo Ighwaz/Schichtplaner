@@ -5,10 +5,13 @@
   "description": "Testwerkzeug fuer die Oberflaeche von frontend/index.html. Die Anwendung selbst braucht kein Node - dies hier ist reine Entwicklungsausstattung.",
   "type": "module",
   "scripts": {
+    "typen": "node tests/typpruefung.mjs",
+    "pretest": "npm run typen --silent",
     "test": "node --test \"tests/*.test.mjs\"",
     "coverage": "node --test --experimental-test-coverage --test-coverage-exclude=tests/lade-*.mjs \"tests/*.test.mjs\""
   },
   "devDependencies": {
-    "jsdom": "^30.0.1"
+    "jsdom": "^30.0.1",
+    "typescript": "7.0.2"
   }
 }

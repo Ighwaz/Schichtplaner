@@ -76,9 +76,10 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 
 ```
 go test ./...       # API, Speicher, Feiertage, ICS, Nebenläufigkeit
-npm install         # einmalig, holt jsdom
-npm test            # Planungsregeln und Oberfläche
-npm run coverage    # dasselbe mit Deckungsgrad
+npm install         # einmalig, holt jsdom und TypeScript
+npm test            # Typprüfung, dann Planungsregeln und Oberfläche
+npm run typen       # nur die Typprüfung
+npm run coverage    # Tests mit Deckungsgrad
 ```
 
 Die Planungsregeln stehen in `frontend/index.html` im Block
@@ -89,6 +90,28 @@ startet stattdessen die ganze Seite in jsdom und hängt eine erfundene API
 davor, sodass Klickwege wie im Fenster laufen. Die Oberfläche bleibt dabei
 eine einzige Datei ohne Laufzeitabhängigkeiten – jsdom ist reine
 Entwicklungsausstattung und landet nicht in der EXE.
+
+### Typprüfung
+
+Die Oberfläche bleibt JavaScript ohne Build-Schritt – die EXE bettet genau
+`frontend/index.html` ein. Geprüft wird trotzdem mit dem TypeScript-Compiler:
+die Typen stehen als JSDoc-Kommentare im Code, `tests/typpruefung.mjs`
+schneidet beide `<script>`-Blöcke zeilengenau heraus und lässt `tsc` darüber
+laufen, ohne etwas zu erzeugen. Jede Meldung zeigt direkt auf eine Zeile in
+`index.html`. TypeScript ist wie jsdom reine Entwicklungsausstattung.
+
+| Teil | Strenge | Warum |
+|---|---|---|
+| Regelkern | `strict`, nur ES-Bibliothek | Hier stehen die Regeln; ihre Typen tragen bis in jeden Aufruf. Ohne DOM-Bibliothek ist „der Regelkern greift nicht ins Fenster“ eine Regel, die tsc durchsetzt. |
+| Oberfläche | `strict` ohne `noImplicitAny` und `strictNullChecks` | Beide lohnen sich, wären aber ein Umbau fast jeder Zeile (rund 840 Stellen). Sie sind der nächste Schritt, Funktion für Funktion. |
+
+Die Einstellungen stehen mit Begründung in `tsconfig.json` und
+`tsconfig.regelkern.json`. Das DOM liefert allgemeine Typen – `getElementById`
+kennt kein `.value` –, deshalb gibt es oben in der Oberfläche eine Handvoll
+Griffe (`dom.eingabe(id)`, `dom.auswahl(id)`, …), die tsc sagen, was an der
+Stelle steht. `tests/typpruefung.test.mjs` gleicht jeden davon gegen das Markup
+ab: ein Griff, der ein `<input>` verspricht, wo ein `<select>` steht, fällt
+dort auf. `@ts-ignore` und Casts auf `any` gibt es nicht; auch das prüft der Test.
 
 ## Datenhaltung
 

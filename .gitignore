@@ -23,6 +23,8 @@ Thumbs.db
 
 # Vom Testlauf aus index.html geschnitten
 /tests/.regelkern.js
+# ... und fuer die Typpruefung (tests/typpruefung.mjs)
+/tests/.typen/
 
 # Testwerkzeug (jsdom); die Anwendung selbst braucht kein Node
 /node_modules/

@@ -559,6 +559,53 @@ describe('Monatsübersicht', () => {
   });
 });
 
+describe('Tooltip eines Tages', () => {
+  // Gefunden von der Typpruefung: der Tooltip las slot.urlaub, slot.krank
+  // und zwei weitere Schichtarten, die es in diesem Zweig nicht gibt - und
+  // liess dafuer den Normaldienst weg. Das Soll rechnete er selbst, mit
+  // eigenen Regeln.
+  async function tooltip(vorgabe, key) {
+    const o = await starteOberflaeche({ mitarbeiter: TEAM, ...vorgabe });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.showTooltip(o.$(`.day-cell[data-key="${key}"]`), key);
+    return o.$('#tooltip').textContent;
+  }
+  const leer = { frueh: [], normal: [], spaet: [], rufbereitschaft: [] };
+
+  test('zeigt, wer Normaldienst hat', async () => {
+    const text = await tooltip({
+      schichten: { '2026-09-03': { ...leer, normal: ['Nair, Anita'] } },
+    }, '2026-09-03');
+    assert.match(text, /Normal/, 'die Zeile für den Normaldienst fehlt');
+    assert.match(text, /Nair, Anita/, 'der Name im Normaldienst fehlt');
+  });
+
+  test('mahnt am Samstag keine Frühschicht an', async () => {
+    // 2026-09-05 ist ein Samstag: dort wird nur Rufbereitschaft besetzt.
+    const text = await tooltip({ schichten: { '2026-09-05': leer } }, '2026-09-05');
+    assert.doesNotMatch(text, /F: 0\/1/, 'am Wochenende wird Früh angemahnt');
+    assert.match(text, /R: 0\/1/, 'die fehlende Rufbereitschaft wird nicht gemeldet');
+  });
+
+  test('ein ausdrückliches Soll von 0 bleibt 0', async () => {
+    const text = await tooltip({
+      soll: { frueh: 0, normal: 0, spaet: 1, rufbereitschaft: 1 },
+      schichten: { '2026-09-03': leer },
+    }, '2026-09-03');
+    assert.doesNotMatch(text, /F: 0\/1/, 'aus dem Soll 0 ist wieder eine 1 geworden');
+    assert.match(text, /S: 0\/1/);
+  });
+
+  test('zeigt nur die vier Schichten, die es gibt', async () => {
+    const text = await tooltip({
+      schichten: { '2026-09-03': { ...leer, frueh: ['Bauer, Martin'] } },
+    }, '2026-09-03');
+    for (const alt of ['Urlaub', 'Krank', 'Elternz', 'Sonder'])
+      assert.doesNotMatch(text, new RegExp(alt), `${alt} steht noch im Tooltip`);
+    assert.match(text, /Bauer, Martin/);
+  });
+});
+
 describe('Template', () => {
   test('ein Klick schaltet die Schicht weiter', async () => {
     const o = await starteOberflaeche({ mitarbeiter: TEAM });

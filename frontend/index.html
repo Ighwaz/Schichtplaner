@@ -1258,37 +1258,112 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
    Die Oberflaeche darunter ruft nur noch auf - wer eine Regel aendert,
    aendert sie hier an genau einer Stelle.
    ══════════════════════════════════════════════════════════════ */
-(function(global){
+/* Typen des Regelkerns. Sie stehen ausserhalb der Funktion, damit tsc sie
+   als globale Typen sieht - die Oberflaeche darunter benutzt dieselben. Zur
+   Laufzeit sind es nur Kommentare. Geprueft wird mit npm run typen. */
+
+/**
+ * Eine Schicht. frueh, normal und spaet schliessen einander aus; die
+ * Rufbereitschaft laeuft daneben her.
+ * @typedef {'frueh'|'normal'|'spaet'|'rufbereitschaft'} Schicht
+ */
+/**
+ * Wer an einem Tag in welcher Schicht steht. Eine fehlende Schicht gilt als
+ * leer - nicht jeder Tag bringt alle vier mit.
+ * @typedef {Partial<Record<Schicht, string[]>>} Belegung
+ */
+/**
+ * Der ganze Plan: je Tagesschluessel "JJJJ-MM-TT" eine Belegung.
+ * @typedef {Record<string, Belegung>} Plan
+ */
+/**
+ * Wie viele Leute eine Schicht braucht. Eine fehlende Schicht gilt als 1.
+ * @typedef {Partial<Record<Schicht, number>>} Soll
+ */
+/**
+ * Ein Feiertag, wie er vom Server kommt. country ist 'DE', 'IN' oder
+ * 'DE+IN'; bridge markiert einen Brueckentag.
+ * @typedef {{name?: string, country?: string, bridge?: boolean}} Feiertag
+ */
+/**
+ * Was an einem Tag in einer Schicht zum Soll fehlt.
+ * @typedef {{schicht: Schicht, ist: number, soll: number}} Fehlstelle
+ */
+/**
+ * Ein Band einer Zelle in der Monatsuebersicht. exklusiv: die Schichten
+ * darin schliessen einander aus.
+ * @typedef {{id: string, schichten: Schicht[], exklusiv: boolean}} Band
+ */
+/**
+ * Was ein Band an einem Tag fuer eine Person zeigt.
+ * @typedef {{id: string, schicht: Schicht|null, alle: Schicht[], doppelt: boolean}} ZellBand
+ */
+/**
+ * Eine Zelle der Monatsuebersicht: je Band ein Eintrag.
+ * @typedef {{baender: ZellBand[], leer: boolean}} MatrixZelle
+ */
+
+// var statt const: ein var auf oberster Ebene eines Skripts ist im Fenster
+// ein Global, und tsc leitet seinen Typ aus dem Rueckgabewert ab - so kommen
+// die Typen bis in jeden Aufruf der Oberflaeche durch.
+var Regelkern = (function(){
 'use strict';
 
+/** @type {Schicht[]} */
 const SCHICHTEN = ['frueh','normal','spaet','rufbereitschaft'];
 // Diese drei schliessen einander aus - wer frueh eingeteilt ist, kann am
 // selben Tag nicht spaet. Die Rufbereitschaft laeuft daneben her und ist
 // deshalb hier bewusst nicht dabei.
+/** @type {Schicht[]} */
 const ARBEITSSCHICHTEN = ['frueh','normal','spaet'];
 // Für den Feiertagskonflikt zählen nur diese drei - der Normaldienst ist
 // Gleitzeit und wurde nie mitgeprüft. Verhalten unverändert übernommen,
 // siehe tests/regelkern.test.mjs ("Normaldienst am Feiertag").
+/** @type {Schicht[]} */
 const ARBEIT_FUER_FEIERTAG = ['frueh','spaet','rufbereitschaft'];
 // Ein Zeitraum über mehr als zehn Jahre ist immer ein Vertipper. Ohne
 // Deckel baut ein Fehlklick Millionen Datumsschlüssel und friert das
 // Fenster ein.
 const MAX_TAGE = 3660;
 
+/**
+ * @param {unknown} w
+ * @returns {w is number}
+ */
 const istGanzzahl = w => typeof w === 'number' && Number.isFinite(w) && Math.floor(w) === w;
 const KEY_MUSTER  = /^\d{4}-\d{2}-\d{2}$/;
 
-// Tagesschlüssel "JJJJ-MM-TT". Bewusst ohne Date: der Schlüssel ist eine
-// Zeichenkette, keine Zeitangabe - sonst zöge eine Zeitzone daran.
+/**
+ * Ist das eine der vier Schichten? Grenzt den Typ ein - danach weiss tsc,
+ * dass der Wert als Schluessel einer Belegung taugt.
+ * @param {unknown} w
+ * @returns {w is Schicht}
+ */
+function istSchicht(w){
+  return typeof w === 'string' && SCHICHTEN.includes(/** @type {Schicht} */ (w));
+}
+
+/**
+ * Tagesschlüssel "JJJJ-MM-TT". Bewusst ohne Date: der Schlüssel ist eine
+ * Zeichenkette, keine Zeitangabe - sonst zöge eine Zeitzone daran.
+ * @param {number} jahr
+ * @param {number} monat  1-12
+ * @param {number} tag    1-31
+ * @returns {string}
+ */
 function tagKey(jahr, monat, tag){
   if(!istGanzzahl(jahr) || !istGanzzahl(monat) || !istGanzzahl(tag))
     throw new RangeError('tagKey: Jahr, Monat und Tag muessen ganze Zahlen sein');
   return jahr + '-' + String(monat).padStart(2,'0') + '-' + String(tag).padStart(2,'0');
 }
 
-// Schlüssel -> lokales Date. 'T00:00:00' ohne Z ist Absicht: der Kalender
-// rechnet durchweg in Ortszeit, sonst läge ein Tag östlich von UTC im
-// falschen Feld.
+/**
+ * Schlüssel -> lokales Date. 'T00:00:00' ohne Z ist Absicht: der Kalender
+ * rechnet durchweg in Ortszeit, sonst läge ein Tag östlich von UTC im
+ * falschen Feld.
+ * @param {Date|string} wert
+ * @returns {Date}
+ */
 function alsDatum(wert){
   if(wert instanceof Date){
     if(Number.isNaN(wert.getTime())) throw new RangeError('alsDatum: ungueltiges Date');
@@ -1306,26 +1381,36 @@ function alsDatum(wert){
   throw new RangeError('alsDatum: erwartet "JJJJ-MM-TT" oder Date, bekommen: ' + String(wert));
 }
 
-// ISO-8601-Kalenderwoche: die Woche mit dem ersten Donnerstag des Jahres
-// ist Woche 1. Rechnung in UTC, damit keine Sommerzeitumstellung
-// dazwischenfährt; die Tagesbestandteile kommen aus der Ortszeit.
+/**
+ * ISO-8601-Kalenderwoche: die Woche mit dem ersten Donnerstag des Jahres
+ * ist Woche 1. Rechnung in UTC, damit keine Sommerzeitumstellung
+ * dazwischenfährt; die Tagesbestandteile kommen aus der Ortszeit.
+ * @param {Date|string} wert
+ * @returns {number}  1-53
+ */
 function isoWoche(wert){
   const d = alsDatum(wert);
   const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const wochentag = tmp.getUTCDay() || 7;          // Mo=1 … So=7
   tmp.setUTCDate(tmp.getUTCDate() + 4 - wochentag); // auf den Donnerstag
   const jahresStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
-  return Math.ceil((((tmp - jahresStart) / 86400000) + 1) / 7);
+  return Math.ceil((((tmp.getTime() - jahresStart.getTime()) / 86400000) + 1) / 7);
 }
 
-// Alle Tage zwischen zwei Schlüsseln, einschließlich beider Enden und in
-// beliebiger Reihenfolge übergeben.
+/**
+ * Alle Tage zwischen zwei Schlüsseln, einschließlich beider Enden und in
+ * beliebiger Reihenfolge übergeben.
+ * @param {Date|string} a
+ * @param {Date|string} b
+ * @returns {string[]}
+ */
 function tageImZeitraum(a, b){
   const von = alsDatum(a), bis = alsDatum(b);
   const [lo, hi] = von <= bis ? [von, bis] : [bis, von];
-  const tage = Math.round((hi - lo) / 86400000) + 1;
+  const tage = Math.round((hi.getTime() - lo.getTime()) / 86400000) + 1;
   if(tage > MAX_TAGE)
     throw new RangeError('tageImZeitraum: ' + tage + ' Tage sind mehr als die erlaubten ' + MAX_TAGE);
+  /** @type {string[]} */
   const raus = [];
   const lauf = new Date(lo.getFullYear(), lo.getMonth(), lo.getDate());
   for(let i = 0; i < tage; i++){
@@ -1335,8 +1420,14 @@ function tageImZeitraum(a, b){
   return raus;
 }
 
-// Das Raster einer Monatsansicht: volle Wochen von Montag bis Sonntag, vorne
-// und hinten mit den Nachbarmonaten aufgefüllt.
+/**
+ * Das Raster einer Monatsansicht: volle Wochen von Montag bis Sonntag, vorne
+ * und hinten mit den Nachbarmonaten aufgefüllt.
+ * @param {number} jahr
+ * @param {number} monat  1-12
+ * @returns {{zellen: {key: string, num: number, fremd: boolean}[],
+ *            wochen: {kw: number, keys: string[]}[]}}
+ */
 function monatsRaster(jahr, monat){
   if(!istGanzzahl(jahr))
     throw new RangeError('monatsRaster: Jahr erwartet, bekommen: ' + jahr);
@@ -1348,6 +1439,7 @@ function monatsRaster(jahr, monat){
   const vorJ = monat === 1  ? jahr-1 : jahr, vorM = monat === 1  ? 12 : monat-1;
   const nachJ= monat === 12 ? jahr+1 : jahr, nachM= monat === 12 ? 1  : monat+1;
 
+  /** @type {{key: string, num: number, fremd: boolean}[]} */
   const zellen = [];
   for(let i = 0; i < ersterWochentag; i++){
     const t = tageVormonat - ersterWochentag + 1 + i;
@@ -1359,16 +1451,23 @@ function monatsRaster(jahr, monat){
   for(let t = 1; t <= rest; t++)
     zellen.push({ key: tagKey(nachJ, nachM, t), num: t, fremd: true });
 
+  /** @type {{kw: number, keys: string[]}[]} */
   const wochen = [];
   for(let i = 0; i < zellen.length; i += 7)
     wochen.push({ kw: isoWoche(zellen[i].key), keys: zellen.slice(i, i+7).map(z => z.key) });
   return { zellen, wochen };
 }
 
-// Soll einer Schicht an einem Tag. Am Wochenende wird nur Rufbereitschaft
-// besetzt; Frueh, Normaldienst und Spaet werden dort nicht angemahnt.
-// Ein ausdrückliches Soll von 0 bleibt 0 - nur ein fehlender Eintrag gilt
-// als 1.
+/**
+ * Soll einer Schicht an einem Tag. Am Wochenende wird nur Rufbereitschaft
+ * besetzt; Frueh, Normaldienst und Spaet werden dort nicht angemahnt.
+ * Ein ausdrückliches Soll von 0 bleibt 0 - nur ein fehlender Eintrag gilt
+ * als 1.
+ * @param {Soll|null|undefined} soll
+ * @param {Schicht} schicht
+ * @param {string|null} [key]  ohne Tag gilt keine Wochenendregel
+ * @returns {number}
+ */
 function sollAmTag(soll, schicht, key){
   if(key != null && schicht !== 'rufbereitschaft'){
     const wt = alsDatum(key).getDay();
@@ -1378,9 +1477,16 @@ function sollAmTag(soll, schicht, key){
   return wert == null ? 1 : wert;
 }
 
-// Was an einem Tag zum Soll fehlt - je Schicht ein Eintrag oder gar keiner.
+/**
+ * Was an einem Tag zum Soll fehlt - je Schicht ein Eintrag oder gar keiner.
+ * @param {Belegung|null|undefined} slot
+ * @param {string} key
+ * @param {Soll|null|undefined} soll
+ * @returns {Fehlstelle[]}
+ */
 function fehlbesetzung(slot, key, soll){
   const tag = slot || {};
+  /** @type {Fehlstelle[]} */
   const raus = [];
   for(const schicht of SCHICHTEN){
     const ziel = sollAmTag(soll, schicht, key);
@@ -1390,16 +1496,30 @@ function fehlbesetzung(slot, key, soll){
   return raus;
 }
 
+/**
+ * @param {Belegung|null|undefined} slot
+ * @param {string} key
+ * @param {Soll|null|undefined} soll
+ * @returns {boolean}
+ */
 function unterSoll(slot, key, soll){
   if(!slot) return false;
   return fehlbesetzung(slot, key, soll).length > 0;
 }
 
-// Alle Tage eines Monats, an denen etwas fehlt. Speist die Zahl in der
-// Kopfleiste und die Liste dahinter.
+/**
+ * Alle Tage eines Monats, an denen etwas fehlt. Speist die Zahl in der
+ * Kopfleiste und die Liste dahinter.
+ * @param {number} jahr
+ * @param {number} monat  1-12
+ * @param {Plan|null|undefined} schichten
+ * @param {Soll|null|undefined} soll
+ * @returns {{key: string, missing: Fehlstelle[]}[]}
+ */
 function tageUnterSoll(jahr, monat, schichten, soll){
   const plan = schichten || {};
   const tage = new Date(jahr, monat, 0).getDate();
+  /** @type {{key: string, missing: Fehlstelle[]}[]} */
   const raus = [];
   for(let t = 1; t <= tage; t++){
     const key = tagKey(jahr, monat, t);
@@ -1409,19 +1529,29 @@ function tageUnterSoll(jahr, monat, schichten, soll){
   return raus;
 }
 
-// Zwei Arten von Konflikt an einem Tag:
-// doppelt eingeteilt (Frueh und Spaet zugleich) und am eigenen Feiertag
-// eingeteilt. teamVon(name) liefert 'DE' oder 'IN' - injiziert, damit der
-// Kern die Mitarbeiterliste nicht kennen muss.
-function konflikte(slot, key, feiertag, teamVon){
+/**
+ * Zwei Arten von Konflikt an einem Tag:
+ * doppelt eingeteilt (Frueh und Spaet zugleich) und am eigenen Feiertag
+ * eingeteilt. teamVon(name) liefert 'DE' oder 'IN' - injiziert, damit der
+ * Kern die Mitarbeiterliste nicht kennen muss.
+ * @param {Belegung|null|undefined} slot
+ * @param {string} _key  ungenutzt; steht fuer den gleichen Aufbau wie
+ *                       fehlbesetzung(slot, key, soll)
+ * @param {Feiertag|null|undefined} feiertag
+ * @param {((name: string) => string|undefined)|undefined} teamVon
+ * @returns {{doppelt: string[], amFeiertag: string[], hatKonflikt: boolean}}
+ */
+function konflikte(slot, _key, feiertag, teamVon){
   const tag = slot || {};
   // Map statt Objekt: ein Name wie "constructor" oder "__proto__" würde in
   // einem Objekt auf Object.prototype treffen und nie als doppelt auffallen.
+  /** @type {Map<string, number>} */
   const zaehler = new Map();
-  for(const s of ['frueh','spaet'])
+  for(const s of /** @type {Schicht[]} */ (['frueh','spaet']))
     for(const n of (tag[s] || [])) zaehler.set(n, (zaehler.get(n) || 0) + 1);
-  const doppelt = [...zaehler.keys()].filter(n => zaehler.get(n) > 1);
+  const doppelt = [...zaehler.keys()].filter(n => (zaehler.get(n) || 0) > 1);
 
+  /** @type {string[]} */
   const amFeiertag = [];
   if(feiertag && feiertag.country && feiertag.country !== 'DE+IN' && typeof teamVon === 'function'){
     for(const s of ARBEIT_FUER_FEIERTAG)
@@ -1431,10 +1561,17 @@ function konflikte(slot, key, feiertag, teamVon){
   return { doppelt, amFeiertag, hatKonflikt: doppelt.length > 0 || amFeiertag.length > 0 };
 }
 
-// Die eine Regel hinter jedem Klick: stehen alle Genannten bereits an allen
-// Zieltagen in der Schicht, trägt der Klick aus - sonst ein. Ein Klick
-// bedeutet damit dasselbe, ob er einen Tag trifft oder dreißig.
-// null heißt: nichts zu tun.
+/**
+ * Die eine Regel hinter jedem Klick: stehen alle Genannten bereits an allen
+ * Zieltagen in der Schicht, trägt der Klick aus - sonst ein. Ein Klick
+ * bedeutet damit dasselbe, ob er einen Tag trifft oder dreißig.
+ * null heißt: nichts zu tun.
+ * @param {string[]} tage
+ * @param {string[]} namen
+ * @param {Plan|null|undefined} schichten
+ * @param {Schicht} schicht
+ * @returns {'add'|'remove'|null}
+ */
 function naechsteAktion(tage, namen, schichten, schicht){
   if(!Array.isArray(tage) || !Array.isArray(namen) || !tage.length || !namen.length) return null;
   const plan = schichten || {};
@@ -1445,7 +1582,13 @@ function naechsteAktion(tage, namen, schichten, schicht){
   return alleDrin ? 'remove' : 'add';
 }
 
-// Markierung einer Tageszelle innerhalb der aufgespannten Strecke.
+/**
+ * Markierung einer Tageszelle innerhalb der aufgespannten Strecke.
+ * @param {string} key
+ * @param {string|null|undefined} von
+ * @param {string|null} [bis]
+ * @returns {string}  CSS-Klassen, durch Leerzeichen getrennt
+ */
 function zeitraumKlasse(key, von, bis){
   if(!von) return '';
   const ende = bis || von;
@@ -1457,17 +1600,24 @@ function zeitraumKlasse(key, von, bis){
   return '';
 }
 
-// Wohin ein Auswahlfeld gehört, damit es ganz sichtbar bleibt.
-//
-// anker und groesse sind Rechtecke ({left,right,top,bottom} bzw.
-// {breite,hoehe}), fenster ist {breite,hoehe}. Zurück kommen Position und
-// die Höhe, auf die das Feld gedeckelt werden muss - reicht der Platz weder
-// darunter noch darüber, wird gescrollt statt abgeschnitten.
-//
-// Vorher rechneten die Auswahlfelder mit fest verdrahteten Höhen (260 px).
-// Wer viele Mitarbeiter hatte und eine der letzten Wochen anklickte, bekam
-// eine Liste, deren untere Namen aus dem Fenster ragten und nicht mehr
-// anklickbar waren.
+/**
+ * Wohin ein Auswahlfeld gehört, damit es ganz sichtbar bleibt.
+ *
+ * anker und groesse sind Rechtecke ({left,right,top,bottom} bzw.
+ * {breite,hoehe}), fenster ist {breite,hoehe}. Zurück kommen Position und
+ * die Höhe, auf die das Feld gedeckelt werden muss - reicht der Platz weder
+ * darunter noch darüber, wird gescrollt statt abgeschnitten.
+ *
+ * Vorher rechneten die Auswahlfelder mit fest verdrahteten Höhen (260 px).
+ * Wer viele Mitarbeiter hatte und eine der letzten Wochen anklickte, bekam
+ * eine Liste, deren untere Namen aus dem Fenster ragten und nicht mehr
+ * anklickbar waren.
+ * @param {{left: number, right?: number, top: number, bottom: number}} anker
+ * @param {{breite: number, hoehe: number}} groesse
+ * @param {{breite: number, hoehe: number}} fenster
+ * @param {number} [rand]
+ * @returns {{left: number, top: number, maxHoehe: number, nachOben: boolean}}
+ */
 function popupPlatz(anker, groesse, fenster, rand = 8) {
   // Manche Umgebungen melden waehrend des Aufbaus noch kein Fenster. Dann
   // wird schlicht unter den Anker gesetzt, statt auf 0 hin zu rechnen.
@@ -1488,8 +1638,12 @@ function popupPlatz(anker, groesse, fenster, rand = 8) {
   return { left, top, maxHoehe, nachOben };
 }
 
-// Anzeigename auf dem Chip: das erste Wort, ohne hängendes Komma -
-// "Bauer, Martin" wird zu "Bauer".
+/**
+ * Anzeigename auf dem Chip: das erste Wort, ohne hängendes Komma -
+ * "Bauer, Martin" wird zu "Bauer".
+ * @param {unknown} name
+ * @returns {string}
+ */
 function kurzName(name){
   if(name == null) return '';
   const erstes = String(name).trim().split(/\s+/)[0] || '';
@@ -1508,18 +1662,26 @@ function kurzName(name){
 //
 // Kaeme eine weitere parallel laufende Art dazu, waere sie hier ein Eintrag
 // und sonst nirgends: Zellen, Fussleiste und Legende bauen sich daraus auf.
+/** @type {Band[]} */
 const MATRIX_BAENDER = [
   { id: 'arbeit', schichten: ARBEITSSCHICHTEN,    exklusiv: true  },
   { id: 'ruf',    schichten: ['rufbereitschaft'], exklusiv: false },
 ];
 
-// Was eine Zelle zeigt: je Band die Schicht, die dort steht.
-//
-// doppelt heisst: zwei einander ausschliessende Schichten in einem Band.
-// Das ist ein Fehler im Plan und wird in dem Band gemeldet, in das er
-// gehoert - nicht in einem anderen.
+/**
+ * Was eine Zelle zeigt: je Band die Schicht, die dort steht.
+ *
+ * doppelt heisst: zwei einander ausschliessende Schichten in einem Band.
+ * Das ist ein Fehler im Plan und wird in dem Band gemeldet, in das er
+ * gehoert - nicht in einem anderen.
+ * @param {Belegung|null|undefined} slot
+ * @param {string} name
+ * @returns {MatrixZelle}
+ */
 function matrixZelle(slot, name){
+  /** @type {Belegung} */
   const tag  = slot || {};
+  /** @param {Schicht} s */
   const drin = s => Array.isArray(tag[s]) && tag[s].includes(name);
   const baender = MATRIX_BAENDER.map(band => {
     const alle = band.schichten.filter(drin);
@@ -1533,15 +1695,26 @@ function matrixZelle(slot, name){
   return { baender, leer: baender.every(b => !b.schicht) };
 }
 
-// Ein einzelnes Band einer Zelle - spart den find() an jeder Aufrufstelle.
+/**
+ * Ein einzelnes Band einer Zelle - spart den find() an jeder Aufrufstelle.
+ * @param {MatrixZelle|null|undefined} zelle
+ * @param {string} id
+ * @returns {ZellBand|null}
+ */
 function matrixBand(zelle, id){
   return (zelle && zelle.baender || []).find(b => b.id === id) || null;
 }
 
-// Besetzung eines Tages, je Band eine Zahl - die Fussleiste zeigt sie
-// uebereinander, so wie die Zellen darueber. Unterbesetzung wird je Band
-// gemeldet, damit eine fehlende Rufbereitschaft nicht in der Summe der
-// Arbeitsschichten untergeht.
+/**
+ * Besetzung eines Tages, je Band eine Zahl - die Fussleiste zeigt sie
+ * uebereinander, so wie die Zellen darueber. Unterbesetzung wird je Band
+ * gemeldet, damit eine fehlende Rufbereitschaft nicht in der Summe der
+ * Arbeitsschichten untergeht.
+ * @param {Belegung|null|undefined} slot
+ * @param {string} key
+ * @param {Soll|null|undefined} soll
+ * @returns {{id: string, zahl: number, fehlt: boolean}[]}
+ */
 function matrixFuss(slot, key, soll){
   const tag   = slot || {};
   const fehlt = fehlbesetzung(tag, key, soll).map(f => f.schicht);
@@ -1552,38 +1725,51 @@ function matrixFuss(slot, key, soll){
   }));
 }
 
-// Reihenfolge der Zeilen in der Monatsuebersicht.
-//
-// zeilen sind {name, team, zaehl:{schicht: anzahl}}. Nach Name und Team
-// aufsteigend, nach einer Schicht absteigend - wer am meisten hat, steht
-// oben, denn danach sucht man. Gleichstand entscheidet immer der Name,
-// damit dieselbe Eingabe immer dieselbe Liste ergibt.
-//
-// Ohne Kriterium bleibt die Reihenfolge der Mitarbeiterliste stehen.
-// Die Eingabe wird nicht veraendert.
+/**
+ * Reihenfolge der Zeilen in der Monatsuebersicht.
+ *
+ * zeilen sind {name, team, zaehl:{schicht: anzahl}}. Nach Name und Team
+ * aufsteigend, nach einer Schicht absteigend - wer am meisten hat, steht
+ * oben, denn danach sucht man. Gleichstand entscheidet immer der Name,
+ * damit dieselbe Eingabe immer dieselbe Liste ergibt.
+ *
+ * Ohne Kriterium bleibt die Reihenfolge der Mitarbeiterliste stehen.
+ * Die Eingabe wird nicht veraendert. Was die Zeilen sonst noch tragen,
+ * kommt unveraendert wieder heraus - daher der Typparameter.
+ * @template {{name?: unknown, team?: unknown, zaehl?: Partial<Record<string, number>>}} Z
+ * @param {readonly Z[]|null|undefined} zeilen
+ * @param {string} [kriterium]  'name', 'team' oder eine Schicht
+ * @returns {Z[]}
+ */
 function sortiereMatrix(zeilen, kriterium){
   const liste = [...(zeilen || [])];
   if(!kriterium) return liste;
+  /** @param {unknown} w */
   const text     = w => String(w == null ? '' : w);
+  /** @param {Z} a @param {Z} b */
   const nachName = (a, b) => text(a.name).localeCompare(text(b.name), 'de');
   if(kriterium === 'name') return liste.sort(nachName);
   if(kriterium === 'team')
     return liste.sort((a, b) => text(a.team).localeCompare(text(b.team), 'de') || nachName(a, b));
-  if(SCHICHTEN.includes(kriterium)){
+  if(istSchicht(kriterium)){
+    /** @param {Z} z */
     const zahl = z => Number((z && z.zaehl || {})[kriterium]) || 0;
     return liste.sort((a, b) => zahl(b) - zahl(a) || nachName(a, b));
   }
   return liste;
 }
 
-global.Regelkern = {
+return {
   SCHICHTEN, ARBEITSSCHICHTEN, MATRIX_BAENDER, MAX_TAGE,
-  tagKey, alsDatum, isoWoche, tageImZeitraum, monatsRaster,
+  istSchicht, tagKey, alsDatum, isoWoche, tageImZeitraum, monatsRaster,
   sollAmTag, fehlbesetzung, unterSoll, tageUnterSoll,
   konflikte, naechsteAktion, zeitraumKlasse, kurzName, popupPlatz,
   matrixZelle, matrixBand, matrixFuss, sortiereMatrix,
 };
-})(globalThis);
+})();
+// Im Fenster ist das var oben schon global. Der Testlauf laedt diesen Block
+// aber als Modul, und dort bleibt ein var modullokal - deshalb ausdruecklich.
+globalThis.Regelkern = Regelkern;
 </script>
 
 <script>
@@ -1591,10 +1777,65 @@ global.Regelkern = {
 // Die Planungsregeln stehen im Block <script id="regelkern"> darüber.
 // Alles hier drunter ist Oberfläche: Zustand, DOM und Netz.
 const RK = globalThis.Regelkern;
+
+// ── Typisierte Griffe ins DOM ─────────────────────────────────
+// Das DOM liefert allgemeine Typen: getElementById ein HTMLElement ohne
+// .value, querySelector ein Element ohne .dataset, e.target ein EventTarget
+// ohne beides. An jeder Stelle hier steht fest, was gemeint ist - diese
+// Griffe sagen es tsc. Zur Laufzeit tun sie genau das, was der Aufruf tut,
+// den sie ersetzen; geprueft wird mit npm run typen.
+//
+// Ob ein Griff zur Stelle passt (eingabe() nur auf ein <input> ...), prueft
+// tests/typpruefung.test.mjs gegen das Markup.
+const dom = {
+  /** Eingabefeld nach id. @param {string} id */
+  eingabe:  id => /** @type {HTMLInputElement} */    (document.getElementById(id)),
+  /** Auswahlliste nach id. @param {string} id */
+  auswahl:  id => /** @type {HTMLSelectElement} */   (document.getElementById(id)),
+  /** Mehrzeiliges Textfeld nach id. @param {string} id */
+  textfeld: id => /** @type {HTMLTextAreaElement} */ (document.getElementById(id)),
+  /** Knopf nach id. @param {string} id */
+  knopf:    id => /** @type {HTMLButtonElement} */   (document.getElementById(id)),
+  /**
+   * querySelector - die Oberflaeche fragt nur HTML-Elemente ab.
+   * @param {ParentNode} wurzel
+   * @param {string} wahl
+   * @returns {HTMLElement|null}
+   */
+  eins: (wurzel, wahl) => wurzel.querySelector(wahl),
+  /**
+   * querySelectorAll, ebenso.
+   * @param {ParentNode} wurzel
+   * @param {string} wahl
+   * @returns {NodeListOf<HTMLElement>}
+   */
+  alle: (wurzel, wahl) => wurzel.querySelectorAll(wahl),
+  /**
+   * Das Element, auf dem ein Ereignis ausgeloest wurde. Ereignisse haengen
+   * hier nur an HTML-Elementen, nie am Fenster oder an Text.
+   * @param {Event} e
+   * @returns {HTMLElement}
+   */
+  ziel: e => /** @type {HTMLElement} */ (e.target),
+  /**
+   * e.target.closest(wahl) - der naechste Vorfahr, der passt.
+   * @param {Event} e
+   * @param {string} wahl
+   * @returns {HTMLElement|null}
+   */
+  naechstes: (e, wahl) => /** @type {HTMLElement} */ (e.target).closest(wahl),
+};
+
+// Elemente, an die schon ein Ereignis gebunden ist. Vorher klebte dafuer
+// eine Eigenschaft _wired am Element selbst - die kennt kein Typ, und eine
+// WeakSet haelt das Element genauso wenig am Leben wie die Eigenschaft.
+/** @type {WeakSet<Element>} */
+const verdrahtet = new WeakSet();
 // ══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════
 // Diese Fassung plant nur Schichten - keine Abwesenheiten.
+/** @type {Schicht[]} */
 const ALL_SHIFTS  = ['frueh','normal','spaet','rufbereitschaft'];
 const WORK_SHIFTS = new Set(['frueh','spaet','rufbereitschaft']);
 const SHIFT_LABEL = {frueh:'Frühschicht',normal:'Normaldienst',spaet:'Spätschicht',rufbereitschaft:'Rufbereitschaft'};
@@ -1616,7 +1857,11 @@ const EMOJIS = ['👩','👨','👩‍💻','👨‍💻','👩‍🔧','👨‍
 let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
 let mitarbeiter=[], schichten={}, holidays={}, notizen={}, customHolidays=[], templates={};
 let soll={frueh:1,spaet:1,rufbereitschaft:1};
-let selectedPerson=null, selectedShift='frueh', selectedPersons=new Set();
+let selectedPerson=null;
+/** @type {Schicht} */
+let selectedShift='frueh';
+/** @type {Set<string>} */
+let selectedPersons=new Set();
 // Zeitraum ist kein Modus mehr: Shift+Klick spannt vom zuletzt geklickten Tag
 // bis hierher auf. rangeStart/previewEnd beschreiben nur noch die Strecke,
 // die gerade markiert ist.
@@ -1632,7 +1877,6 @@ let tmplData={};
 // damit ein Wiederherstellen nicht nur die Einträge zurückbringt.
 let deletedProfiles={};
 let activeView='cal';
-const currentSubTab={};
 
 // ══════════════════════════════════════════════════════════════
 // INIT
@@ -1674,13 +1918,13 @@ function getTodayKwKey(){
   const day=tmp.getUTCDay()||7;
   tmp.setUTCDate(tmp.getUTCDate()+4-day);
   const yearStart=new Date(Date.UTC(tmp.getUTCFullYear(),0,1));
-  const week=Math.ceil((((tmp-yearStart)/86400000)+1)/7);
+  const week=Math.ceil((((tmp.getTime()-yearStart.getTime())/86400000)+1)/7);
   return `${tmp.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
 }
 
 function initRufKWYear(){
   ['rufkw-year','rufkw-apply-year'].forEach(id=>{
-    const sel=document.getElementById(id); if(!sel) return;
+    const sel=dom.auswahl(id); if(!sel) return;
     const years=new Set(Object.keys(rufKW).map(k=>k.slice(0,4)));
     // Das laufende Jahr und die zwei folgenden stehen immer zur Wahl,
     // unabhängig davon, wohin der Kalender gerade navigiert wurde
@@ -1796,9 +2040,9 @@ async function toggleKwPerson(name, weekDates){
 
 function renderRufKWTable(){
   initRufKWYear();
-  const sel=document.getElementById('rufkw-year'); if(!sel) return;
+  const sel=dom.auswahl('rufkw-year'); if(!sel) return;
   // Den onchange-Griff nur einmal anhängen
-  if(!sel._wired){ sel.addEventListener('change', renderRufKWTable); sel._wired=true; }
+  if(!verdrahtet.has(sel)){ sel.addEventListener('change', renderRufKWTable); verdrahtet.add(sel); }
   const year=parseInt(sel.value);
   const weeks=getISOWeeks(year);
   const todayKW=getTodayKwKey();
@@ -1812,8 +2056,8 @@ function renderRufKWTable(){
       <th style="width:110px">Abgleich</th>
     </tr></thead><tbody id="rufkw-tbody"></tbody></table></div>`;
   renderRufSummary();
-  const filter=document.getElementById('ruf-nur-abw');
-  if(filter&&!filter._wired){ filter.addEventListener('change',renderRufKWTable); filter._wired=true; }
+  const filter=dom.eingabe('ruf-nur-abw');
+  if(filter&&!verdrahtet.has(filter)){ filter.addEventListener('change',renderRufKWTable); verdrahtet.add(filter); }
   const tbody=document.getElementById('rufkw-tbody');
   const nurAbweichungen=filter?.checked;
   weeks.forEach(w=>{
@@ -1849,7 +2093,7 @@ function renderRufKWTable(){
     if(!names.length){const em=document.createElement('span');em.className='rufkw-empty';em.textContent='– niemand –';cell.appendChild(em);}
     cell.appendChild(addBtn);
     cell.addEventListener('click',e=>{
-      const rm=e.target.closest('[data-rm-kw]');
+      const rm=dom.naechstes(e,'[data-rm-kw]');
       if(rm){e.stopPropagation();removeRufKWPerson(rm.dataset.rmKw,rm.dataset.rmName);return;}
       openRufKWPicker(w.kwKey,addBtn);
     });
@@ -1904,14 +2148,14 @@ function renderRufKWTable(){
 let reihumFolge=[];
 
 function openRufReihum(){
-  const jahr=parseInt(document.getElementById('rufkw-year')?.value||curYear);
+  const jahr=parseInt(dom.auswahl('rufkw-year')?.value||String(curYear));
   const wochen=getISOWeeks(jahr);
   // Namen ergänzen, die noch nicht in der Reihenfolge stehen
   mitarbeiter.forEach(m=>{ if(!reihumFolge.some(r=>r.name===m.name)) reihumFolge.push({name:m.name,an:true}); });
   reihumFolge=reihumFolge.filter(r=>mitarbeiter.some(m=>m.name===r.name));
 
   const opt=w=>`<option value="${w.kwKey}">KW ${w.kw} · ${fmtDateShort(w.start)}</option>`;
-  const von=document.getElementById('reihum-von'), bis=document.getElementById('reihum-bis');
+  const von=dom.auswahl('reihum-von'), bis=dom.auswahl('reihum-bis');
   von.innerHTML=wochen.map(opt).join('');
   bis.innerHTML=wochen.map(opt).join('');
   const heute=getTodayKwKey();
@@ -1938,13 +2182,13 @@ function renderReihumListe(){
     </div>`;
   }).join('')||'<span style="font-size:12px;color:var(--text3)">Keine Mitarbeiter angelegt.</span>';
 
-  box.querySelectorAll('[data-an]').forEach(el=>el.onchange=()=>{
+  /** @type {NodeListOf<HTMLInputElement>} */ (box.querySelectorAll('[data-an]')).forEach(el=>el.onchange=()=>{
     reihumFolge[+el.dataset.an].an=el.checked; renderReihumListe();
   });
-  box.querySelectorAll('[data-hoch]').forEach(el=>el.onclick=()=>{
+  dom.alle(box,'[data-hoch]').forEach(el=>el.onclick=()=>{
     const i=+el.dataset.hoch; [reihumFolge[i-1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i-1]]; renderReihumListe();
   });
-  box.querySelectorAll('[data-runter]').forEach(el=>el.onclick=()=>{
+  dom.alle(box,'[data-runter]').forEach(el=>el.onclick=()=>{
     const i=+el.dataset.runter; [reihumFolge[i+1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i+1]]; renderReihumListe();
   });
   renderReihumVorschau();
@@ -1955,12 +2199,12 @@ function nummerVon(i){ return reihumFolge.slice(0,i+1).filter(r=>r.an).length; }
 
 // Welche Wochen würden gefüllt - und mit wem?
 function reihumPlan(){
-  const jahr=parseInt(document.getElementById('rufkw-year')?.value||curYear);
+  const jahr=parseInt(dom.auswahl('rufkw-year')?.value||String(curYear));
   const wochen=getISOWeeks(jahr);
-  const von=document.getElementById('reihum-von')?.value, bis=document.getElementById('reihum-bis')?.value;
+  const von=dom.auswahl('reihum-von')?.value, bis=dom.auswahl('reihum-bis')?.value;
   const i=wochen.findIndex(w=>w.kwKey===von), j=wochen.findIndex(w=>w.kwKey===bis);
   const leute=reihumFolge.filter(r=>r.an).map(r=>r.name);
-  const ueber=document.getElementById('reihum-ueber')?.checked;
+  const ueber=dom.eingabe('reihum-ueber')?.checked;
   const plan=[], uebersprungen=[];
   if(i<0||j<0||j<i||!leute.length) return {plan,uebersprungen,leute};
   let n=0;
@@ -1976,7 +2220,7 @@ function reihumPlan(){
 function renderReihumVorschau(){
   const el=document.getElementById('reihum-vorschau'); if(!el) return;
   const {plan,uebersprungen,leute}=reihumPlan();
-  document.getElementById('reihum-go').disabled=!plan.length;
+  dom.knopf('reihum-go').disabled=!plan.length;
   if(!leute.length){ el.innerHTML='<span style="color:var(--krank)">Niemand ausgewählt.</span>'; return; }
   if(!plan.length){ el.innerHTML='<span style="color:var(--krank)">Keine Woche zu füllen – alle sind schon vergeben.</span>'; return; }
   const beispiel=plan.slice(0,4).map(p=>`KW ${p.kw} ${esc(p.name)}`).join(' · ');
@@ -2035,7 +2279,7 @@ function tageZeilen(w,geplant){
     if(!namen.length){const em=document.createElement('span');em.className='rufkw-empty';em.textContent='– nichts –';zelle.appendChild(em);}
     zelle.appendChild(plus);
     zelle.addEventListener('click',async e=>{
-      const rm=e.target.closest('[data-rm-tag]');
+      const rm=dom.naechstes(e,'[data-rm-tag]');
       if(rm){ e.stopPropagation(); await setzeTagRuf(rm.dataset.rmTag,rm.dataset.rmName,false); return; }
       openRufTagPicker(key,plus);
     });
@@ -2068,7 +2312,7 @@ function openRufTagPicker(key,anchor){
     picker=document.createElement('div'); picker.id='ruftag-picker'; picker.className='rufkw-picker hidden';
     document.body.appendChild(picker);
     document.addEventListener('click',e=>{
-      if(!e.target.closest('#ruftag-picker')&&!e.target.closest('.rufkw-person-cell'))
+      if(!dom.naechstes(e,'#ruftag-picker')&&!dom.naechstes(e,'.rufkw-person-cell'))
         picker.classList.add('hidden');
     });
   }
@@ -2079,7 +2323,7 @@ function openRufTagPicker(key,anchor){
       <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m.color};font-size:9px;color:#fff;font-weight:700">${m.icon||initials(m.name)}</span>
       <span>${esc(m.name)}</span></div>`).join('')
       :'<div style="padding:8px 12px;font-size:12px;color:var(--text3)">Keine Mitarbeiter</div>');
-  picker.querySelectorAll('[data-pname]').forEach(el=>{
+  dom.alle(picker,'[data-pname]').forEach(el=>{
     el.onclick=async ev=>{
       ev.stopPropagation();
       const name=el.dataset.pname;
@@ -2110,7 +2354,7 @@ function openRufKWPicker(kwKey,anchor){
     picker=document.createElement('div'); picker.id='rufkw-picker'; picker.className='rufkw-picker hidden';
     document.body.appendChild(picker);
     document.addEventListener('click',e=>{
-      if(!e.target.closest('#rufkw-picker')&&!e.target.closest('.rufkw-person-cell'))
+      if(!dom.naechstes(e,'#rufkw-picker')&&!dom.naechstes(e,'.rufkw-person-cell'))
         picker.classList.add('hidden');
     });
   }
@@ -2120,7 +2364,7 @@ function openRufKWPicker(kwKey,anchor){
       <div class="avatar" style="background:${m.color};width:24px;height:24px;font-size:${m.icon?'14px':'9px'};flex-shrink:0">${m.icon||initials(m.name)}</div>
       <span>${esc(m.name)}</span>${current.has(m.name)?'<span style="margin-left:auto;color:var(--ruf)">✓</span>':''}
     </div>`).join('')||'<div style="padding:10px;color:var(--text3);font-size:12px">Keine Mitarbeiter</div>');
-  picker.querySelectorAll('[data-pname]').forEach(el=>{
+  dom.alle(picker,'[data-pname]').forEach(el=>{
     el.addEventListener('click',async e=>{
       e.stopPropagation();
       picker.classList.add('hidden');
@@ -2149,8 +2393,8 @@ function openApplyRufKW(){
 }
 
 async function applyRufKW(){
-  const year=parseInt(document.getElementById('rufkw-apply-year').value);
-  const month=document.getElementById('rufkw-apply-month').value;
+  const year=parseInt(dom.auswahl('rufkw-apply-year').value);
+  const month=dom.auswahl('rufkw-apply-month').value;
   const resEl=document.getElementById('rufkw-apply-result');
   const d=await api('/api/ruf_kw/apply',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({year,month:month?parseInt(month):null})});
@@ -2170,7 +2414,7 @@ async function applyRufKW(){
 }
 
 function exportRufKWCSV(){
-  const sel=document.getElementById('rufkw-year');
+  const sel=dom.auswahl('rufkw-year');
   const year=sel?parseInt(sel.value):curYear;
   const weeks=getISOWeeks(year);
   let csv='KW,Von,Bis,Person\n';
@@ -2197,10 +2441,10 @@ function applyData(d){
   notizen=d.notizen||{}; soll=d.soll||{frueh:1,normal:0,spaet:1,rufbereitschaft:1};
   customHolidays=d.custom_holidays||[]; templates=d.templates||{}; rufKW=d.ruf_kw||{};
   mitarbeiter.forEach(m=>{if(!m.color)m.color=AVATAR_COLORS[0];if(!m.icon)m.icon='';if(!m.prefs)m.prefs={};});
-  document.getElementById('soll-f').value=soll.frueh??1;
-  document.getElementById('soll-n').value=soll.normal??0;
-  document.getElementById('soll-s').value=soll.spaet??1;
-  document.getElementById('soll-r').value=soll.rufbereitschaft??1;
+  dom.eingabe('soll-f').value=String(soll.frueh??1);
+  dom.eingabe('soll-n').value=String(soll.normal??0);
+  dom.eingabe('soll-s').value=String(soll.spaet??1);
+  dom.eingabe('soll-r').value=String(soll.rufbereitschaft??1);
 }
 
 function renderAll(){
@@ -2311,19 +2555,7 @@ function bindEvents(){
   });
 
   // View tabs
-function switchSubTab(view, subId){
-  currentSubTab[view]=subId;
-  document.querySelectorAll(`[data-sub]`).forEach(t=>{
-    if(t.closest('[data-panel="'+view+'"]')||t.closest('.view-panel.active'))
-      t.classList.toggle('active', t.dataset.sub===subId);
-  });
-  document.querySelectorAll('.sub-panel').forEach(p=>{
-    p.classList.toggle('active', p.id==='sub-'+subId);
-  });
-  if(subId==='ruf-overview'||subId==='ruf-kw') renderRufKWTable();
-}
-
-  document.querySelectorAll('.vtab').forEach(tab=>{
+  dom.alle(document,'.vtab').forEach(tab=>{
     tab.addEventListener('click',()=>{
       document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
       document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
@@ -2342,11 +2574,11 @@ function switchSubTab(view, subId){
   // Schichtwahl - per Maus und per Tastatur bedienbar
   const bar=document.getElementById('modebar');
   bar.addEventListener('click',e=>{
-    const p=e.target.closest('[data-shift]'); if(p) waehleSchicht(p.dataset.shift);
+    const p=dom.naechstes(e,'[data-shift]'); if(p) waehleSchicht(p.dataset.shift);
   });
   bar.addEventListener('keydown',e=>{
     if(e.key!=='Enter'&&e.key!==' ')return;
-    const p=e.target.closest('[data-shift]'); if(!p) return;
+    const p=dom.naechstes(e,'[data-shift]'); if(!p) return;
     e.preventDefault(); waehleSchicht(p.dataset.shift);
   });
 
@@ -2355,9 +2587,9 @@ function switchSubTab(view, subId){
   document.getElementById('btn-more').addEventListener('click',e=>{
     e.stopPropagation(); more.classList.toggle('hidden');
   });
-  more.addEventListener('click',e=>{ if(e.target.closest('.mm-item')) more.classList.add('hidden'); });
+  more.addEventListener('click',e=>{ if(dom.naechstes(e,'.mm-item')) more.classList.add('hidden'); });
   document.addEventListener('click',e=>{
-    if(!e.target.closest('#more-menu')&&!e.target.closest('#btn-more')) more.classList.add('hidden');
+    if(!dom.naechstes(e,'#more-menu')&&!dom.naechstes(e,'#btn-more')) more.classList.add('hidden');
   });
 
   document.getElementById('btn-ics').addEventListener('click',openIcsModal);
@@ -2365,18 +2597,18 @@ function switchSubTab(view, subId){
   document.getElementById('btn-check').addEventListener('click',showUnderstaffedReport);
   document.getElementById('btn-folder').addEventListener('click',changeFolder);
   document.getElementById('btn-export-data').addEventListener('click',()=>{
-    document.getElementById('backup-file').value='';
+    dom.eingabe('backup-file').value='';
     document.getElementById('backup-result').className='backup-result';
     document.getElementById('backup-drop-label').textContent='📂 .json Backup hier ablegen oder klicken';
     document.getElementById('backup-modal').classList.remove('hidden');
   });
   document.getElementById('backup-file').addEventListener('change',e=>{
-    if(e.target.files[0]) document.getElementById('backup-drop-label').textContent='📂 '+e.target.files[0].name;
+    const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files[0]) document.getElementById('backup-drop-label').textContent='📂 '+inp.files[0].name;
   });
   document.getElementById('btn-refresh').addEventListener('click',refreshData);
   // Das Anwenden hängt am onclick von btn-run-tmpl
 
-  document.querySelectorAll('.sb-tab').forEach(tab=>{
+  dom.alle(document,'.sb-tab').forEach(tab=>{
     tab.addEventListener('click',()=>{
       document.querySelectorAll('.sb-tab').forEach(t=>t.classList.remove('active'));
       document.querySelectorAll('.sb-panel').forEach(p=>p.classList.remove('active'));
@@ -2408,17 +2640,17 @@ function switchSubTab(view, subId){
 
   document.querySelectorAll('.modal-bg').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)closeAllModals();});});
   document.addEventListener('click',e=>{
-    if(!e.target.closest('#cpop')&&!e.target.closest('.color-preview')&&!e.target.closest('.avatar'))
+    if(!dom.naechstes(e,'#cpop')&&!dom.naechstes(e,'.color-preview')&&!dom.naechstes(e,'.avatar'))
       document.getElementById('cpop').classList.add('hidden');
   });
 
   document.addEventListener('dragstart',e=>{
-    const chip=e.target.closest('.chip'); if(!chip) return;
+    const chip=dom.naechstes(e,'.chip'); if(!chip) return;
     dragState={name:chip.dataset.name,fromKey:chip.dataset.key,fromShift:chip.dataset.shift};
     e.dataTransfer.effectAllowed='move';
     setTimeout(()=>chip.style.opacity='.3',0);
   });
-  document.addEventListener('dragend',e=>{const chip=e.target.closest('.chip');if(chip)chip.style.opacity='';dragState=null;});
+  document.addEventListener('dragend',e=>{const chip=dom.naechstes(e,'.chip');if(chip)chip.style.opacity='';dragState=null;});
 
   // Import data drop zone
   const izone=document.getElementById('import-drop-zone');
@@ -2428,11 +2660,11 @@ function switchSubTab(view, subId){
     izone.addEventListener('drop',e=>{
       e.preventDefault();izone.classList.remove('drag-over');
       const file=e.dataTransfer.files[0];
-      if(file){try{const dt=new DataTransfer();dt.items.add(file);document.getElementById('import-file').files=dt.files;}catch(err){}
+      if(file){try{const dt=new DataTransfer();dt.items.add(file);dom.eingabe('import-file').files=dt.files;}catch(err){}
       document.getElementById('import-drop-label').textContent='📄 '+file.name;}
     });
     document.getElementById('import-file').addEventListener('change',e=>{
-      if(e.target.files[0]) document.getElementById('import-drop-label').textContent='📄 '+e.target.files[0].name;
+      const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files[0]) document.getElementById('import-drop-label').textContent='📄 '+inp.files[0].name;
     });
   }
 
@@ -2442,11 +2674,11 @@ function switchSubTab(view, subId){
   zone.addEventListener('drop',e=>{
     e.preventDefault();zone.classList.remove('drag-over');
     const file=e.dataTransfer.files[0];
-    if(file){try{const dt=new DataTransfer();dt.items.add(file);document.getElementById('ics-file').files=dt.files;}catch(err){}
+    if(file){try{const dt=new DataTransfer();dt.items.add(file);dom.eingabe('ics-file').files=dt.files;}catch(err){}
     document.getElementById('drop-label').textContent='📄 '+file.name;}
   });
   document.getElementById('ics-file').addEventListener('change',e=>{
-    if(e.target.files[0]) document.getElementById('drop-label').textContent='📄 '+e.target.files[0].name;
+    const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files[0]) document.getElementById('drop-label').textContent='📄 '+inp.files[0].name;
   });
 }
 
@@ -2474,7 +2706,7 @@ function updatePrintHead(){
     meta=`Soll je Tag: Früh ${soll.frueh??1} · Spät ${soll.spaet??1} · Rufbereitschaft ${soll.rufbereitschaft??1}`+
       ` — ${gedruckt}`;
   }else if(activeView==='ruf'){
-    text=`Rufbereitschaft ${document.getElementById('rufkw-year')?.value||curYear}`;
+    text=`Rufbereitschaft ${dom.auswahl('rufkw-year')?.value||curYear}`;
   }else if(activeView==='matrix'){
     text=`Monatsübersicht ${monat}`;
   }else if(activeView==='tmpl'){
@@ -2491,39 +2723,39 @@ function updateLabel(){
   updateContextBar();
   updatePrintHead();
   // Sync month dropdown
-  const mSel=document.getElementById('nav-month');
+  const mSel=dom.auswahl('nav-month');
   if(mSel){
     if(!mSel.options.length){
-      MONTHS.forEach((m,i)=>{ const o=document.createElement('option'); o.value=i+1; o.textContent=m; mSel.appendChild(o); });
+      MONTHS.forEach((m,i)=>{ const o=document.createElement('option'); o.value=String(i+1); o.textContent=m; mSel.appendChild(o); });
       mSel.addEventListener('change',()=>{
         const neu=parseInt(mSel.value,10);
-        if(!Number.isInteger(neu)||neu<1||neu>12){ mSel.value=curMonth; return; }
+        if(!Number.isInteger(neu)||neu<1||neu>12){ mSel.value=String(curMonth); return; }
         curMonth=neu; renderCalendar(); updateLabel();
       });
     }
-    mSel.value=curMonth;
+    mSel.value=String(curMonth);
   }
   // Sync year dropdown
-  const ySel=document.getElementById('nav-year');
+  const ySel=dom.auswahl('nav-year');
   if(ySel){
     const todayY=new Date().getFullYear();
     const years=new Set([todayY-1,todayY,todayY+1,todayY+2,curYear]);
     const sorted=[...years].sort();
     if(ySel.dataset.built!=='1'){
-      sorted.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y; ySel.appendChild(o); });
+      sorted.forEach(y=>{ const o=document.createElement('option'); o.value=String(y); o.textContent=String(y); ySel.appendChild(o); });
       ySel.dataset.built='1';
       ySel.addEventListener('change',async()=>{
         // Ein Auswahlfeld ohne passenden Eintrag liefert "" - daraus wuerde
         // NaN, und der Kalender koennte gar nichts mehr zeichnen.
         const newY=parseInt(ySel.value,10);
-        if(!Number.isInteger(newY)){ ySel.value=curYear; return; }
+        if(!Number.isInteger(newY)){ ySel.value=String(curYear); return; }
         if(newY!==curYear){ curYear=newY; await loadHolidays(curYear); }
         updateLabel(); renderCalendar();
       });
     } else {
       // Das gerade gezeigte Jahr ergänzen, falls es fehlt
       if(![...ySel.options].find(o=>parseInt(o.value)===curYear)){
-        const o=document.createElement('option'); o.value=curYear; o.textContent=curYear;
+        const o=document.createElement('option'); o.value=String(curYear); o.textContent=String(curYear);
         // An der richtigen Stelle einfügen
         let inserted=false;
         for(let i=0;i<ySel.options.length;i++){
@@ -2532,7 +2764,7 @@ function updateLabel(){
         if(!inserted) ySel.appendChild(o);
       }
     }
-    ySel.value=curYear;
+    ySel.value=String(curYear);
   }
   const tml=document.getElementById('tmpl-month-label'); if(tml) tml.textContent=MONTHS[curMonth-1]+' '+curYear;
 
@@ -2554,12 +2786,12 @@ async function refreshFolderBar(){
   }
 }
 async function changeFolder(){
-  const btn=document.getElementById('btn-folder');btn.disabled=true;
+  const btn=dom.knopf('btn-folder');btn.disabled=true;
   try{const d=await api('/api/pick_folder',{method:'POST'});if(d.ok){await refreshFolderBar();await refreshData();toast('Ordner gewechselt');}}
   finally{btn.disabled=false;}
 }
 async function refreshData(){
-  const btn=document.getElementById('btn-refresh');btn.disabled=true;
+  const btn=dom.knopf('btn-refresh');btn.disabled=true;
   try{
     const d=await api('/api/data');
     applyData(d);
@@ -2576,8 +2808,8 @@ function pushUndo(){
   updateUndoBtns();
 }
 function updateUndoBtns(){
-  document.getElementById('btn-undo').disabled=!undoStack.length;
-  document.getElementById('btn-redo').disabled=!redoStack.length;
+  dom.knopf('btn-undo').disabled=!undoStack.length;
+  dom.knopf('btn-redo').disabled=!redoStack.length;
 }
 
 async function doUndo(){if(!undoStack.length)return;redoStack.push(JSON.parse(JSON.stringify(schichten)));schichten=undoStack.pop();await api('/api/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schichten})});renderCalendar();updateUndoBtns();toast('Rückgängig');}
@@ -2594,7 +2826,7 @@ function showColorPicker(anchor,memberName){
   pop.style.left=Math.min(r.left,window.innerWidth-190)+'px';
   pop.style.top=(r.bottom+5)+'px';
   pop.onclick=async e=>{
-    const sw=e.target.closest('[data-c]');if(!sw)return;
+    const sw=dom.naechstes(e,'[data-c]');if(!sw)return;
     const color=sw.dataset.c,mname=sw.dataset.m;pop.classList.add('hidden');
     if(mname){
       await api('/api/mitarbeiter/'+encodeURIComponent(mname)+'/color',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({color})});
@@ -2611,8 +2843,8 @@ function avContent(m){return m.icon?`<span style="font-size:17px;line-height:1">
 
 // Suche und Team-Filter der Seitenleiste gelten auch für die Monatsübersicht.
 function visibleMembers(){
-  const search=(document.getElementById('sb-search')?.value||'').toLowerCase();
-  const teamF=document.getElementById('sb-team-filter')?.value||'';
+  const search=(dom.eingabe('sb-search')?.value||'').toLowerCase();
+  const teamF=dom.auswahl('sb-team-filter')?.value||'';
   return mitarbeiter.filter(m=>
     (!search||m.name.toLowerCase().includes(search))&&
     (!teamF||m.team===teamF)
@@ -2653,13 +2885,13 @@ async function handleMemberClick(e){
   if(cno){
     e.stopPropagation();
     const conf=document.querySelector(`[data-cfor="${cno.dataset.cno}"]`);
-    const btns=conf?.previousElementSibling;
+    const btns=/** @type {HTMLElement} */ (conf?.previousElementSibling);
     if(conf)conf.classList.remove('show');if(btns)btns.style.display='';return;
   }
   const del=e.target.closest('[data-del]');
   if(del){
     e.stopPropagation();const name=del.dataset.del;
-    const btns=document.querySelector(`.member-item[data-member="${name}"] .member-btns`);
+    const btns=dom.eins(document,`.member-item[data-member="${name}"] .member-btns`);
     const conf=document.querySelector(`[data-cfor="${name}"]`);
     if(btns)btns.style.display='none';if(conf)conf.classList.add('show');return;
   }
@@ -2732,7 +2964,7 @@ function updateSelInfo(){
 }
 
 async function addMitarbeiter(){
-  const name=document.getElementById('new-name').value.trim(),team=document.getElementById('new-team').value;
+  const name=dom.eingabe('new-name').value.trim(),team=dom.auswahl('new-team').value;
   if(!name)return;
   if(deletedBackups[name]&&Object.keys(deletedBackups[name]).length>0){pendingRestore={name,team,color:newColor};showRestoreModal(name,deletedBackups[name]);return;}
   await doAdd(name,team,newColor);
@@ -2741,7 +2973,7 @@ async function doAdd(name,team,color){
   const d=await api('/api/mitarbeiter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,team,color})});
   if(d.error){toast(d.error);return;}
   mitarbeiter.push({name,team,color:color||AVATAR_COLORS[0],icon:'',prefs:{}});
-  document.getElementById('new-name').value='';newColor=randColor();document.getElementById('new-color').style.background=newColor;
+  dom.eingabe('new-name').value='';newColor=randColor();document.getElementById('new-color').style.background=newColor;
   // Das Formular nach dem Anlegen wieder zuklappen
   document.getElementById('add-form').classList.remove('open');document.getElementById('add-toggle').classList.remove('open');
   renderMembers();renderCalendar();renderTemplateTable();toast(name+' hinzugefügt');
@@ -2757,7 +2989,7 @@ async function deleteMitarbeiter(name){
     selectedPersons.delete(name);
     for(const k in schichten)for(const s in schichten[k]){const a=schichten[k][s];const i=a.indexOf(name);if(i!==-1)a.splice(i,1);}
     renderMembers();renderCalendar();renderTemplateTable();toast(name+' entfernt');
-  }catch(err){toast('Fehler: '+err.message);}
+  }catch(err){toast('Fehler: '+(err instanceof Error?err.message:String(err)));}
 }
 function showRestoreModal(name,backup){
   document.getElementById('restore-name').textContent=name;
@@ -2798,10 +3030,10 @@ function cancelRestore(){closeModal('restore-modal');pendingRestore=null;}
 // SOLL
 // ══════════════════════════════════════════════════════════════
 async function saveSoll(){
-  soll.frueh=+document.getElementById('soll-f').value||0;
-  soll.normal=+document.getElementById('soll-n').value||0;
-  soll.spaet=+document.getElementById('soll-s').value||0;
-  soll.rufbereitschaft=+document.getElementById('soll-r').value||0;
+  soll.frueh=+dom.eingabe('soll-f').value||0;
+  soll.normal=+dom.eingabe('soll-n').value||0;
+  soll.spaet=+dom.eingabe('soll-s').value||0;
+  soll.rufbereitschaft=+dom.eingabe('soll-r').value||0;
   await api('/api/soll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(soll)});
   renderCalendar();
 }
@@ -2831,20 +3063,20 @@ function openProfile(name){
   const m=mitarbeiter.find(x=>x.name===name);if(!m)return;
   profOldName=name;profColor=m.color;profEmoji=m.icon||'';
   profPrefs=Object.fromEntries(Object.entries(m.prefs||{}).map(([k,v])=>[parseInt(k),v]));
-  document.getElementById('prof-name').value=m.name;
-  document.getElementById('prof-team').value=m.team||'DE';
+  dom.eingabe('prof-name').value=m.name;
+  dom.auswahl('prof-team').value=m.team||'DE';
   document.getElementById('prof-cur-name').textContent=m.name;
   document.getElementById('prof-cur-team').textContent=m.team==='DE'?'🇩🇪 Deutschland':'🇮🇳 Indien';
   document.getElementById('prof-err').style.display='none';
   updateProfAvatar();
   const cr=document.getElementById('prof-colors');
   cr.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch-big${c===profColor?' sel':''}" style="background:${c}" data-pc="${c}"></div>`).join('');
-  cr.querySelectorAll('[data-pc]').forEach(sw=>sw.addEventListener('click',()=>{profColor=sw.dataset.pc;cr.querySelectorAll('[data-pc]').forEach(s=>s.classList.toggle('sel',s===sw));updateProfAvatar();}));
+  dom.alle(cr,'[data-pc]').forEach(sw=>sw.addEventListener('click',()=>{profColor=sw.dataset.pc;cr.querySelectorAll('[data-pc]').forEach(s=>s.classList.toggle('sel',s===sw));updateProfAvatar();}));
   const eg=document.getElementById('prof-emojis');
   eg.innerHTML=`<span class="emoji-none${profEmoji===''?' sel':''}" data-pe="">Kein Icon</span>`+EMOJIS.map(e=>`<span class="emoji-opt${e===profEmoji?' sel':''}" data-pe="${e}">${e}</span>`).join('');
-  eg.querySelectorAll('[data-pe]').forEach(el=>el.addEventListener('click',()=>{profEmoji=el.dataset.pe;eg.querySelectorAll('[data-pe]').forEach(x=>x.classList.toggle('sel',x===el));updateProfAvatar();}));
+  dom.alle(eg,'[data-pe]').forEach(el=>el.addEventListener('click',()=>{profEmoji=el.dataset.pe;eg.querySelectorAll('[data-pe]').forEach(x=>x.classList.toggle('sel',x===el));updateProfAvatar();}));
   updatePrefButtons();
-  document.querySelectorAll('.pref-btn').forEach(btn=>btn.addEventListener('click',()=>{
+  dom.alle(document,'.pref-btn').forEach(btn=>btn.addEventListener('click',()=>{
     const dow=parseInt(btn.dataset.dow),val=btn.dataset.val;
     if(val==='')delete profPrefs[dow];else profPrefs[dow]=val;updatePrefButtons();
   }));
@@ -2855,11 +3087,11 @@ function openProfile(name){
 function updateProfAvatar(){
   const av=document.getElementById('prof-av');av.style.background=profColor;
   document.getElementById('prof-emoji-disp').textContent=profEmoji;
-  const name=document.getElementById('prof-name').value.trim();
+  const name=dom.eingabe('prof-name').value.trim();
   document.getElementById('prof-init-disp').textContent=profEmoji?'':name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 }
 function updatePrefButtons(){
-  document.querySelectorAll('.pref-btn').forEach(btn=>{
+  dom.alle(document,'.pref-btn').forEach(btn=>{
     const dow=parseInt(btn.dataset.dow),val=btn.dataset.val,cur=profPrefs[dow]??'';
     const isActive=(val===''&&cur==='')||(val!==''&&cur===val);
     let cls='pref-btn';
@@ -2868,7 +3100,7 @@ function updatePrefButtons(){
   });
 }
 async function saveProfile(){
-  const newName=document.getElementById('prof-name').value.trim(),team=document.getElementById('prof-team').value;
+  const newName=dom.eingabe('prof-name').value.trim(),team=dom.auswahl('prof-team').value;
   const errEl=document.getElementById('prof-err');
   if(!newName){errEl.textContent='Name darf nicht leer sein.';errEl.style.display='block';return;}
   const d=await api('/api/mitarbeiter/'+encodeURIComponent(profOldName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newName,team,color:profColor,icon:profEmoji})});
@@ -2907,7 +3139,7 @@ function waehleSchicht(shift){
   // Die Monatsübersicht braucht oben eine Arbeitsschicht, auch wenn gerade
   // Rufbereitschaft gewählt ist.
   if(RK.ARBEITSSCHICHTEN.includes(shift)) letzteArbeitsschicht=shift;
-  document.querySelectorAll('#modebar .pill').forEach(p=>p.classList.toggle('active',p.dataset.shift===shift));
+  dom.alle(document,'#modebar .pill').forEach(p=>p.classList.toggle('active',p.dataset.shift===shift));
   updateSelInfo();
 }
 
@@ -3004,7 +3236,7 @@ function renderCalendar(){
         'color:var(--text3);background:var(--surface);border-radius:6px;' +
         'cursor:pointer;user-select:none;transition:background .15s,color .15s;';
       kwDiv.title = 'KW ' + kw + ' – Klick: Rufbereitschaft für ganze Woche zuweisen';
-      kwDiv.textContent = kw;
+      kwDiv.textContent = String(kw);
       kwDiv.addEventListener('mouseenter', () => { kwDiv.style.background='var(--surface3)'; kwDiv.style.color='var(--ruf)'; });
       kwDiv.addEventListener('mouseleave', () => { kwDiv.style.background='var(--surface)';  kwDiv.style.color='var(--text3)'; });
       const weekDates = wochen[i/7].keys;
@@ -3212,10 +3444,10 @@ async function handleCellClick(e,key){
 // Ein Klick auf einen Tag - für eine wie für mehrere Personen derselbe
 // Ablauf, damit sich beide Auswahlarten nicht widersprechen.
 async function handleDayClick(key,ctrl,namen){
-  if(!namen.length) return;
+  if(!namen.length) return undefined;
   if(ctrl){
     if(multiDays.has(key)) multiDays.delete(key); else multiDays.add(key);
-    renderCalendar(); updateSelInfo(); return;
+    renderCalendar(); updateSelInfo(); return undefined;
   }
   if(multiDays.size>0){
     const tage=[...multiDays];
@@ -3234,7 +3466,7 @@ async function handleDayClick(key,ctrl,namen){
 // Leiste gewaehlt ist. Ohne Angabe gilt weiter die gewaehlte Schicht.
 async function schichtAufTagen(tage,namen,modus,schicht=selectedShift){
   const aktion=modus||RK.naechsteAktion(tage,namen,schichten,schicht);
-  if(!aktion) return;
+  if(!aktion) return undefined;
   if(aktion==='add'){ await applyToDateList(tage,namen,'add',schicht); return 'add'; }
   pushUndo();
   for(const name of namen){
@@ -3311,8 +3543,11 @@ async function handleDrop(toKey){
 
   if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
     const ersetzen=r.error==='needs_confirm';
-    const ok=ersetzen?await confirmReplaceShift(name,r.blocking)
-                     :await confirmHolidayEntry(name,[[toKey,r]]);
+    // Die Rückfrage nennt die gezogene Schicht, nicht die aus der Leiste -
+    // wer einen Rufbereitschafts-Chip zieht, bekam sonst "Durch Frühschicht
+    // ersetzen?" gefragt und Rufbereitschaft eingetragen.
+    const ok=ersetzen?await confirmReplaceShift(name,r.blocking,fromShift)
+                     :await confirmHolidayEntry(name,[[toKey,r]],fromShift);
     if(!ok){ undoStack.pop(); updateUndoBtns(); return; }   // Ausgangstag bleibt
     res=await postSchicht([toKey],'add',fromShift,name,true,ersetzen);
     r=res?.results?.[toKey];
@@ -3392,7 +3627,7 @@ function rangeClass(key){ return RK.zeitraumKlasse(key,rangeStart,previewEnd); }
 // kompletter renderCalendar() bei jeder Mausbewegung tauscht das DOM aus und
 // kann den nächsten Klick verschlucken.
 function updateRangePreview(){
-  document.querySelectorAll('.day-cell').forEach(cell=>{
+  dom.alle(document,'.day-cell').forEach(cell=>{
     if(cell.classList.contains('other'))return;
     cell.classList.remove('in-range','range-start','range-end');
     const rc=rangeClass(cell.dataset.key);
@@ -3403,7 +3638,7 @@ const datesInRange = RK.tageImZeitraum;
 // Vorschau der Strecke, solange Shift gedrückt ist: der Zeiger zeigt, was
 // der nächste Klick fassen würde, ohne dass ein Modus dafür nötig wäre.
 document.addEventListener('mouseover',e=>{
-  const cell=e.target.closest('.day-cell:not(.other)');
+  const cell=dom.naechstes(e,'.day-cell:not(.other)');
   if(e.shiftKey&&letzterKlick&&!frozenRangeEnd){
     if(!cell) return;
     rangeStart=letzterKlick;
@@ -3476,7 +3711,7 @@ function jumpToDate(key){
   updateLabel(); renderCalendar();
   showCalendarView(); closeAllModals();
   setTimeout(()=>{
-    const cell=document.querySelector(`.day-cell[data-key="${key}"]`);
+    const cell=dom.eins(document,`.day-cell[data-key="${key}"]`);
     if(cell){cell.scrollIntoView({behavior:'smooth',block:'center'});
       cell.style.outline='3px solid var(--blue)';
       setTimeout(()=>cell.style.outline='',1800);}
@@ -3507,11 +3742,11 @@ function openDayModal(key){
     const ph=people.length?people.map(name=>{const m=mitarbeiter.find(x=>x.name===name),av=m?m.color:'#64748b';const conf=WORK_SHIFTS.has(s)&&absents.has(name);const avC=m?.icon?`<span style="font-size:12px">${m.icon}</span>`:`<span>${initials(name)}</span>`;return `<div class="dm-chip" style="background:color-mix(in srgb,${color} 15%,transparent);color:${color}${conf?';outline:2px solid #f87171':''}"><div class="dm-av" style="background:${av}">${avC}</div>${esc(name)}${conf?' ⚠':''}</div>`;}).join(''):'<div class="dm-empty">Niemand</div>';
     return `<div class="dm-shift"><div class="dm-shift-hdr"><div class="dm-dot" style="background:${color}"></div><div class="dm-shift-name">${SHIFT_LABEL[s]}</div><div class="dm-meta">${SHIFT_TIME[s]}</div></div><div class="dm-people">${ph}</div></div>`;
   }).join('');
-  document.getElementById('dm-note').value=notizen[key]||'';
+  dom.textfeld('dm-note').value=notizen[key]||'';
   openModal('day-modal');
 }
 async function saveDayNote(){
-  const text=document.getElementById('dm-note').value;
+  const text=dom.textfeld('dm-note').value;
   await api('/api/notiz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:activeDayKey,text})});
   if(text)notizen[activeDayKey]=text;else delete notizen[activeDayKey];
   closeModal('day-modal');renderCalendar();toast('Notiz gespeichert');
@@ -3521,7 +3756,7 @@ async function saveDayNote(){
 // AUTOPLAN
 // ══════════════════════════════════════════════════════════════
 async function applyTemplateDirectly(){
-  const name=document.getElementById('tmpl-name-input')?.value?.trim()||'default';
+  const name=dom.eingabe('tmpl-name-input')?.value?.trim()||'default';
   if(!templates[name]&&!Object.keys(templates).length){
     toast('Bitte zuerst ein Template speichern'); return;
   }
@@ -3562,11 +3797,11 @@ async function applyTemplateDirectly(){
   );
   if(!ok) return;
 
-  const modus=document.querySelector('input[name="_tmpl-modus"]:checked')?.value||'ergaenzen';
-  const vonM=parseInt(document.getElementById('_tmpl-month')?.value||curMonth);
-  const vonJ=parseInt(document.getElementById('_tmpl-year')?.value||curYear);
-  const bisM=parseInt(document.getElementById('_tmpl-month2')?.value||vonM);
-  const bisJ=parseInt(document.getElementById('_tmpl-year2')?.value||vonJ);
+  const modus=/** @type {HTMLInputElement|null} */ (document.querySelector('input[name="_tmpl-modus"]:checked'))?.value||'ergaenzen';
+  const vonM=parseInt(dom.auswahl('_tmpl-month')?.value||String(curMonth));
+  const vonJ=parseInt(dom.auswahl('_tmpl-year')?.value||String(curYear));
+  const bisM=parseInt(dom.auswahl('_tmpl-month2')?.value||String(vonM));
+  const bisJ=parseInt(dom.auswahl('_tmpl-year2')?.value||String(vonJ));
   const selMonth=vonM, selYear=vonJ;
   if(bisJ*12+bisM < vonJ*12+vonM){ toast('„bis" liegt vor „von"'); return; }
 
@@ -3692,15 +3927,15 @@ function cellClass(val){ return TMPL_KLASSE[val]||''; }
 async function loadTemplates(){
   const d=await api('/api/templates');templates=d||{};
   const wrap=document.getElementById('tmpl-saved');
-  const current=document.getElementById('tmpl-name-input').value.trim();
+  const current=dom.eingabe('tmpl-name-input').value.trim();
   wrap.innerHTML=Object.keys(templates).map(n=>`<div style="display:flex;gap:3px;align-items:center">
     <div class="tmpl-saved-btn${n===current?' active':''}" data-tmpl="${n}">${esc(n)}</div>
     <button onclick="deleteTemplate('${n.replace(/'/g,"\\'")}') " style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:#f87171;cursor:pointer;font-size:10px;padding:2px 5px;border-radius:4px;font-weight:600">✕</button>
   </div>`).join('')||'<div style="font-size:11px;color:var(--text3)">Noch keine Templates gespeichert</div>';
-  wrap.querySelectorAll('[data-tmpl]').forEach(btn=>{
+  dom.alle(wrap,'[data-tmpl]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const name=btn.dataset.tmpl;
-      document.getElementById('tmpl-name-input').value=name;
+      dom.eingabe('tmpl-name-input').value=name;
       // Ein Template in den Editor laden
       const tmpl=templates[name]||{};
       tmplData={};
@@ -3713,7 +3948,7 @@ async function loadTemplates(){
 }
 
 async function saveTemplate(){
-  const name=document.getElementById('tmpl-name-input').value.trim();
+  const name=dom.eingabe('tmpl-name-input').value.trim();
   if(!name){toast('Template-Name eingeben');return;}
   // Für JSON brauchen die Wochentage Zeichenketten als Schlüssel
   const payload={};
@@ -3734,7 +3969,7 @@ async function deleteTemplate(name){
 function renderRufSummary(){
   const sumWrap=document.getElementById('ruf-summary');
   if(!sumWrap) return;
-  const jahr=document.getElementById('rufkw-year')?.value||String(curYear);
+  const jahr=dom.auswahl('rufkw-year')?.value||String(curYear);
   const proPerson={};
   Object.entries(schichten).forEach(([key,slot])=>{
     if(!key.startsWith(jahr)) return;
@@ -3750,7 +3985,7 @@ function renderRufSummary(){
 }
 
 function exportRufCSV(){
-  const pre=document.getElementById('rufkw-year')?.value||String(curYear);
+  const pre=dom.auswahl('rufkw-year')?.value||String(curYear);
   const entries=[];
   Object.entries(schichten).forEach(([key,slot])=>{
     if(!key.startsWith(pre))return;
@@ -3912,7 +4147,7 @@ function renderMatrix(){
   document.getElementById('mx-zahl').textContent=
     `${leute.length} Mitarbeiter · ${gesamtArbeit} Arbeitstage · ${gesamtRuf} Tage Rufbereitschaft${zeitraum}`;
 
-  tbl.querySelectorAll('[data-band][data-key]').forEach(el=>{
+  dom.alle(tbl,'[data-band][data-key]').forEach(el=>{
     el.addEventListener('click',ev=>matrixKlick(el.dataset.key,el.dataset.name,el.dataset.band,ev.shiftKey));
   });
   bindeMatrixZiehen(tbl);
@@ -3989,7 +4224,7 @@ async function matrixZiehen(vonKey,nachKey,name,schicht){
 // Die beiden Auswahlfelder im Kopf. Die Wochenliste hängt am Monat und wird
 // deshalb bei jedem Aufbau neu gefüllt.
 function fuelleMatrixWahl(){
-  const zr=document.getElementById('mx-zeitraum');
+  const zr=dom.auswahl('mx-zeitraum');
   if(zr){
     const wochen=RK.monatsRaster(curYear,curMonth).wochen;
     zr.innerHTML='<option value="">Ganzer Monat</option>'+wochen.map((w,i)=>{
@@ -4000,15 +4235,15 @@ function fuelleMatrixWahl(){
     // weniger Wochen, rückt die Wahl auf die letzte.
     if(mxWoche!==null) mxWoche=Math.min(mxWoche,wochen.length-1);
     zr.value=mxWoche===null?'':String(mxWoche);
-    if(!zr._wired){
+    if(!verdrahtet.has(zr)){
       zr.addEventListener('change',()=>{
         mxWoche=zr.value===''?null:parseInt(zr.value,10);
         merkeMatrixWahl(); renderMatrix();
       });
-      zr._wired=true;
+      verdrahtet.add(zr);
     }
   }
-  const so=document.getElementById('mx-sort');
+  const so=dom.auswahl('mx-sort');
   if(so){
     if(!so.options.length){
       so.innerHTML='<option value="">Reihenfolge der Liste</option>'+
@@ -4016,11 +4251,11 @@ function fuelleMatrixWahl(){
         ALL_SHIFTS.map(s=>`<option value="${s}">Meiste ${esc(SHIFT_LABEL[s])}</option>`).join('');
     }
     so.value=mxSortierung;
-    if(!so._wired){
+    if(!verdrahtet.has(so)){
       so.addEventListener('change',()=>{
         mxSortierung=so.value; merkeMatrixWahl(); renderMatrix();
       });
-      so._wired=true;
+      verdrahtet.add(so);
     }
   }
 }
@@ -4039,7 +4274,7 @@ function ladeMatrixWahl(){
     const w=localStorage.getItem('schichtplaner-mx-woche');
     if(w!==null&&w!=='') { const n=parseInt(w,10); if(Number.isInteger(n)&&n>=0) mxWoche=n; }
     const s=localStorage.getItem('schichtplaner-mx-sort');
-    if(s!==null&&(s===''||s==='name'||s==='team'||ALL_SHIFTS.includes(s))) mxSortierung=s;
+    if(s!==null&&(s===''||s==='name'||s==='team'||RK.istSchicht(s))) mxSortierung=s;
   }catch(e){}
 }
 
@@ -4051,7 +4286,7 @@ function zeigeAnker(){
   if(!tbl) return;
   tbl.querySelectorAll('.anker').forEach(el=>el.classList.remove('anker'));
   if(!mxAnker) return;
-  const el=[...tbl.querySelectorAll(`[data-band="${mxAnker.band}"][data-key="${mxAnker.key}"]`)]
+  const el=[...dom.alle(tbl,`[data-band="${mxAnker.band}"][data-key="${mxAnker.key}"]`)]
     .find(e=>e.dataset.name===mxAnker.name);
   if(el) el.classList.add('anker');
 }
@@ -4059,6 +4294,7 @@ function zeigeAnker(){
 // Welche Arbeitsschicht das obere Feld einträgt. Ist gerade Rufbereitschaft
 // gewählt, wäre "die gewählte Schicht" oben sinnlos - dann gilt die zuletzt
 // gewählte Arbeitsschicht.
+/** @type {Schicht} */
 let letzteArbeitsschicht='frueh';
 function arbeitsschichtWahl(){
   return RK.ARBEITSSCHICHTEN.includes(selectedShift)?selectedShift:letzteArbeitsschicht;
@@ -4138,7 +4374,7 @@ function openBulk(mode){
   bulkMode=mode;
   const titel=document.getElementById('bulk-title');
   const hinweis=document.getElementById('bulk-hint');
-  const feld=document.getElementById('bulk-input');
+  const feld=dom.textfeld('bulk-input');
   if(mode==='mitarbeiter'){
     titel.textContent='Mehrere Mitarbeiter anlegen';
     hinweis.innerHTML='Eine Person je Zeile: <b>Name</b> oder <b>Name;DE</b> bzw. <b>Name;IN</b>. '+
@@ -4201,8 +4437,8 @@ function parseBulk(text){
 
 function updateBulkPreview(){
   const el=document.getElementById('bulk-preview');
-  const {gut,fehler}=parseBulk(document.getElementById('bulk-input').value);
-  document.getElementById('bulk-go').disabled=gut.length===0;
+  const {gut,fehler}=parseBulk(dom.textfeld('bulk-input').value);
+  dom.knopf('bulk-go').disabled=gut.length===0;
   if(!gut.length&&!fehler.length){el.innerHTML='<span style="color:var(--text3)">Noch nichts eingetragen.</span>';return;}
   const was=bulkMode==='mitarbeiter'?'Mitarbeiter':'Feiertage';
   let html=`<span style="color:var(--frueh);font-weight:600">${gut.length} ${was}</span> werden angelegt.`;
@@ -4215,9 +4451,9 @@ function updateBulkPreview(){
 }
 
 async function runBulk(){
-  const {gut}=parseBulk(document.getElementById('bulk-input').value);
+  const {gut}=parseBulk(dom.textfeld('bulk-input').value);
   if(!gut.length) return;
-  const btn=document.getElementById('bulk-go');
+  const btn=dom.knopf('bulk-go');
   btn.disabled=true; btn.textContent='Lege an…';
   try{
     if(bulkMode==='mitarbeiter'){
@@ -4258,15 +4494,15 @@ function renderCustomHolidays(){
 }
 
 async function addCustomHoliday(){
-  const date=document.getElementById('hol-date').value;
-  const name=document.getElementById('hol-name').value.trim();
-  const country=document.getElementById('hol-country').value;
+  const date=dom.eingabe('hol-date').value;
+  const name=dom.eingabe('hol-name').value.trim();
+  const country=dom.auswahl('hol-country').value;
   if(!date||!name){toast('Datum und Name ausfüllen');return;}
   await api('/api/custom_holidays',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date,name,country})});
   customHolidays=customHolidays.filter(h=>!(h.date===date&&h.name===name));
   customHolidays.push({date,name,country});
   customHolidays.sort((a,b)=>a.date.localeCompare(b.date));
-  document.getElementById('hol-name').value='';document.getElementById('hol-date').value='';
+  dom.eingabe('hol-name').value='';dom.eingabe('hol-date').value='';
   // Feiertage neu laden, damit der neue dabei ist
   const yr=parseInt(date.slice(0,4));if(!holidays[date])await loadHolidays(yr);else{const h=await api('/api/holidays/'+yr);Object.assign(holidays,h);}
   renderCustomHolidays();renderCalendar();toast('Feiertag hinzugefügt');
@@ -4285,14 +4521,14 @@ async function deleteCustomHoliday(date,name){
 function openIcsModal(){
   document.getElementById('exp-person').innerHTML='<option value="">Alle</option>'+mitarbeiter.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
   const years=new Set(Object.keys(schichten).map(k=>k.slice(0,4)));years.add(String(curYear));
-  document.getElementById('exp-year').innerHTML='<option value="">Alle Jahre</option>'+[...years].sort().map(y=>`<option value="${y}"${y==curYear?' selected':''}>${y}</option>`).join('');
+  document.getElementById('exp-year').innerHTML='<option value="">Alle Jahre</option>'+[...years].sort().map(y=>`<option value="${y}"${Number(y)===curYear?' selected':''}>${y}</option>`).join('');
   document.getElementById('exp-month').innerHTML='<option value="">Alle Monate</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
   document.getElementById('imp-result').className='imp-result';
   openModal('ics-modal');
 }
-function doExport(){const p=document.getElementById('exp-person').value,y=document.getElementById('exp-year').value,m=document.getElementById('exp-month').value;let url='/api/export_ics?x=1';if(p)url+='&person='+encodeURIComponent(p);if(y)url+='&year='+y;if(m)url+='&month='+m;window.location=url;}
+function doExport(){const p=dom.auswahl('exp-person').value,y=dom.auswahl('exp-year').value,m=dom.auswahl('exp-month').value;let url='/api/export_ics?x=1';if(p)url+='&person='+encodeURIComponent(p);if(y)url+='&year='+y;if(m)url+='&month='+m;window.location.href=url;}
 async function doImport(){
-  const input=document.getElementById('ics-file'),resEl=document.getElementById('imp-result');
+  const input=dom.eingabe('ics-file'),resEl=document.getElementById('imp-result');
   if(!input.files.length){resEl.textContent='Datei auswählen.';resEl.className='imp-result err';return;}
   const fd=new FormData();fd.append('file',input.files[0]);
   const d=await fetch('/api/import_ics',{method:'POST',body:fd}).then(r=>r.json());
@@ -4317,8 +4553,23 @@ function showTooltip(cellEl,key){
   const slot=getSlot(key),hol=holidays[key],note=notizen[key],d=new Date(key+'T00:00:00'),tt=document.getElementById('tooltip');
   const{schichtC,holC}=getConflicts(slot,key);
   const row=(lbl,ppl,clr)=>ppl?.length?`<div class="tt-row"><span class="tt-lbl" style="color:${clr}">${lbl}</span><span class="tt-names">${ppl.map(esc).join(', ')}</span></div>`:'';
-  const siRows=['frueh','spaet','rufbereitschaft'].map(s=>{const ist=(slot[s]||[]).length,tgt=soll[s]||1;const cls=ist===0?'tt-si-low':ist<tgt?'tt-si-low':ist===tgt?'tt-si-ok':'tt-si-over';return `<span class="${cls}">${SHIFT_SHORT[s][0]}: ${ist}/${tgt}</span>`;}).join(' · ');
-  tt.innerHTML=`<div class="tt-date">${d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${hol?'<br>'+(hol.bridge?'🌉 Brückentag':hol.custom?'★ '+hol.name:'🎉 '+hol.name):''}</div>`+row('Früh',slot.frueh,'var(--frueh)')+row('Spät',slot.spaet,'var(--spaet)')+row('Ruf',slot.rufbereitschaft,'var(--ruf)')+row('Urlaub',slot.urlaub,'var(--urlaub)')+row('Krank',slot.krank,'var(--krank)')+row('Elternz.',slot.elternzeit,'var(--eltern)')+row('Sonder.',slot.sonderurlaub,'var(--sonder)')+(schichtC.length?`<div class="tt-warn">⚠ ${schichtC.map(esc).join(', ')}</div>`:''  )+(holC.length?`<div class="tt-hol-warn">${holidays[key]?.country==='DE'?'🇩🇪':'🇮🇳'} Feiertag, eingeteilt: ${holC.map(esc).join(', ')}</div>`:'')+(isUnderstaffed(slot,key)?'<div class="tt-under">⚠ Unterbesetzt</div>':'')+(note?`<div class="tt-note">📝 ${esc(note)}</div>`:'')+`<div class="tt-soll">${siRows}</div>`;
+  // Besetzung je Schicht nach denselben Regeln wie ueberall: das Soll kommt
+  // aus RK.sollAmTag. Vorher stand hier soll[s]||1 - ein ausdrueckliches Soll
+  // von 0 wurde zur 1, und am Samstag stand rot "F: 0/1", waehrend der
+  // Kalender den Tag als besetzt zeigte. Eine Schicht ohne Soll und ohne
+  // Eintrag hat nichts zu sagen und bleibt weg.
+  const siRows=ALL_SHIFTS.map(s=>{
+    const ist=(slot[s]||[]).length,tgt=sollFor(s,key);
+    if(!tgt&&!ist) return '';
+    const cls=ist<tgt?'tt-si-low':ist===tgt?'tt-si-ok':'tt-si-over';
+    return `<span class="${cls}">${SHIFT_SHORT[s][0]}: ${ist}/${tgt}</span>`;
+  }).filter(Boolean).join(' · ');
+  // Wer an dem Tag wo steht - alle vier Schichten, in der Reihenfolge des
+  // Kalenders. Vorher fehlte der Normaldienst, dafuer standen Urlaub, Krank,
+  // Elternzeit und Sonderurlaub noch drin, die es in diesem Zweig nicht gibt.
+  const TT_KURZ={frueh:'Früh',normal:'Normal',spaet:'Spät',rufbereitschaft:'Ruf'};
+  const wer=ALL_SHIFTS.map(s=>row(TT_KURZ[s],slot[s],SHIFT_SHORT[s][1])).join('');
+  tt.innerHTML=`<div class="tt-date">${d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${hol?'<br>'+(hol.bridge?'🌉 Brückentag':hol.custom?'★ '+hol.name:'🎉 '+hol.name):''}</div>`+wer+(schichtC.length?`<div class="tt-warn">⚠ ${schichtC.map(esc).join(', ')}</div>`:''  )+(holC.length?`<div class="tt-hol-warn">${holidays[key]?.country==='DE'?'🇩🇪':'🇮🇳'} Feiertag, eingeteilt: ${holC.map(esc).join(', ')}</div>`:'')+(isUnderstaffed(slot,key)?'<div class="tt-under">⚠ Unterbesetzt</div>':'')+(note?`<div class="tt-note">📝 ${esc(note)}</div>`:'')+`<div class="tt-soll">${siRows}</div>`;
   tt.classList.add('show');
   platziere(tt,cellEl);
 }
@@ -4347,10 +4598,10 @@ function confirmDialog(title,html,yesLabel='Ja'){
     // Aufrufer lesen ihre eigenen Eingabefelder aus dem Dialog aus, nachdem das
     // Versprechen erfüllt ist. Wird sofort entfernt, sind die Felder weg und
     // die Auswahl fällt stillschweigend auf die Vorgabe zurück.
-    dlg.querySelector('#_cdlg-yes').onclick=()=>{
+    dom.eins(dlg,'#_cdlg-yes').onclick=()=>{
       dlg.style.display='none'; resolve(true); setTimeout(()=>dlg.remove(),0);
     };
-    dlg.querySelector('#_cdlg-no').onclick=()=>{dlg.remove();resolve(false);};
+    dom.eins(dlg,'#_cdlg-no').onclick=()=>{dlg.remove();resolve(false);};
     dlg.addEventListener('click',e=>{if(e.target===dlg){dlg.remove();resolve(false);}});
   });
 }
@@ -4360,7 +4611,7 @@ function confirmDialog(title,html,yesLabel='Ja'){
 // ══════════════════════════════════════════════════════════════
 function doExportData(){
   // Die vollständige Sicherung direkt herunterladen
-  window.location = '/api/export_data';
+  window.location.href = '/api/export_data';
   toast('Backup wird heruntergeladen…');
 }
 
@@ -4379,8 +4630,8 @@ let zoomStufe=1;
 
 function setZoom(stufe){
   zoomStufe=Math.max(0,Math.min(ZOOM_STUFEN.length-1,stufe));
-  document.body.style.zoom=ZOOM_STUFEN[zoomStufe];
-  try{ localStorage.setItem('schichtplaner-zoom',zoomStufe); }catch(e){}
+  document.body.style.zoom=String(ZOOM_STUFEN[zoomStufe]);
+  try{ localStorage.setItem('schichtplaner-zoom',String(zoomStufe)); }catch(e){}
   const proz=Math.round(ZOOM_STUFEN[zoomStufe]*100);
   document.getElementById('btn-zoom-in')?.toggleAttribute('disabled',zoomStufe===ZOOM_STUFEN.length-1);
   document.getElementById('btn-zoom-out')?.toggleAttribute('disabled',zoomStufe===0);
@@ -4416,7 +4667,7 @@ function ladeZoom(){
 
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
 function exportAllData(){
-  window.location = '/api/export_data';
+  window.location.href = '/api/export_data';
   toast('Export wird heruntergeladen…');
 }
 
@@ -4431,18 +4682,18 @@ async function handleBackupImport(input){
     const d=await fetch('/api/import_data',{method:'POST',body:fd}).then(r=>r.json());
     if(d.error) toast('✗ Import fehlgeschlagen: '+d.error);
     else{ toast(`✓ ${d.mitarbeiter} Mitarbeiter, ${d.tage||0} Tage importiert`); await refreshData(); await loadHolidays(curYear); }
-  }catch(e){ toast('✗ Fehler: '+e.message); }
+  }catch(e){ toast('✗ Fehler: '+(e instanceof Error ? e.message : String(e))); }
 }
 
 function openImportModal(){
   document.getElementById('import-result').style.display='none';
   document.getElementById('import-drop-label').textContent='📄 .json Datei hier ablegen oder klicken';
-  document.getElementById('import-file').value='';
+  dom.eingabe('import-file').value='';
   openModal('data-import-modal');
 }
 
 async function doImportData(){
-  const input=document.getElementById('import-file');
+  const input=dom.eingabe('import-file');
   const resEl=document.getElementById('import-result');
   if(!input.files.length){
     resEl.style.cssText='display:block;background:rgba(248,113,113,.1);color:#f87171';
@@ -4470,7 +4721,7 @@ async function doImportData(){
 
 function closeModal(id){
   const el=document.getElementById(id);
-  const box=el?.querySelector('.modal-box');
+  const box=/** @type {HTMLElement|null|undefined} */ (el?.querySelector('.modal-box'));
   if(box){box.style.animation='scaleIn .18s ease reverse';
     setTimeout(()=>{el.classList.add('hidden');box.style.animation='';},160);}
   else el?.classList.add('hidden');
@@ -4479,7 +4730,7 @@ function closeAllModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.cl
 function openModal(id){
   const el=document.getElementById(id);
   el.classList.remove('hidden');
-  const box=el?.querySelector('.modal-box');
+  const box=dom.eins(el,'.modal-box');
   if(box){box.style.animation='none';void box.offsetWidth;box.style.animation='scaleIn .18s cubic-bezier(.34,1.2,.64,1)';}
 }
 

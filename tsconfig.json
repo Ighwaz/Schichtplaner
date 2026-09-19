@@ -1,0 +1,40 @@
+// Typpruefung der ganzen Oberflaeche - beide <script>-Bloecke aus
+// frontend/index.html, herausgeschnitten von tests/typpruefung.mjs.
+//
+// Der Regelkern ist mit dabei, weil die Oberflaeche ihn aufruft: seine Typen
+// sollen bis in jeden Aufruf durchgreifen. Streng geprueft wird er zusaetzlich
+// fuer sich allein, siehe tsconfig.regelkern.json.
+//
+// Fuer die Oberflaeche gilt alles aus "strict" bis auf zwei Schalter:
+//
+//   noImplicitAny     verlangt einen Typ an jedem Parameter (+517 Stellen)
+//   strictNullChecks  verlangt eine Pruefung nach jedem getElementById (+325)
+//
+// Beide lohnen sich, aber nicht in einem Zug: das waere ein Umbau fast jeder
+// Zeile einer Oberflaeche, die funktioniert. Sie sind der naechste Schritt,
+// Funktion fuer Funktion. Alles andere aus "strict" ist unten einzeln an.
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "skipLibCheck": true,
+
+    "strict": false,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictBuiltinIteratorReturn": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "files": ["tests/.typen/regelkern.js", "tests/.typen/oberflaeche.js"]
+}

@@ -348,6 +348,26 @@ describe('Ziehen auf einen belegten Tag', () => {
     zielZelle.dispatchEvent(drop);
   }
 
+  test('die Rückfrage nennt die gezogene Schicht, nicht die gewählte', async () => {
+    // Gefunden bei der Typisierung: handleDrop rief die Rückfrage ohne
+    // Schicht auf, und die fiel auf die aus der Leiste zurück.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.waehleSchicht('normal');   // etwas anderes als die gezogene Frühschicht
+
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await warteBis(() => o.$('#_cdlg'), 'die Rückfrage');
+    const text = o.$('#_cdlg').textContent;
+    assert.match(text, /Durch Frühschicht ersetzen/, text);
+    assert.doesNotMatch(text, /Normaldienst/, 'die Rückfrage nennt die Schicht aus der Leiste');
+  });
+
   test('ein Chip geht beim Ziehen in einen Konflikt nicht verloren', async () => {
     // Bauer hat am 3.9. Früh und am 10.9. bereits Spät. Wird die Frühschicht
     // auf den 10. gezogen, stünde er in zwei Arbeitsschichten - dieselbe
