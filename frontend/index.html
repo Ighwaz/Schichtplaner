@@ -1212,27 +1212,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   </div>
 </div>
 
-<div class="modal-bg hidden" id="data-import-modal">
-  <div class="modal-box" style="width:420px">
-    <div class="modal-hdr">
-      <div class="modal-title">📂 Daten importieren</div>
-      <button class="modal-close" onclick="closeModal('data-import-modal')">✕</button>
-    </div>
-    <div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-radius:9px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:#f87171;line-height:1.6">
-      ⚠ <strong>Achtung:</strong> Der Import überschreibt alle aktuellen Daten vollständig. Vorher mit <strong>💾 Export</strong> ein Backup erstellen!
-    </div>
-    <div class="drop-zone" id="import-drop-zone" style="margin-bottom:10px">
-      <input type="file" id="import-file" accept=".json">
-      <span id="import-drop-label">📄 .json Datei hier ablegen oder klicken</span>
-    </div>
-    <div id="import-result" style="display:none;padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:10px"></div>
-    <div class="modal-footer">
-      <button class="btn-p" onclick="doImportData()" style="flex:1;background:var(--orange)">↑ Importieren &amp; Wiederherstellen</button>
-      <button class="btn-s" onclick="closeModal('data-import-modal')">Abbrechen</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-bg hidden" id="restore-modal">
   <div class="modal-box" style="width:370px">
     <div class="modal-hdr"><div class="modal-title">↩ Wiederherstellen</div><button class="modal-close" onclick="cancelRestore()">✕</button></div>
@@ -1845,7 +1824,6 @@ const SHIFT_TIME  = {frueh:'06:00–14:00',normal:'Gleitzeit',spaet:'14:00–22:
 const SHIFT_CSS   = {frueh:'frueh',normal:'normal',spaet:'spaet',rufbereitschaft:'ruf'};
 const SHIFT_VAR   = {frueh:'--frueh',normal:'--normal',spaet:'--spaet',rufbereitschaft:'--ruf'};
 const SHIFT_SHORT = {frueh:['F','var(--frueh)'],normal:['N','var(--normal)'],spaet:['S','var(--spaet)'],rufbereitschaft:['R','var(--ruf)']};
-const DOW_NAMES   = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 const MONTHS      = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const MONTH_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const AVATAR_COLORS = ['#4a9eff','#ff7043','#22c55e','#f59e0b','#a78bfa','#f472b6','#34d399','#fb923c','#60a5fa','#e879f9','#4ade80','#facc15','#f87171','#38bdf8','#a3e635'];
@@ -1982,14 +1960,15 @@ async function syncRufKWFromCalendar(){
 }
 
 function showKwRufDialog(kw, weekDates){
-  // Build person picker popover
-  const existing = new Set();
-  weekDates.forEach(d=>{ const s=schichten[d]; if(s)(s.rufbereitschaft||[]).forEach(n=>existing.add(n)); });
-  const items = mitarbeiter.map(m=>{
-    const sel = [...existing].some(n=>n===m.name);
+  // Der Dialog bearbeitet den KW-Plan (setzeKwPersonen), also zeigt das
+  // Haekchen auch den Plan. Vorher kam es aus dem Kalender - das aendert
+  // sich beim Klicken nicht, und der Dialog blieb stumm.
+  const kwKey = kwSchluessel(new Date(weekDates[0]+'T00:00:00'));
+  const items = () => mitarbeiter.map(m=>{
+    const sel = kwNamen(kwKey).includes(m.name);
     const av = m.icon?`<span style="font-size:14px">${m.icon}</span>`
       :`<span style="font-size:10px;font-weight:700;color:#fff">${initials(m.name)}</span>`;
-    return `<div onclick="toggleKwPerson('${m.name.replace(/'/g,"\\'")}',${JSON.stringify(weekDates)})"
+    return `<div class="kw-ruf-person" data-name="${esc(m.name)}"
       style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;
       background:${sel?'rgba(167,139,250,.15)':'var(--surface2)'};margin-bottom:3px;
       border:1px solid ${sel?'var(--ruf)':'var(--border)'}">
@@ -1998,14 +1977,33 @@ function showKwRufDialog(kw, weekDates){
       ${sel?'<span style="margin-left:auto;color:var(--ruf);font-size:12px">✓</span>':''}
     </div>`;
   }).join('');
-  confirmDialog(`KW ${kw} – Rufbereitschaft`,
-    `<div style="max-height:300px;overflow-y:auto">${items||'<p style="color:var(--text3)">Keine Mitarbeiter</p>'}</div>
+  const leer = '<p style="color:var(--text3)">Keine Mitarbeiter</p>';
+  const fertig = confirmDialog(`KW ${kw} – Rufbereitschaft`,
+    `<div class="kw-ruf-liste" style="max-height:300px;overflow-y:auto">${items()||leer}</div>
      <p style="font-size:11px;color:var(--text3);margin-top:8px">Klick wechselt Zuweisung</p>`,
     'Fertig'
-  ).then(()=>{ renderRufKWTable(); });
+  );
+  const liste = dom.eins(document, '#_cdlg .kw-ruf-liste');
+  if(liste) liste.addEventListener('click', async ev=>{
+    const el = dom.naechstes(ev, '.kw-ruf-person');
+    if(!el) return;
+    await toggleKwPersonKey(kwKey, el.dataset.name);
+    liste.innerHTML = items()||leer;
+  });
+  return fertig.then(()=>{ renderRufKWTable(); });
 }
 // Namen einer Kalenderwoche - der Plan hält entweder einen Namen oder eine
 // Liste, beides kommt vor.
+// Ein CSV-Feld nach RFC 4180: in Anführungszeichen, und darin werden
+// Anführungszeichen verdoppelt. Ohne das zerschneidet jedes Tabellenprogramm
+// die Zeile an einem Namen wie  Max "Mo" Muster.
+/**
+ * Ein CSV-Feld nach RFC 4180.
+ * @param {unknown} w
+ * @returns {string}
+ */
+function csvFeld(w){ return '"' + String(w == null ? '' : w).replace(/"/g, '""') + '"'; }
+
 function kwNamen(kwKey){
   const roh=rufKW[kwKey];
   return roh?(Array.isArray(roh)?[...roh]:[roh]):[];
@@ -2085,7 +2083,7 @@ function renderRufKWTable(){
       const m=mitarbeiter.find(x=>x.name===name);
       const chip=document.createElement('span'); chip.className='rufkw-person-chip';
       const av=`<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'11px':'8px'};color:#fff;font-weight:700;flex-shrink:0">${m?.icon||initials(name)}</span>`;
-      chip.innerHTML=`${av}<span>${esc(name)}</span><span data-rm-kw="${w.kwKey}" data-rm-name="${name}" style="margin-left:3px;cursor:pointer;opacity:.6;font-size:10px;padding:0 2px">✕</span>`;
+      chip.innerHTML=`${av}<span>${esc(name)}</span><span data-rm-kw="${w.kwKey}" data-rm-name="${esc(name)}" style="margin-left:3px;cursor:pointer;opacity:.6;font-size:10px;padding:0 2px">✕</span>`;
       cell.appendChild(chip);
     });
     const addBtn=document.createElement('span'); addBtn.className='rufkw-add'; addBtn.textContent='＋'; addBtn.title='Person hinzufügen';
@@ -2222,7 +2220,15 @@ function renderReihumVorschau(){
   const {plan,uebersprungen,leute}=reihumPlan();
   dom.knopf('reihum-go').disabled=!plan.length;
   if(!leute.length){ el.innerHTML='<span style="color:var(--krank)">Niemand ausgewählt.</span>'; return; }
-  if(!plan.length){ el.innerHTML='<span style="color:var(--krank)">Keine Woche zu füllen – alle sind schon vergeben.</span>'; return; }
+  // Ohne Plan und ohne uebersprungene Wochen liegt kein Zeitraum vor - das
+  // ist etwas anderes als "alles schon vergeben", und genau so stand es
+  // vorher da, wenn jemand "von" hinter "bis" gewaehlt hatte.
+  if(!plan.length){
+    el.innerHTML=uebersprungen.length
+      ? '<span style="color:var(--krank)">Keine Woche zu füllen – alle sind schon vergeben.</span>'
+      : '<span style="color:var(--krank)">Kein Zeitraum – „von“ liegt hinter „bis“.</span>';
+    return;
+  }
   const beispiel=plan.slice(0,4).map(p=>`KW ${p.kw} ${esc(p.name)}`).join(' · ');
   el.innerHTML=`<b style="color:var(--frueh)">${plan.length} Wochen</b> werden verteilt: ${beispiel}${plan.length>4?' …':''}`+
     (uebersprungen.length?`<br><span style="color:var(--spaet)">${uebersprungen.length} bereits vergebene Woche(n) bleiben unberührt.</span>`:'');
@@ -2360,7 +2366,7 @@ function openRufKWPicker(kwKey,anchor){
   }
   const rawKW2=rufKW[kwKey]; const current=new Set(rawKW2?(Array.isArray(rawKW2)?rawKW2:[rawKW2]):[]);
   picker.innerHTML=`<div style="padding:6px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);font-family:'JetBrains Mono',monospace">Person wählen</div>`+
-    (mitarbeiter.map(m=>`<div class="rufkw-picker-item${current.has(m.name)?' selected':''}" data-pname="${m.name}">
+    (mitarbeiter.map(m=>`<div class="rufkw-picker-item${current.has(m.name)?' selected':''}" data-pname="${esc(m.name)}">
       <div class="avatar" style="background:${m.color};width:24px;height:24px;font-size:${m.icon?'14px':'9px'};flex-shrink:0">${m.icon||initials(m.name)}</div>
       <span>${esc(m.name)}</span>${current.has(m.name)?'<span style="margin-left:auto;color:var(--ruf)">✓</span>':''}
     </div>`).join('')||'<div style="padding:10px;color:var(--text3);font-size:12px">Keine Mitarbeiter</div>');
@@ -2419,9 +2425,11 @@ function exportRufKWCSV(){
   const weeks=getISOWeeks(year);
   let csv='KW,Von,Bis,Person\n';
   weeks.forEach(w=>{
-    const names=rufKW[w.kwKey]||[];
+    // kwNamen statt rufKW[...]: eine Woche im alten Format haelt einen
+    // einzelnen Namen als Zeichenkette, und darauf gibt es kein forEach.
+    const names=kwNamen(w.kwKey);
     if(!names.length) csv+=`KW ${w.kw},${fmtDate(w.start)},${fmtDate(w.end)},\n`;
-    else names.forEach(n=>{csv+=`KW ${w.kw},${fmtDate(w.start)},${fmtDate(w.end)},"${n}"\n`;});
+    else names.forEach(n=>{csv+=`KW ${w.kw},${fmtDate(w.start)},${fmtDate(w.end)},${csvFeld(n)}\n`;});
   });
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
@@ -2652,22 +2660,6 @@ function bindEvents(){
   });
   document.addEventListener('dragend',e=>{const chip=dom.naechstes(e,'.chip');if(chip)chip.style.opacity='';dragState=null;});
 
-  // Import data drop zone
-  const izone=document.getElementById('import-drop-zone');
-  if(izone){
-    izone.addEventListener('dragover',e=>{e.preventDefault();izone.classList.add('drag-over');});
-    izone.addEventListener('dragleave',()=>izone.classList.remove('drag-over'));
-    izone.addEventListener('drop',e=>{
-      e.preventDefault();izone.classList.remove('drag-over');
-      const file=e.dataTransfer.files[0];
-      if(file){try{const dt=new DataTransfer();dt.items.add(file);dom.eingabe('import-file').files=dt.files;}catch(err){}
-      document.getElementById('import-drop-label').textContent='📄 '+file.name;}
-    });
-    document.getElementById('import-file').addEventListener('change',e=>{
-      const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files[0]) document.getElementById('import-drop-label').textContent='📄 '+inp.files[0].name;
-    });
-  }
-
   const zone=document.getElementById('drop-zone');
   zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
   zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
@@ -2804,7 +2796,23 @@ async function refreshData(){
 function pushUndo(){
   undoStack.push(JSON.parse(JSON.stringify(schichten)));
   if(undoStack.length>50) undoStack.shift();
+  verworfenesRedo=redoStack;
   redoStack=[];
+  updateUndoBtns();
+}
+
+// Der Wiederholen-Stapel, den das letzte pushUndo() geleert hat.
+/** @type {any[]} */
+let verworfenesRedo=[];
+
+// Einen Rückgängig-Schritt zurücknehmen, weil die Aktion doch nicht
+// stattgefunden hat - abgebrochene Rückfrage, abgelehnter Eintrag. Dabei
+// kommt auch der Wiederholen-Stapel zurück: pushUndo() hatte ihn geleert,
+// und ohne das war Wiederholen nach einem Abbruch verloren, obwohl sich
+// nichts geändert hatte.
+function verwerfeUndo(){
+  undoStack.pop();
+  redoStack=verworfenesRedo;
   updateUndoBtns();
 }
 function updateUndoBtns(){
@@ -2820,7 +2828,7 @@ async function doRedo(){if(!redoStack.length)return;undoStack.push(JSON.parse(JS
 // ══════════════════════════════════════════════════════════════
 function showColorPicker(anchor,memberName){
   const pop=document.getElementById('cpop');
-  pop.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch" style="background:${c}" data-c="${c}" data-m="${memberName||''}"></div>`).join('');
+  pop.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch" style="background:${c}" data-c="${c}" data-m="${esc(memberName||'')}"></div>`).join('');
   pop.classList.remove('hidden');
   const r=anchor.getBoundingClientRect();
   pop.style.left=Math.min(r.left,window.innerWidth-190)+'px';
@@ -2855,19 +2863,19 @@ function renderMembers(){
   const visible=visibleMembers();
   document.getElementById('member-list').innerHTML=visible.map(m=>{
     const sel=selectedPerson?.name===m.name,picked=selectedPersons.has(m.name);
-    return `<div class="member-item${sel?' selected':''}${picked?' multi-picked':''}" data-member="${m.name}" style="${sel?`border-color:${m.color};color:${m.color}`:''}">
-      <input type="checkbox" class="member-cb" data-cb="${m.name}" ${picked?'checked':''}>
+    return `<div class="member-item${sel?' selected':''}${picked?' multi-picked':''}" data-member="${esc(m.name)}" style="${sel?`border-color:${m.color};color:${m.color}`:''}">
+      <input type="checkbox" class="member-cb" data-cb="${esc(m.name)}" ${picked?'checked':''}>
       <div class="avatar" style="background:${m.color}">${avContent(m)}</div>
       <span class="member-name">${esc(m.name)}</span>
       <span class="badge badge-${m.team.toLowerCase()}">${m.team}</span>
       <div class="member-btns">
-        <button class="mbtn mbtn-edit" data-edit="${m.name}">✎</button>
-        <button class="mbtn mbtn-del" data-del="${m.name}">✕</button>
+        <button class="mbtn mbtn-edit" data-edit="${esc(m.name)}">✎</button>
+        <button class="mbtn mbtn-del" data-del="${esc(m.name)}">✕</button>
       </div>
-      <div class="member-confirm" data-cfor="${m.name}">
+      <div class="member-confirm" data-cfor="${esc(m.name)}">
         <span style="font-size:10px;color:var(--text2)">Löschen?</span>
-        <button class="cfbtn cfbtn-yes" data-cdel="${m.name}">Ja</button>
-        <button class="cfbtn cfbtn-no" data-cno="${m.name}">Nein</button>
+        <button class="cfbtn cfbtn-yes" data-cdel="${esc(m.name)}">Ja</button>
+        <button class="cfbtn cfbtn-no" data-cno="${esc(m.name)}">Nein</button>
       </div>
     </div>`;
   }).join('');
@@ -2884,15 +2892,15 @@ async function handleMemberClick(e){
   const cno=e.target.closest('[data-cno]');
   if(cno){
     e.stopPropagation();
-    const conf=document.querySelector(`[data-cfor="${cno.dataset.cno}"]`);
+    const conf=document.querySelector(`[data-cfor="${esc(cno.dataset.cno)}"]`);
     const btns=/** @type {HTMLElement} */ (conf?.previousElementSibling);
     if(conf)conf.classList.remove('show');if(btns)btns.style.display='';return;
   }
   const del=e.target.closest('[data-del]');
   if(del){
     e.stopPropagation();const name=del.dataset.del;
-    const btns=dom.eins(document,`.member-item[data-member="${name}"] .member-btns`);
-    const conf=document.querySelector(`[data-cfor="${name}"]`);
+    const btns=dom.eins(document,`.member-item[data-member="${esc(name)}"] .member-btns`);
+    const conf=document.querySelector(`[data-cfor="${esc(name)}"]`);
     if(btns)btns.style.display='none';if(conf)conf.classList.add('show');return;
   }
   const edit=e.target.closest('[data-edit]');
@@ -2940,7 +2948,7 @@ function updateSelInfo(){
       dates.forEach(d=>{ALL_SHIFTS.forEach(sh=>(getSlot(d)[sh]||[]).forEach(n=>allNames.add(n)));});
       const personBtns=[...allNames].map(n=>{
         const m=mitarbeiter.find(x=>x.name===n);
-        return `<button onclick="clearRangePerson('${n.replace(/'/g,"\'")}')" style="padding:3px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--surface3);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;border-left:3px solid ${m?m.color:'#64748b'}">${m?.icon?m.icon+' ':''}${esc(n)}</button>`;
+        return `<button data-rp="${esc(n)}" style="padding:3px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--surface3);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;border-left:3px solid ${m?m.color:'#64748b'}">${m?.icon?m.icon+' ':''}${esc(n)}</button>`;
       }).join('');
       const shiftBtns=ALL_SHIFTS.map(sh=>
         `<button onclick="clearRangeShift('${sh}')" style="padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:10px;font-weight:700;cursor:pointer">${SHIFT_SHORT[sh][0]} ${SHIFT_LABEL[sh]}</button>`
@@ -2950,6 +2958,9 @@ function updateSelInfo(){
         <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${shiftBtns}</div>
         ${allNames.size?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${personBtns}</div>`:''}
         <button onclick="clearSelection()" style="width:100%;padding:3px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text3);font-size:10px;cursor:pointer">← Abbrechen</button>`;
+      // Der Name steht in einem data-Attribut statt in einem onclick:
+      // ein Apostroph (D'Souza) hatte den Aufruf zerbrochen.
+      dom.alle(el,'[data-rp]').forEach(b=>b.addEventListener('click',()=>clearRangePerson(b.dataset.rp)));
       setHint('Nur löschen – zum Eintragen erst einen Mitarbeiter wählen');
       return;
     }
@@ -2988,6 +2999,10 @@ async function deleteMitarbeiter(name){
     if(selectedPerson?.name===name){selectedPerson=null;updateSelInfo();}
     selectedPersons.delete(name);
     for(const k in schichten)for(const s in schichten[k]){const a=schichten[k][s];const i=a.indexOf(name);if(i!==-1)a.splice(i,1);}
+    // Wie beim Umbenennen: der Rueckgaengig-Stapel und ein kopierter Tag
+    // tragen den Namen noch. Ein Schritt zurueck holte sonst Chips einer
+    // Person zurueck, die es nicht mehr gibt.
+    copiedDay=null; undoStack=[]; redoStack=[]; updateUndoBtns();
     renderMembers();renderCalendar();renderTemplateTable();toast(name+' entfernt');
   }catch(err){toast('Fehler: '+(err instanceof Error?err.message:String(err)));}
 }
@@ -3047,11 +3062,15 @@ function renderStats(){
   const pre=curYear+'-'+String(curMonth).padStart(2,'0');
   Object.entries(schichten).forEach(([k,slot])=>{if(!k.startsWith(pre))return;ALL_SHIFTS.forEach(s=>(slot[s]||[]).forEach(n=>{if(counts[n])counts[n][s]++;}));});
   const mx=Math.max(1,...Object.values(counts).flatMap(c=>Object.values(c)));
-  const bclr={frueh:'var(--frueh)',spaet:'var(--spaet)',rufbereitschaft:'var(--ruf)',urlaub:'var(--urlaub)',krank:'var(--krank)',elternzeit:'var(--eltern)',sonderurlaub:'var(--sonder)'};
-  const slbl={frueh:'Früh',spaet:'Spät',rufbereitschaft:'Ruf',urlaub:'Url',krank:'Krank',elternzeit:'Eltern',sonderurlaub:'Sonder'};
+  // Kürzel und Farbe je Schicht. Vorher fehlte hier der Normaldienst,
+  // obwohl die Zeilen aus ALL_SHIFTS kommen: seine Zeile zeigte den Text
+  // "undefined" und einen unsichtbaren Balken. Dafür standen vier
+  // Schichtarten darin, die es in diesem Zweig nicht mehr gibt. Die Farbe
+  // kommt jetzt aus SHIFT_SHORT, damit es bei einer Liste bleibt.
+  const slbl={frueh:'Früh',normal:'Normal',spaet:'Spät',rufbereitschaft:'Ruf'};
   wrap.innerHTML=mitarbeiter.map(m=>{
     const c=counts[m.name]||{},total=Object.values(c).reduce((a,b)=>a+b,0);
-    const bars=ALL_SHIFTS.map(s=>`<div class="stat-bar-row"><div class="stat-bar-label">${slbl[s]}</div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(c[s]||0)/mx*100}%;background:${bclr[s]}"></div></div><div class="stat-bar-count">${c[s]||0}</div></div>`).join('');
+    const bars=ALL_SHIFTS.map(s=>`<div class="stat-bar-row"><div class="stat-bar-label">${slbl[s]}</div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(c[s]||0)/mx*100}%;background:${SHIFT_SHORT[s][1]}"></div></div><div class="stat-bar-count">${c[s]||0}</div></div>`).join('');
     return `<div class="stat-row"><div class="stat-name"><div class="avatar" style="background:${m.color};width:22px;height:22px;font-size:${m.icon?'13px':'9px'};flex-shrink:0">${m.icon||initials(m.name)}</div>${esc(m.name)}<span style="color:var(--text3);font-size:11px;margin-left:auto">${total}</span></div><div>${bars}</div></div>`;
   }).join('')||'<div style="padding:14px;color:var(--text3)">Keine Mitarbeiter</div>';
 }
@@ -3130,7 +3149,6 @@ async function saveProfile(){
 // ══════════════════════════════════════════════════════════════
 const dk       = RK.tagKey;
 const isoWeek  = RK.isoWoche;
-const getISOWeek = RK.isoWoche;
 
 // Schichtwahl an einer Stelle - Maus, Tastatur und Kürzel laufen hier zusammen.
 function waehleSchicht(shift){
@@ -3548,12 +3566,12 @@ async function handleDrop(toKey){
     // ersetzen?" gefragt und Rufbereitschaft eingetragen.
     const ok=ersetzen?await confirmReplaceShift(name,r.blocking,fromShift)
                      :await confirmHolidayEntry(name,[[toKey,r]],fromShift);
-    if(!ok){ undoStack.pop(); updateUndoBtns(); return; }   // Ausgangstag bleibt
+    if(!ok){ verwerfeUndo(); return; }   // Ausgangstag bleibt
     res=await postSchicht([toKey],'add',fromShift,name,true,ersetzen);
     r=res?.results?.[toKey];
     showHolWarnings(res.hol_warnings);
   }
-  if(r?.error){ undoStack.pop(); updateUndoBtns(); toast('Verschieben nicht möglich'); return; }
+  if(r?.error){ verwerfeUndo(); toast('Verschieben nicht möglich'); return; }
 
   applyResults(res.results);
   await applySchicht([fromKey],'remove',fromShift,name);
@@ -3818,7 +3836,18 @@ async function applyTemplateDirectly(){
     (r.unbekannt||[]).forEach(n=>d.unbekannt.add(n));
   }
   const monate=bisJ*12+bisM-(vonJ*12+vonM)+1;
-  if(d.error) toast('Fehler: '+d.error);
+  if(d.error){
+    // Was vor dem Abbruch geschrieben wurde, steht schon in der Datenbank.
+    // Ohne Neuladen bliebe es unsichtbar, bis jemand das Fenster neu öffnet -
+    // und der nächste Versuch liefe auf einen Plan, den man nicht sieht.
+    if(d.planned||d.ersetzt){
+      await reloadSchichten();
+      curYear=selYear; curMonth=selMonth;
+      updateLabel(); renderCalendar(); showCalendarView();
+      toast(`Abgebrochen: ${d.error} – die ${d.planned} Einträge davor stehen schon im Kalender`);
+    }
+    else toast('Fehler: '+d.error);
+  }
   else{
     await reloadSchichten();
     // Zum angewendeten Monat springen
@@ -3930,8 +3959,12 @@ async function loadTemplates(){
   const current=dom.eingabe('tmpl-name-input').value.trim();
   wrap.innerHTML=Object.keys(templates).map(n=>`<div style="display:flex;gap:3px;align-items:center">
     <div class="tmpl-saved-btn${n===current?' active':''}" data-tmpl="${n}">${esc(n)}</div>
-    <button onclick="deleteTemplate('${n.replace(/'/g,"\\'")}') " style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:#f87171;cursor:pointer;font-size:10px;padding:2px 5px;border-radius:4px;font-weight:600">✕</button>
+    <button data-tmpl-del="${esc(n)}" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:#f87171;cursor:pointer;font-size:10px;padding:2px 5px;border-radius:4px;font-weight:600">✕</button>
   </div>`).join('')||'<div style="font-size:11px;color:var(--text3)">Noch keine Templates gespeichert</div>';
+  // Der Name steht im data-Attribut, nicht in einem onclick - ein
+  // Anfuehrungszeichen im Namen hatte das Attribut beendet.
+  dom.alle(wrap,'[data-tmpl-del]').forEach(b=>
+    b.addEventListener('click',()=>deleteTemplate(b.dataset.tmplDel)));
   dom.alle(wrap,'[data-tmpl]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const name=btn.dataset.tmpl;
@@ -3996,7 +4029,7 @@ function exportRufCSV(){
     });
   });
   entries.sort((a,b)=>a[0].localeCompare(b[0]));
-  let csv='Datum,Wochentag,Mitarbeiter\n'+entries.map(r=>r.map(v=>'"'+v+'"').join(',')).join('\n');
+  let csv='Datum,Wochentag,Mitarbeiter\n'+entries.map(r=>r.map(csvFeld).join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=url;a.download='rufbereitschaft_'+pre+'.csv';a.click();URL.revokeObjectURL(url);
@@ -4208,12 +4241,12 @@ async function matrixZiehen(vonKey,nachKey,name,schicht){
     const ersetzen=r.error==='needs_confirm';
     const ok=ersetzen?await confirmReplaceShift(name,r.blocking,schicht)
                      :await confirmHolidayEntry(name,[[nachKey,r]],schicht);
-    if(!ok){ undoStack.pop(); updateUndoBtns(); return; }   // Ausgangstag bleibt
+    if(!ok){ verwerfeUndo(); return; }   // Ausgangstag bleibt
     res=await postSchicht([nachKey],'add',schicht,name,true,ersetzen);
     r=res?.results?.[nachKey];
     showHolWarnings(res.hol_warnings);
   }
-  if(r?.error){ undoStack.pop(); updateUndoBtns(); toast('Verschieben nicht möglich'); return; }
+  if(r?.error){ verwerfeUndo(); toast('Verschieben nicht möglich'); return; }
 
   applyResults(res.results);
   await applySchicht([vonKey],'remove',schicht,name);
@@ -4332,7 +4365,7 @@ async function matrixEinzelklick(key,name,schicht){
   const res=await postSchicht([key],'toggle',schicht,name);
   const r=res?.results?.[key];
   if(r?.error==='needs_confirm'||r?.error==='holiday_conflict'){
-    undoStack.pop();updateUndoBtns();
+    verwerfeUndo();
     const replace=r.error==='needs_confirm';
     const ok=replace?await confirmReplaceShift(name,r.blocking,schicht)
                     :await confirmHolidayEntry(name,[[key,r]],schicht);
@@ -4340,7 +4373,7 @@ async function matrixEinzelklick(key,name,schicht){
     pushUndo();
     const r2=await postSchicht([key],'add',schicht,name,true,replace);
     applyResults(r2.results);showHolWarnings(r2.hol_warnings);
-  }else if(r?.error){ undoStack.pop();updateUndoBtns();toast('⚠ Konflikt – nicht möglich'); }
+  }else if(r?.error){ verwerfeUndo();toast('⚠ Konflikt – nicht möglich'); }
   else { applyResults(res.results);showHolWarnings(res.hol_warnings); }
 }
 
@@ -4488,9 +4521,13 @@ function renderCustomHolidays(){
       <span class="hol-item-date" onclick="jumpToDate('${h.date}')" style="cursor:pointer;color:var(--blue);text-decoration:underline dotted" title="Im Kalender anzeigen">${d}</span>
       <span class="hol-item-name">★ ${esc(h.name)}</span>
       ${countryBadge[h.country]||countryBadge['DE']}
-      <button class="hol-del-btn" onclick="deleteCustomHoliday('${h.date}','${h.name.replace(/'/g,"\\'")}')">✕</button>
+      <button class="hol-del-btn" data-hol-datum="${h.date}" data-hol-name="${esc(h.name)}">✕</button>
     </div>`;
   }).join('');
+  // Datum und Name im data-Attribut statt im onclick: ein Anfuehrungszeichen
+  // im Namen hatte den Knopf zerbrochen.
+  dom.alle(list,'.hol-del-btn').forEach(b=>
+    b.addEventListener('click',()=>deleteCustomHoliday(b.dataset.holDatum,b.dataset.holName)));
 }
 
 async function addCustomHoliday(){
@@ -4569,7 +4606,7 @@ function showTooltip(cellEl,key){
   // Elternzeit und Sonderurlaub noch drin, die es in diesem Zweig nicht gibt.
   const TT_KURZ={frueh:'Früh',normal:'Normal',spaet:'Spät',rufbereitschaft:'Ruf'};
   const wer=ALL_SHIFTS.map(s=>row(TT_KURZ[s],slot[s],SHIFT_SHORT[s][1])).join('');
-  tt.innerHTML=`<div class="tt-date">${d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${hol?'<br>'+(hol.bridge?'🌉 Brückentag':hol.custom?'★ '+hol.name:'🎉 '+hol.name):''}</div>`+wer+(schichtC.length?`<div class="tt-warn">⚠ ${schichtC.map(esc).join(', ')}</div>`:''  )+(holC.length?`<div class="tt-hol-warn">${holidays[key]?.country==='DE'?'🇩🇪':'🇮🇳'} Feiertag, eingeteilt: ${holC.map(esc).join(', ')}</div>`:'')+(isUnderstaffed(slot,key)?'<div class="tt-under">⚠ Unterbesetzt</div>':'')+(note?`<div class="tt-note">📝 ${esc(note)}</div>`:'')+`<div class="tt-soll">${siRows}</div>`;
+  tt.innerHTML=`<div class="tt-date">${d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${hol?'<br>'+(hol.bridge?'🌉 Brückentag':hol.custom?'★ '+esc(hol.name):'🎉 '+esc(hol.name)):''}</div>`+wer+(schichtC.length?`<div class="tt-warn">⚠ ${schichtC.map(esc).join(', ')}</div>`:''  )+(holC.length?`<div class="tt-hol-warn">${holidays[key]?.country==='DE'?'🇩🇪':'🇮🇳'} Feiertag, eingeteilt: ${holC.map(esc).join(', ')}</div>`:'')+(isUnderstaffed(slot,key)?'<div class="tt-under">⚠ Unterbesetzt</div>':'')+(note?`<div class="tt-note">📝 ${esc(note)}</div>`:'')+`<div class="tt-soll">${siRows}</div>`;
   tt.classList.add('show');
   platziere(tt,cellEl);
 }
@@ -4666,35 +4703,10 @@ function ladeZoom(){
 }
 
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
-function exportAllData(){
-  window.location.href = '/api/export_data';
-  toast('Export wird heruntergeladen…');
-}
-
-async function handleBackupImport(input){
-  if(!input.files.length) return;
-  const file=input.files[0]; input.value='';
-  const ok=await confirmDialog('⚠ Backup importieren?',
-    `Datei: <strong>${esc(file.name)}</strong><br><br>Alle aktuellen Daten werden <strong>vollständig ersetzt</strong>.<br><small style="color:var(--text3)">Tipp: Vorher exportieren um aktuelle Daten zu sichern.</small>`,'Ja, importieren');
-  if(!ok) return;
-  const fd=new FormData(); fd.append('file',file);
-  try{
-    const d=await fetch('/api/import_data',{method:'POST',body:fd}).then(r=>r.json());
-    if(d.error) toast('✗ Import fehlgeschlagen: '+d.error);
-    else{ toast(`✓ ${d.mitarbeiter} Mitarbeiter, ${d.tage||0} Tage importiert`); await refreshData(); await loadHolidays(curYear); }
-  }catch(e){ toast('✗ Fehler: '+(e instanceof Error ? e.message : String(e))); }
-}
-
-function openImportModal(){
-  document.getElementById('import-result').style.display='none';
-  document.getElementById('import-drop-label').textContent='📄 .json Datei hier ablegen oder klicken';
-  dom.eingabe('import-file').value='';
-  openModal('data-import-modal');
-}
-
 async function doImportData(){
-  const input=dom.eingabe('import-file');
-  const resEl=document.getElementById('import-result');
+  // Felder des Sicherungsdialogs - der einzige Weg, der hierher fuehrt.
+  const input=dom.eingabe('backup-file');
+  const resEl=document.getElementById('backup-result');
   if(!input.files.length){
     resEl.style.cssText='display:block;background:rgba(248,113,113,.1);color:#f87171';
     resEl.textContent='Bitte eine .json Datei auswählen.'; return;
@@ -4714,7 +4726,7 @@ async function doImportData(){
     applyData(await api('/api/data'));
     await loadHolidays(curYear);
     renderMembers(); renderCalendar(); renderStats();
-    setTimeout(()=>closeModal('data-import-modal'),1800);
+    setTimeout(()=>closeModal('backup-modal'),1800);
     toast('Daten erfolgreich importiert!');
   }
 }

@@ -41,8 +41,14 @@ const namenDerWoche = roh =>
  * und beantwortet genau die Wege, die die Oberflaeche aufruft. Jeder Aufruf
  * wird in .aufrufe mitgeschrieben, damit Tests pruefen koennen, was die
  * Oberflaeche geschickt haette.
+ *
+ * autoplan ist die Antwort auf /api/autoplan, je Aufruf einmal aufgerufen.
+ * Die echte Antwort ist {planned, ersetzt, skipped_*, unbekannt} oder
+ * {error}; welche Tage dabei entstehen, entscheidet der Go-Teil - deshalb
+ * legt der Test das hier selbst fest.
  */
-export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage = {} } = {}) {
+export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage = {},
+                          autoplan = null } = {}) {
   const zustand = {
     mitarbeiter: [...mitarbeiter],
     schichten: JSON.parse(JSON.stringify(schichten)),
@@ -145,6 +151,9 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
         results[d] = kopie(t);
       }
       return { results, hol_warnings: {} };
+    }
+    if (pfad === '/api/autoplan') {
+      return autoplan ? autoplan(koerper, zustand) : { planned: 0 };
     }
     if (pfad === '/api/paste') {
       for (const d of koerper.dates) {

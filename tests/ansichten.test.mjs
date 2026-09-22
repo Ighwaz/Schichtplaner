@@ -831,3 +831,90 @@ describe('Mitarbeiterliste', () => {
     assert.match(o.$('#stats-wrap').textContent, /Bauer/);
   });
 });
+
+describe('Sicherung wiederherstellen', () => {
+  // Der Knopf "Backup einspielen" rief doImportData auf, und das las
+  // Dateifeld und Ergebnisanzeige aus einem zweiten Importdialog, den
+  // niemand oeffnen konnte. Ein Klick bewirkte deshalb gar nichts: keine
+  // Datei gefunden, und die Meldung landete im verborgenen Zwilling.
+  test('die Meldung steht im geöffneten Sicherungsdialog', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: TEAM });
+    o.fenster.openModal('backup-modal');
+    await o.fenster.doImportData();
+
+    const res = o.$('#backup-result');
+    assert.match(res.textContent, /\.json/, 'im Sicherungsdialog steht keine Meldung');
+    assert.ok(res.closest('#backup-modal'), 'die Meldung steht nicht im Sicherungsdialog');
+    assert.ok(!o.$('#backup-modal').classList.contains('hidden'), 'der Dialog ist zu');
+  });
+
+  test('es gibt nur noch einen Weg, ein Backup einzuspielen', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: TEAM });
+    assert.equal(o.$('#import-file'), null, 'der unerreichbare zweite Importdialog steht noch da');
+    assert.equal(o.$('#data-import-modal'), null);
+    assert.ok(o.$('#backup-file'), 'das Dateifeld des Sicherungsdialogs fehlt');
+  });
+});
+
+describe('Statistik', () => {
+  test('jede der vier Schichten hat Beschriftung und Farbe', async () => {
+    // Die Zeilen kommen aus ALL_SHIFTS, die Beschriftungen standen aber in
+    // einer eigenen Liste ohne Normaldienst: dessen Zeile zeigte den Text
+    // "undefined" und einen Balken ohne Farbe.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: [], normal: ['Bauer, Martin'], spaet: [], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+
+    const zeilen = o.$$('#stats-wrap .stat-bar-row');
+    assert.ok(zeilen.length >= 4, 'die Statistik ist leer');
+    const beschriftungen = [...new Set(
+      o.$$('#stats-wrap .stat-bar-label').map(el => el.textContent))];
+    assert.deepEqual(beschriftungen.sort(), ['Früh', 'Normal', 'Ruf', 'Spät']);
+
+    for (const fuellung of o.$$('#stats-wrap .stat-bar-fill'))
+      assert.doesNotMatch(fuellung.getAttribute('style'), /undefined/,
+        'ein Balken hat keine Farbe');
+
+    // Und der Normaldienst wird auch gezählt.
+    const zeile = o.$$('#stats-wrap .stat-row').find(r => r.textContent.includes('Bauer'));
+    const normal = [...zeile.querySelectorAll('.stat-bar-row')]
+      .find(r => r.querySelector('.stat-bar-label').textContent === 'Normal');
+    assert.equal(normal.querySelector('.stat-bar-count').textContent, '1');
+  });
+});
+
+describe('Template über mehrere Monate', () => {
+  test('bricht ein späterer Monat ab, ist der frühere trotzdem zu sehen', async () => {
+    // Vorher stand nach einem Fehler nur ein Toast da: der Januar war
+    // geschrieben, der Kalender zeigte ihn aber erst nach einem Neustart.
+    let aufruf = 0;
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      autoplan: (koerper, zustand) => {
+        aufruf++;
+        if (aufruf > 1) return { error: 'Datenbank nicht erreichbar' };
+        zustand.schichten['2026-01-05'] =
+          { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] };
+        return { planned: 1 };
+      },
+    });
+    o.api.zustand.templates['default'] = { mo: { 'Bauer, Martin': 'frueh' } };
+    await o.fenster.loadTemplates();
+    o.$('#tmpl-name-input').value = 'default';
+
+    o.fenster.applyTemplateDirectly();
+    await warteBis(() => o.$('#_cdlg'), 'den Anwenden-Dialog');
+    for (const [id, wert] of [['_tmpl-month', '1'], ['_tmpl-year', '2026'],
+      ['_tmpl-month2', '2'], ['_tmpl-year2', '2026']]) o.$('#' + id).value = wert;
+    klick(o.$('#_cdlg-yes'));
+
+    await warteBis(() => aufruf >= 2, 'den zweiten Monat');
+    await warteBis(() => o.$('.day-cell[data-key="2026-01-05"] .chip'),
+      'den Eintrag aus dem ersten Monat im Kalender');
+    assert.match(o.$('#toast').textContent, /Abgebrochen/, o.$('#toast').textContent);
+  });
+});

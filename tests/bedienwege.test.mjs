@@ -348,6 +348,32 @@ describe('Ziehen auf einen belegten Tag', () => {
     zielZelle.dispatchEvent(drop);
   }
 
+  test('ein abgebrochener Zug lässt Wiederholen stehen', async () => {
+    // pushUndo() leert den Wiederholen-Stapel. Wurde die Rückfrage dann
+    // abgebrochen, nahm der Code nur den Rückgängig-Schritt zurück - und
+    // Wiederholen war weg, obwohl sich nichts geändert hatte.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+
+    o.fenster.waehleSchicht('frueh');
+    await o.fenster.schichtAufTagen(['2026-09-21'], ['Krüger, Sina']);
+    await o.fenster.doUndo();
+    await warteBis(() => !o.$('#btn-redo').disabled, 'einen Schritt zum Wiederholen');
+
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await warteBis(() => o.$('#_cdlg'), 'die Rückfrage');
+    klick(o.$('#_cdlg-no'));
+    await ruhe(); await ruhe();
+
+    assert.ok(!o.$('#btn-redo').disabled, 'Wiederholen ist nach dem Abbruch verloren');
+  });
+
   test('die Rückfrage nennt die gezogene Schicht, nicht die gewählte', async () => {
     // Gefunden bei der Typisierung: handleDrop rief die Rückfrage ohne
     // Schicht auf, und die fiel auf die aus der Leiste zurück.
