@@ -2309,10 +2309,18 @@ async function setzeTagRuf(key,name,eintragen){
   toast(`${name}: ${fmtDateShort(new Date(key+'T00:00:00'))} ${eintragen?'eingetragen':'entfernt'}`);
 }
 
+// Das jeweils andere Auswahlfeld zumachen. Beide lassen einen Klick auf
+// .rufkw-person-cell durch - ohne das blieben zwei offen übereinander.
+/** @param {string} id */
+function schliesseRufPicker(id){
+  document.getElementById(id)?.classList.add('hidden');
+}
+
 // Personenauswahl für einen einzelnen Tag.
 let _rufTagKey=null;
 function openRufTagPicker(key,anchor){
   _rufTagKey=key;
+  schliesseRufPicker('rufkw-picker');
   let picker=document.getElementById('ruftag-picker');
   if(!picker){
     picker=document.createElement('div'); picker.id='ruftag-picker'; picker.className='rufkw-picker hidden';
@@ -2355,6 +2363,7 @@ function kwImKalender(w){
 let _rufkwPickerKey=null;
 function openRufKWPicker(kwKey,anchor){
   _rufkwPickerKey=kwKey;
+  schliesseRufPicker('ruftag-picker');
   let picker=document.getElementById('rufkw-picker');
   if(!picker){
     picker=document.createElement('div'); picker.id='rufkw-picker'; picker.className='rufkw-picker hidden';
@@ -3587,12 +3596,15 @@ function getRangeDates(){
 }
 
 async function clearRangeAll(){
+  const gemerkt=frozenRangeEnd;
   frozenRangeEnd=null;
   const dates=getRangeDates();
   if(dates.length>1){
     const ok=await confirmDialog('Zeitraum leeren?',
       `${dates.length} Tage vollständig leeren? Diese Aktion kann per Undo rückgängig gemacht werden.`,'Ja, leeren');
-    if(!ok) return;
+    // Abbruch heißt: alles bleibt, auch die Strecke. Ohne das stand der
+    // Löschblock weiter da, während es den Zustand dahinter nicht mehr gab.
+    if(!ok){ frozenRangeEnd=gemerkt; return; }
   }
   pushUndo();
   await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},

@@ -438,3 +438,61 @@ describe('Ziehen auf einen belegten Tag', () => {
     assert.equal((o.api.zustand.schichten['2026-09-10'].spaet || []).length, 0);
   });
 });
+
+describe('Zeitraum leeren', () => {
+  // Ohne Werkzeug spannt Klick + Shift-Klick einen Zeitraum zum Löschen auf.
+  async function spanneAuf(o) {
+    klick(o.$('.day-cell[data-key="2026-09-07"]'));
+    await ruhe();
+    klick(o.$('.day-cell[data-key="2026-09-11"]'), { shiftKey: true });
+    await ruhe();
+  }
+
+  test('ein Abbruch lässt die Strecke stehen', async () => {
+    // clearRangeAll setzte frozenRangeEnd vor der Rückfrage auf null. Bei
+    // einem Abbruch blieb der Löschblock zwar stehen, der Zustand dahinter
+    // war aber weg - der nächste Klick darin traf ins Leere.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-09': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+    await spanneAuf(o);
+    assert.match(o.$('#sel-info').textContent, /5 Tage/, o.$('#sel-info').textContent);
+
+    o.fenster.clearRangeAll();
+    await warteBis(() => o.$('#_cdlg'), 'die Rückfrage');
+    klick(o.$('#_cdlg-no'));
+    await ruhe(); await ruhe();
+
+    // Nichts gelöscht ...
+    assert.deepEqual(o.api.zustand.schichten['2026-09-09'].frueh, ['Bauer, Martin']);
+    // ... und die Strecke steht noch, samt Löschblock.
+    o.fenster.updateSelInfo();
+    assert.match(o.$('#sel-info').textContent, /5 Tage/,
+      'die Strecke ist nach dem Abbruch verschwunden');
+  });
+});
+
+describe('Auswahlfelder der Rufbereitschaft', () => {
+  test('es ist immer nur eines offen', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: TEAM });
+    klick(o.$('.vtab[data-view="ruf"]'));
+    await ruhe();
+    const anker = o.$('.vtab[data-view="ruf"]');
+
+    o.fenster.openRufTagPicker('2026-09-14', anker);
+    assert.ok(!o.$('#ruftag-picker').classList.contains('hidden'), 'das Tagesfeld ging nicht auf');
+
+    o.fenster.openRufKWPicker('2026-W38', anker);
+    assert.ok(o.$('#ruftag-picker').classList.contains('hidden'),
+      'das Tagesfeld blieb neben dem Wochenfeld offen');
+    assert.ok(!o.$('#rufkw-picker').classList.contains('hidden'));
+
+    o.fenster.openRufTagPicker('2026-09-15', anker);
+    assert.ok(o.$('#rufkw-picker').classList.contains('hidden'),
+      'das Wochenfeld blieb neben dem Tagesfeld offen');
+  });
+});
