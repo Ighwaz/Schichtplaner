@@ -5,14 +5,14 @@
 // sollen bis in jeden Aufruf durchgreifen. Streng geprueft wird er zusaetzlich
 // fuer sich allein, siehe tsconfig.regelkern.json.
 //
-// Fuer die Oberflaeche gilt alles aus "strict" bis auf zwei Schalter:
+// Fuer die Oberflaeche gilt alles aus "strict" bis auf einen Schalter:
 //
-//   noImplicitAny     verlangt einen Typ an jedem Parameter (+517 Stellen)
-//   strictNullChecks  verlangt eine Pruefung nach jedem getElementById (+325)
+//   noImplicitAny  verlangt einen Typ an jedem Parameter (rund 480 Stellen)
 //
-// Beide lohnen sich, aber nicht in einem Zug: das waere ein Umbau fast jeder
-// Zeile einer Oberflaeche, die funktioniert. Sie sind der naechste Schritt,
-// Funktion fuer Funktion. Alles andere aus "strict" ist unten einzeln an.
+// Der lohnt sich, ist aber ein eigener Durchgang - Funktion fuer Funktion.
+// Alles andere aus "strict" ist unten einzeln an; strictNullChecks kam als
+// zweite Stufe dazu und hat dabei einen Absturz ans Licht gebracht
+// (Object.entries(undefined), wenn /api/schicht einen Fehler meldet).
 {
   "compilerOptions": {
     "allowJs": true,
@@ -24,6 +24,7 @@
     "skipLibCheck": true,
 
     "strict": false,
+    "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
     "strictBuiltinIteratorReturn": true,

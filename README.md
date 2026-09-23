@@ -103,7 +103,7 @@ laufen, ohne etwas zu erzeugen. Jede Meldung zeigt direkt auf eine Zeile in
 | Teil | Strenge | Warum |
 |---|---|---|
 | Regelkern | `strict`, nur ES-Bibliothek | Hier stehen die Regeln; ihre Typen tragen bis in jeden Aufruf. Ohne DOM-Bibliothek ist „der Regelkern greift nicht ins Fenster“ eine Regel, die tsc durchsetzt. |
-| Oberfläche | `strict` ohne `noImplicitAny` und `strictNullChecks` | Beide lohnen sich, wären aber ein Umbau fast jeder Zeile (rund 840 Stellen). Sie sind der nächste Schritt, Funktion für Funktion. |
+| Oberfläche | `strict` ohne `noImplicitAny` | Der eine fehlende Schalter verlangt einen Typ an jedem Parameter (rund 480 Stellen) und ist ein eigener Durchgang. `strictNullChecks` kam als zweite Stufe dazu. |
 
 Die Einstellungen stehen mit Begründung in `tsconfig.json` und
 `tsconfig.regelkern.json`. Das DOM liefert allgemeine Typen – `getElementById`
@@ -112,6 +112,11 @@ Griffe (`dom.eingabe(id)`, `dom.auswahl(id)`, …), die tsc sagen, was an der
 Stelle steht. `tests/typpruefung.test.mjs` gleicht jeden davon gegen das Markup
 ab: ein Griff, der ein `<input>` verspricht, wo ein `<select>` steht, fällt
 dort auf. `@ts-ignore` und Casts auf `any` gibt es nicht; auch das prüft der Test.
+
+Mit `strictNullChecks` kommen `dom.muss(id)` und `dom.einsMuss(wurzel, wahl)`
+dazu: sie sprechen aus, was der Code ohnehin annimmt – das Element steht fest
+im Markup. Fehlt es doch, werfen sie sofort mit dem Namen im Text, statt drei
+Zeilen später an einer Eigenschaft von `null`.
 
 ## Datenhaltung
 

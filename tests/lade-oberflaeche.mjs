@@ -48,7 +48,7 @@ const namenDerWoche = roh =>
  * legt der Test das hier selbst fest.
  */
 export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage = {},
-                          autoplan = null } = {}) {
+                          autoplan = null, schichtFehler = null } = {}) {
   const zustand = {
     mitarbeiter: [...mitarbeiter],
     schichten: JSON.parse(JSON.stringify(schichten)),
@@ -118,6 +118,11 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
       return { ok: true, applied: angelegt };
     }
 
+    if (pfad === '/api/schicht' && schichtFehler) {
+      // Der Go-Teil antwortet bei einem unbekannten Namen oder einem
+      // unmoeglichen Datum mit {error}, ohne "results".
+      return { error: schichtFehler(koerper) };
+    }
     if (pfad === '/api/schicht') {
       // Dieselben vier Aktionen wie im Go-Teil - und dieselbe Rückfrage bei
       // einer zweiten Arbeitsschicht am selben Tag. Ohne die prüfen Tests

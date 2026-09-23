@@ -496,3 +496,25 @@ describe('Auswahlfelder der Rufbereitschaft', () => {
       'das Wochenfeld blieb neben dem Tagesfeld offen');
   });
 });
+
+describe('Wenn der Server einen Fehler meldet', () => {
+  test('ein Klick stürzt nicht ab und lässt keinen Rückgängig-Schritt zurück', async () => {
+    // /api/schicht antwortet bei einem unbekannten Namen oder einem
+    // unmöglichen Datum mit {error} und ohne "results". applyToDateList lief
+    // darauf in Object.entries(undefined) - mitten im Klick, nach bereits
+    // gesetztem Rückgängig-Punkt.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichtFehler: () => 'unbekannter Mitarbeiter',
+    });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.waehleSchicht('frueh');
+
+    await o.fenster.schichtAufTagen(['2026-09-07', '2026-09-08'], ['Bauer, Martin']);
+
+    assert.match(o.$('#toast').textContent, /unbekannter Mitarbeiter/,
+      'der Fehler wird nicht gemeldet');
+    assert.ok(o.$('#btn-undo').disabled,
+      'es blieb ein Rückgängig-Schritt stehen, obwohl nichts geschehen ist');
+  });
+});

@@ -1262,7 +1262,7 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 /**
  * Ein Feiertag, wie er vom Server kommt. country ist 'DE', 'IN' oder
  * 'DE+IN'; bridge markiert einen Brueckentag.
- * @typedef {{name?: string, country?: string, bridge?: boolean}} Feiertag
+ * @typedef {{name?: string, country?: string, bridge?: boolean, custom?: boolean}} Feiertag
  */
 /**
  * Was an einem Tag in einer Schicht zum Soll fehlt.
@@ -1803,6 +1803,30 @@ const dom = {
    * @returns {HTMLElement|null}
    */
   naechstes: (e, wahl) => /** @type {HTMLElement} */ (e.target).closest(wahl),
+  /**
+   * Ein Element, das es geben muss, weil es fest im Markup steht. Fehlt es,
+   * ist die Datei kaputt - dann soll das hier auffallen und nicht drei
+   * Zeilen später an einer Eigenschaft von null. Wo ein Element wirklich
+   * fehlen darf, bleibt getElementById mit seiner Prüfung stehen.
+   * @param {string} id
+   * @returns {HTMLElement}
+   */
+  muss: id => {
+    const el = document.getElementById(id);
+    if(!el) throw new Error('Element fehlt im Markup: #' + id);
+    return el;
+  },
+  /**
+   * Wie eins(), aber es muss etwas passen.
+   * @param {ParentNode} wurzel
+   * @param {string} wahl
+   * @returns {HTMLElement}
+   */
+  einsMuss: (wurzel, wahl) => {
+    const el = dom.eins(wurzel, wahl);
+    if(!el) throw new Error('Kein Element für ' + wahl);
+    return el;
+  },
 };
 
 // Elemente, an die schon ein Ereignis gebunden ist. Vorher klebte dafuer
@@ -1832,9 +1856,37 @@ const EMOJIS = ['👩','👨','👩‍💻','👨‍💻','👩‍🔧','👨‍
 // ══════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════
+/**
+ * Ein Mitarbeiter, wie ihn der Server liefert. prefs sind Wunsch-Schichten
+ * je Wochentag (0=So … 6=Sa, als Schluessel eine Zahl in Textform).
+ * @typedef {{name: string, team?: string, color?: string, icon?: string,
+ *            prefs?: Record<string, string>}} Mitarbeiter
+ */
+/**
+ * Ein eigener Feiertag, wie ihn die Oberflaeche verwaltet.
+ * @typedef {{date: string, name: string, country?: string}} EigenerFeiertag
+ */
+/**
+ * Ein Template: je Wochentag, wer dort welche Schicht hat.
+ * @typedef {Record<string, Record<string, string>>} Wochentemplate
+ */
+
 let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
-let mitarbeiter=[], schichten={}, holidays={}, notizen={}, customHolidays=[], templates={};
+/** @type {Mitarbeiter[]} */
+let mitarbeiter=[];
+/** @type {Plan} */
+let schichten={};
+/** @type {Record<string, Feiertag>} */
+let holidays={};
+/** @type {Record<string, string>} */
+let notizen={};
+/** @type {EigenerFeiertag[]} */
+let customHolidays=[];
+/** @type {Record<string, Wochentemplate>} */
+let templates={};
+/** @type {Soll} */
 let soll={frueh:1,spaet:1,rufbereitschaft:1};
+/** @type {Mitarbeiter|null} */
 let selectedPerson=null;
 /** @type {Schicht} */
 let selectedShift='frueh';
@@ -1843,12 +1895,47 @@ let selectedPersons=new Set();
 // Zeitraum ist kein Modus mehr: Shift+Klick spannt vom zuletzt geklickten Tag
 // bis hierher auf. rangeStart/previewEnd beschreiben nur noch die Strecke,
 // die gerade markiert ist.
-let letzterKlick=null, letzterModus='add', rangeStart=null, previewEnd=null, frozenRangeEnd=null, multiDays=new Set();
-let copiedDay=null, activeDayKey=null;
-let deletedBackups={}, pendingRestore=null, dragState=null, newColor=null;
-let undoStack=[], redoStack=[];
+/** @type {string|null} */
+let letzterKlick=null;
+/** @type {'add'|'remove'} */
+let letzterModus='add';
+/** @type {string|null} */
+let rangeStart=null;
+/** @type {string|null} */
+let previewEnd=null;
+/** @type {string|null} */
+let frozenRangeEnd=null;
+/** @type {Set<string>} */
+let multiDays=new Set();
+/** @type {{key: string, slot: Belegung}|null} */
+let copiedDay=null;
+/** @type {string|null} */
+let activeDayKey=null;
+/** Gesicherte Schichten geloeschter Mitarbeiter, bis zum Wiederherstellen. */
+/** @type {Record<string, Record<string, unknown>>} */
+let deletedBackups={};
+/** @type {{name: string, team: string, color: string|null}|null} */
+let pendingRestore=null;
+/** @type {{name: string, fromKey: string, fromShift: Schicht}|null} */
+let dragState=null;
+/** @type {string|null} */
+let newColor=null;
+/** @type {Plan[]} */
+let undoStack=[];
+/** @type {Plan[]} */
+let redoStack=[];
+/** Rufbereitschaftsplan je Kalenderwoche; alte Staende halten einen Namen
+ *  als Zeichenkette statt als Liste. */
+/** @type {Record<string, string|string[]>} */
 let rufKW={};
-let profOldName=null, profColor=null, profEmoji=null, profPrefs={};
+/** @type {string|null} */
+let profOldName=null;
+/** @type {string|null} */
+let profColor=null;
+/** @type {string|null} */
+let profEmoji=null;
+/** @type {Record<number, string>} */
+let profPrefs={};
 // Zustand des Template-Editors: {Name: {Wochentag: Schicht}}
 let tmplData={};
 // Beim Löschen gemerkte Mitarbeiterdaten (Team/Farbe/Icon/Wünsche),
@@ -2056,7 +2143,7 @@ function renderRufKWTable(){
   renderRufSummary();
   const filter=dom.eingabe('ruf-nur-abw');
   if(filter&&!verdrahtet.has(filter)){ filter.addEventListener('change',renderRufKWTable); verdrahtet.add(filter); }
-  const tbody=document.getElementById('rufkw-tbody');
+  const tbody=dom.muss('rufkw-tbody');
   const nurAbweichungen=filter?.checked;
   weeks.forEach(w=>{
     const rawKW=rufKW[w.kwKey]; const names=rawKW?(Array.isArray(rawKW)?rawKW:[rawKW]):[];
@@ -2160,14 +2247,14 @@ function openRufReihum(){
   von.value=wochen.some(w=>w.kwKey===heute)?heute:wochen[0].kwKey;
   bis.value=wochen[wochen.length-1].kwKey;
   von.onchange=bis.onchange=renderReihumVorschau;
-  document.getElementById('reihum-ueber').onchange=renderReihumVorschau;
+  dom.eingabe('reihum-ueber').onchange=renderReihumVorschau;
 
   renderReihumListe();
   openModal('reihum-modal');
 }
 
 function renderReihumListe(){
-  const box=document.getElementById('reihum-liste');
+  const box=dom.muss('reihum-liste');
   box.innerHTML=reihumFolge.map((r,i)=>{
     const m=mitarbeiter.find(x=>x.name===r.name);
     return `<div class="reihum-zeile${r.an?'':' aus'}">
@@ -2181,13 +2268,13 @@ function renderReihumListe(){
   }).join('')||'<span style="font-size:12px;color:var(--text3)">Keine Mitarbeiter angelegt.</span>';
 
   /** @type {NodeListOf<HTMLInputElement>} */ (box.querySelectorAll('[data-an]')).forEach(el=>el.onchange=()=>{
-    reihumFolge[+el.dataset.an].an=el.checked; renderReihumListe();
+    reihumFolge[Number(el.dataset.an)].an=el.checked; renderReihumListe();
   });
   dom.alle(box,'[data-hoch]').forEach(el=>el.onclick=()=>{
-    const i=+el.dataset.hoch; [reihumFolge[i-1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i-1]]; renderReihumListe();
+    const i=Number(el.dataset.hoch); [reihumFolge[i-1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i-1]]; renderReihumListe();
   });
   dom.alle(box,'[data-runter]').forEach(el=>el.onclick=()=>{
-    const i=+el.dataset.runter; [reihumFolge[i+1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i+1]]; renderReihumListe();
+    const i=Number(el.dataset.runter); [reihumFolge[i+1],reihumFolge[i]]=[reihumFolge[i],reihumFolge[i+1]]; renderReihumListe();
   });
   renderReihumVorschau();
 }
@@ -2325,9 +2412,10 @@ function openRufTagPicker(key,anchor){
   if(!picker){
     picker=document.createElement('div'); picker.id='ruftag-picker'; picker.className='rufkw-picker hidden';
     document.body.appendChild(picker);
+    const feld=picker;
     document.addEventListener('click',e=>{
       if(!dom.naechstes(e,'#ruftag-picker')&&!dom.naechstes(e,'.rufkw-person-cell'))
-        picker.classList.add('hidden');
+        feld.classList.add('hidden');
     });
   }
   const drin=new Set((schichten[key]?.rufbereitschaft)||[]);
@@ -2342,6 +2430,8 @@ function openRufTagPicker(key,anchor){
       ev.stopPropagation();
       const name=el.dataset.pname;
       picker.classList.add('hidden');
+      // Beides ist beim Zeichnen gesetzt; ohne waere der Eintrag sinnlos.
+      if(!name||!_rufTagKey) return;
       await setzeTagRuf(_rufTagKey,name,!drin.has(name));
     };
   });
@@ -2368,9 +2458,10 @@ function openRufKWPicker(kwKey,anchor){
   if(!picker){
     picker=document.createElement('div'); picker.id='rufkw-picker'; picker.className='rufkw-picker hidden';
     document.body.appendChild(picker);
+    const feld=picker;
     document.addEventListener('click',e=>{
       if(!dom.naechstes(e,'#rufkw-picker')&&!dom.naechstes(e,'.rufkw-person-cell'))
-        picker.classList.add('hidden');
+        feld.classList.add('hidden');
     });
   }
   const rawKW2=rufKW[kwKey]; const current=new Set(rawKW2?(Array.isArray(rawKW2)?rawKW2:[rawKW2]):[]);
@@ -2403,14 +2494,14 @@ async function saveRufKW({still=false}={}){
 
 function openApplyRufKW(){
   initRufKWYear();
-  document.getElementById('rufkw-apply-result').style.display='none';
+  dom.muss('rufkw-apply-result').style.display='none';
   openModal('rufkw-apply-modal');
 }
 
 async function applyRufKW(){
   const year=parseInt(dom.auswahl('rufkw-apply-year').value);
   const month=dom.auswahl('rufkw-apply-month').value;
-  const resEl=document.getElementById('rufkw-apply-result');
+  const resEl=dom.muss('rufkw-apply-result');
   const d=await api('/api/ruf_kw/apply',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({year,month:month?parseInt(month):null})});
   if(d.error){resEl.style.cssText='display:block;background:rgba(239,68,68,.1);color:#f87171';resEl.textContent='Fehler: '+d.error;}
@@ -2479,11 +2570,11 @@ async function init(){
   // Theme
   const theme=localStorage.getItem('sp-theme')||'dark';
   document.documentElement.dataset.theme=theme;
-  document.getElementById('btn-theme').textContent=(theme==='dark'?'🌙':'☀️')+' Theme';
+  dom.muss('btn-theme').textContent=(theme==='dark'?'🌙':'☀️')+' Theme';
 
   // Color init
   newColor=randColor();
-  document.getElementById('new-color').style.background=newColor;
+  dom.muss('new-color').style.background=newColor;
 
   // Erst die Ereignisse binden, damit die Oberfläche sofort bedienbar ist
   bindEvents();
@@ -2537,38 +2628,38 @@ function randColor(){ return AVATAR_COLORS[Math.floor(Math.random()*AVATAR_COLOR
 // EVENTS
 // ══════════════════════════════════════════════════════════════
 function toggleAddForm(){
-  const form=document.getElementById('add-form');
-  const toggle=document.getElementById('add-toggle');
+  const form=dom.muss('add-form');
+  const toggle=dom.muss('add-toggle');
   const isOpen=form.classList.contains('open');
   form.classList.toggle('open',!isOpen);
   toggle.classList.toggle('open',!isOpen);
-  if(!isOpen) setTimeout(()=>document.getElementById('new-name').focus(),50);
+  if(!isOpen) setTimeout(()=>dom.eingabe('new-name').focus(),50);
 }
 
 function bindEvents(){
-  document.getElementById('btn-prev').onclick=prevMonth;
-  document.getElementById('btn-next').onclick=nextMonth;
-  document.getElementById('btn-today').onclick=goToday;
-  document.getElementById('btn-add').onclick=addMitarbeiter;
-  document.getElementById('bulk-input').addEventListener('input',updateBulkPreview);
-  document.getElementById('new-name').addEventListener('keydown',e=>{
+  dom.muss('btn-prev').onclick=prevMonth;
+  dom.muss('btn-next').onclick=nextMonth;
+  dom.muss('btn-today').onclick=goToday;
+  dom.muss('btn-add').onclick=addMitarbeiter;
+  dom.textfeld('bulk-input').addEventListener('input',updateBulkPreview);
+  dom.eingabe('new-name').addEventListener('keydown',e=>{
     if(e.key==='Enter') addMitarbeiter();
-    if(e.key==='Escape'){ document.getElementById('add-form').classList.remove('open'); document.getElementById('add-toggle').classList.remove('open'); }
+    if(e.key==='Escape'){ dom.muss('add-form').classList.remove('open'); dom.muss('add-toggle').classList.remove('open'); }
   });
-  document.getElementById('btn-undo').onclick=doUndo;
-  document.getElementById('btn-redo').onclick=doRedo;
+  dom.knopf('btn-undo').onclick=doUndo;
+  dom.knopf('btn-redo').onclick=doRedo;
 
-  document.getElementById('btn-zoom-in').addEventListener('click',()=>setZoom(zoomStufe+1));
-  document.getElementById('btn-zoom-out').addEventListener('click',()=>setZoom(zoomStufe-1));
-  document.getElementById('btn-theme').addEventListener('click',()=>{
+  dom.muss('btn-zoom-in').addEventListener('click',()=>setZoom(zoomStufe+1));
+  dom.muss('btn-zoom-out').addEventListener('click',()=>setZoom(zoomStufe-1));
+  dom.muss('btn-theme').addEventListener('click',()=>{
     const t=document.documentElement.dataset.theme==='dark'?'light':'dark';
     document.documentElement.dataset.theme=t;
-    document.getElementById('btn-theme').textContent=(t==='dark'?'🌙':'☀️')+' Theme';
+    dom.muss('btn-theme').textContent=(t==='dark'?'🌙':'☀️')+' Theme';
     localStorage.setItem('sp-theme',t);
   });
 
-  document.getElementById('sidebar-toggle').addEventListener('click',()=>{
-    setSidebar(!document.getElementById('main').classList.contains('collapsed'));
+  dom.muss('sidebar-toggle').addEventListener('click',()=>{
+    setSidebar(!dom.muss('main').classList.contains('collapsed'));
   });
 
   // View tabs
@@ -2577,8 +2668,8 @@ function bindEvents(){
       document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
       document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
       tab.classList.add('active');
-      const view=tab.dataset.view; activeView=view;
-      document.querySelector('[data-panel="'+view+'"]').classList.add('active');
+      const view=tab.dataset.view??''; activeView=view;
+      dom.einsMuss(document,'[data-panel="'+view+'"]').classList.add('active');
       updateContextBar();
       if(view==='matrix') renderMatrix();
       if(view==='ruf') renderRufKWTable();
@@ -2589,7 +2680,7 @@ function bindEvents(){
   });
 
   // Schichtwahl - per Maus und per Tastatur bedienbar
-  const bar=document.getElementById('modebar');
+  const bar=dom.muss('modebar');
   bar.addEventListener('click',e=>{
     const p=dom.naechstes(e,'[data-shift]'); if(p) waehleSchicht(p.dataset.shift);
   });
@@ -2600,8 +2691,8 @@ function bindEvents(){
   });
 
   // Mehr-Menü öffnen und schließen
-  const more=document.getElementById('more-menu');
-  document.getElementById('btn-more').addEventListener('click',e=>{
+  const more=dom.muss('more-menu');
+  dom.muss('btn-more').addEventListener('click',e=>{
     e.stopPropagation(); more.classList.toggle('hidden');
   });
   more.addEventListener('click',e=>{ if(dom.naechstes(e,'.mm-item')) more.classList.add('hidden'); });
@@ -2609,20 +2700,20 @@ function bindEvents(){
     if(!dom.naechstes(e,'#more-menu')&&!dom.naechstes(e,'#btn-more')) more.classList.add('hidden');
   });
 
-  document.getElementById('btn-ics').addEventListener('click',openIcsModal);
-  document.getElementById('btn-print').addEventListener('click',()=>window.print());
-  document.getElementById('btn-check').addEventListener('click',showUnderstaffedReport);
-  document.getElementById('btn-folder').addEventListener('click',changeFolder);
-  document.getElementById('btn-export-data').addEventListener('click',()=>{
+  dom.muss('btn-ics').addEventListener('click',openIcsModal);
+  dom.muss('btn-print').addEventListener('click',()=>window.print());
+  dom.muss('btn-check').addEventListener('click',showUnderstaffedReport);
+  dom.muss('btn-folder').addEventListener('click',changeFolder);
+  dom.muss('btn-export-data').addEventListener('click',()=>{
     dom.eingabe('backup-file').value='';
-    document.getElementById('backup-result').className='backup-result';
-    document.getElementById('backup-drop-label').textContent='📂 .json Backup hier ablegen oder klicken';
-    document.getElementById('backup-modal').classList.remove('hidden');
+    dom.muss('backup-result').className='backup-result';
+    dom.muss('backup-drop-label').textContent='📂 .json Backup hier ablegen oder klicken';
+    dom.muss('backup-modal').classList.remove('hidden');
   });
-  document.getElementById('backup-file').addEventListener('change',e=>{
-    const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files[0]) document.getElementById('backup-drop-label').textContent='📂 '+inp.files[0].name;
+  dom.muss('backup-file').addEventListener('change',e=>{
+    const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files?.[0]) dom.muss('backup-drop-label').textContent='📂 '+inp.files[0].name;
   });
-  document.getElementById('btn-refresh').addEventListener('click',refreshData);
+  dom.muss('btn-refresh').addEventListener('click',refreshData);
   // Das Anwenden hängt am onclick von btn-run-tmpl
 
   dom.alle(document,'.sb-tab').forEach(tab=>{
@@ -2630,18 +2721,18 @@ function bindEvents(){
       document.querySelectorAll('.sb-tab').forEach(t=>t.classList.remove('active'));
       document.querySelectorAll('.sb-panel').forEach(p=>p.classList.remove('active'));
       tab.classList.add('active');
-      document.querySelector('[data-panel="'+tab.dataset.tab+'"]').classList.add('active');
+      dom.einsMuss(document,'[data-panel="'+tab.dataset.tab+'"]').classList.add('active');
       if(tab.dataset.tab==='stats') renderStats();
     });
   });
 
-  document.getElementById('member-list').addEventListener('click',handleMemberClick);
-  document.getElementById('new-color').addEventListener('click',e=>{e.stopPropagation();showColorPicker(e.target,null);});
+  dom.muss('member-list').addEventListener('click',handleMemberClick);
+  dom.muss('new-color').addEventListener('click',e=>{e.stopPropagation();showColorPicker(e.target,null);});
 
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();doUndo();}
     if((e.ctrlKey||e.metaKey)&&(e.shiftKey&&e.key==='Z'||e.key==='y')){e.preventDefault();doRedo();}
-    if(e.key==='Escape'){closeAllModals();closeDayMenu();document.getElementById('more-menu').classList.add('hidden');clearAll();copiedDay=null;renderCalendar();}
+    if(e.key==='Escape'){closeAllModals();closeDayMenu();dom.muss('more-menu').classList.add('hidden');clearAll();copiedDay=null;renderCalendar();}
     // Kürzel nur, wenn gerade nicht getippt wird
     if(e.ctrlKey||e.metaKey||e.altKey) return;
     const ziel=e.target instanceof Element?e.target:null;
@@ -2658,28 +2749,33 @@ function bindEvents(){
   document.querySelectorAll('.modal-bg').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)closeAllModals();});});
   document.addEventListener('click',e=>{
     if(!dom.naechstes(e,'#cpop')&&!dom.naechstes(e,'.color-preview')&&!dom.naechstes(e,'.avatar'))
-      document.getElementById('cpop').classList.add('hidden');
+      dom.muss('cpop').classList.add('hidden');
   });
 
   document.addEventListener('dragstart',e=>{
     const chip=dom.naechstes(e,'.chip'); if(!chip) return;
-    dragState={name:chip.dataset.name,fromKey:chip.dataset.key,fromShift:chip.dataset.shift};
-    e.dataTransfer.effectAllowed='move';
+    const {name,key,shift}=chip.dataset;
+    // data-shift setzt renderCalendar aus ALL_SHIFTS, zur Laufzeit steht dort
+    // also immer eine Schicht. Geprüft statt behauptet: ein Chip ohne diese
+    // Angaben wäre kaputt, und dann wird er lieber nicht gezogen.
+    if(!name||!key||!RK.istSchicht(shift)) return;
+    dragState={name,fromKey:key,fromShift:shift};
+    if(e.dataTransfer) e.dataTransfer.effectAllowed='move';
     setTimeout(()=>chip.style.opacity='.3',0);
   });
   document.addEventListener('dragend',e=>{const chip=dom.naechstes(e,'.chip');if(chip)chip.style.opacity='';dragState=null;});
 
-  const zone=document.getElementById('drop-zone');
+  const zone=dom.muss('drop-zone');
   zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
   zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
   zone.addEventListener('drop',e=>{
     e.preventDefault();zone.classList.remove('drag-over');
-    const file=e.dataTransfer.files[0];
+    const file=e.dataTransfer?.files[0];
     if(file){try{const dt=new DataTransfer();dt.items.add(file);dom.eingabe('ics-file').files=dt.files;}catch(err){}
-    document.getElementById('drop-label').textContent='📄 '+file.name;}
+    dom.muss('drop-label').textContent='📄 '+file.name;}
   });
-  document.getElementById('ics-file').addEventListener('change',e=>{
-    const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files[0]) document.getElementById('drop-label').textContent='📄 '+inp.files[0].name;
+  dom.muss('ics-file').addEventListener('change',e=>{
+    const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files?.[0]) dom.muss('drop-label').textContent='📄 '+inp.files[0].name;
   });
 }
 
@@ -2716,7 +2812,7 @@ function updatePrintHead(){
     text=`Eigene Feiertage ${curYear}`;
   }
   titel.textContent=text;
-  document.getElementById('print-meta').textContent=meta;
+  dom.muss('print-meta').textContent=meta;
 }
 
 function updateLabel(){
@@ -2776,7 +2872,7 @@ function updateLabel(){
 // ══════════════════════════════════════════════════════════════
 async function refreshFolderBar(){
   const d=await api('/api/datadir');
-  const lbl=document.getElementById('folder-label');
+  const lbl=dom.muss('folder-label');
   if(d.folder){
     // Nur den letzten Teil des Pfades zeigen
     const parts=d.folder.replace(/\\/g,'/').split('/');
@@ -2829,14 +2925,14 @@ function updateUndoBtns(){
   dom.knopf('btn-redo').disabled=!redoStack.length;
 }
 
-async function doUndo(){if(!undoStack.length)return;redoStack.push(JSON.parse(JSON.stringify(schichten)));schichten=undoStack.pop();await api('/api/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schichten})});renderCalendar();updateUndoBtns();toast('Rückgängig');}
-async function doRedo(){if(!redoStack.length)return;undoStack.push(JSON.parse(JSON.stringify(schichten)));schichten=redoStack.pop();await api('/api/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schichten})});renderCalendar();updateUndoBtns();toast('Wiederholt');}
+async function doUndo(){const vorher=undoStack.pop();if(!vorher)return;redoStack.push(JSON.parse(JSON.stringify(schichten)));schichten=vorher;await api('/api/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schichten})});renderCalendar();updateUndoBtns();toast('Rückgängig');}
+async function doRedo(){const danach=redoStack.pop();if(!danach)return;undoStack.push(JSON.parse(JSON.stringify(schichten)));schichten=danach;await api('/api/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schichten})});renderCalendar();updateUndoBtns();toast('Wiederholt');}
 
 // ══════════════════════════════════════════════════════════════
 // COLOR PICKER
 // ══════════════════════════════════════════════════════════════
 function showColorPicker(anchor,memberName){
-  const pop=document.getElementById('cpop');
+  const pop=dom.muss('cpop');
   pop.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch" style="background:${c}" data-c="${c}" data-m="${esc(memberName||'')}"></div>`).join('');
   pop.classList.remove('hidden');
   const r=anchor.getBoundingClientRect();
@@ -2844,11 +2940,11 @@ function showColorPicker(anchor,memberName){
   pop.style.top=(r.bottom+5)+'px';
   pop.onclick=async e=>{
     const sw=dom.naechstes(e,'[data-c]');if(!sw)return;
-    const color=sw.dataset.c,mname=sw.dataset.m;pop.classList.add('hidden');
+    const color=sw.dataset.c??'',mname=sw.dataset.m;pop.classList.add('hidden');
     if(mname){
       await api('/api/mitarbeiter/'+encodeURIComponent(mname)+'/color',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({color})});
       const m=mitarbeiter.find(x=>x.name===mname);if(m)m.color=color;renderMembers();renderCalendar();
-    } else {newColor=color;document.getElementById('new-color').style.background=color;}
+    } else {newColor=color;dom.muss('new-color').style.background=color;}
   };
 }
 
@@ -2870,13 +2966,13 @@ function visibleMembers(){
 
 function renderMembers(){
   const visible=visibleMembers();
-  document.getElementById('member-list').innerHTML=visible.map(m=>{
+  dom.muss('member-list').innerHTML=visible.map(m=>{
     const sel=selectedPerson?.name===m.name,picked=selectedPersons.has(m.name);
     return `<div class="member-item${sel?' selected':''}${picked?' multi-picked':''}" data-member="${esc(m.name)}" style="${sel?`border-color:${m.color};color:${m.color}`:''}">
       <input type="checkbox" class="member-cb" data-cb="${esc(m.name)}" ${picked?'checked':''}>
       <div class="avatar" style="background:${m.color}">${avContent(m)}</div>
       <span class="member-name">${esc(m.name)}</span>
-      <span class="badge badge-${m.team.toLowerCase()}">${m.team}</span>
+      <span class="badge badge-${(m.team||'').toLowerCase()}">${m.team||''}</span>
       <div class="member-btns">
         <button class="mbtn mbtn-edit" data-edit="${esc(m.name)}">✎</button>
         <button class="mbtn mbtn-del" data-del="${esc(m.name)}">✕</button>
@@ -2920,7 +3016,7 @@ async function handleMemberClick(e){
 
 function selectPerson(name){
   selectedPersons.clear();
-  selectedPerson=selectedPerson?.name===name?null:mitarbeiter.find(m=>m.name===name);
+  selectedPerson=selectedPerson?.name===name?null:(mitarbeiter.find(m=>m.name===name)??null);
   // Die Strecke beim Personenwechsel stehen lassen - erst die Person und
   // dann den Zeitraum zu wählen ist ein üblicher Weg
   multiDays.clear();renderMembers();updateSelInfo();
@@ -2930,7 +3026,7 @@ function selectPerson(name){
 // nächste Klick tut. Ohne Werkzeug und mit aufgespanntem Zeitraum steht hier
 // stattdessen, was sich löschen lässt.
 function updateSelInfo(){
-  const el=document.getElementById('sel-info');
+  const el=dom.muss('sel-info');
   const hintEl=document.getElementById('tool-hint');
   const setHint=t=>{ if(hintEl) hintEl.innerHTML=t; };
   const basisHinweis='<kbd>Klick</kbd> ein-/austragen &middot; <kbd>Shift</kbd> Zeitraum &middot; <kbd>Strg</kbd> mehrere Tage';
@@ -2993,9 +3089,9 @@ async function doAdd(name,team,color){
   const d=await api('/api/mitarbeiter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,team,color})});
   if(d.error){toast(d.error);return;}
   mitarbeiter.push({name,team,color:color||AVATAR_COLORS[0],icon:'',prefs:{}});
-  dom.eingabe('new-name').value='';newColor=randColor();document.getElementById('new-color').style.background=newColor;
+  dom.eingabe('new-name').value='';newColor=randColor();dom.muss('new-color').style.background=newColor;
   // Das Formular nach dem Anlegen wieder zuklappen
-  document.getElementById('add-form').classList.remove('open');document.getElementById('add-toggle').classList.remove('open');
+  dom.muss('add-form').classList.remove('open');dom.muss('add-toggle').classList.remove('open');
   renderMembers();renderCalendar();renderTemplateTable();toast(name+' hinzugefügt');
 }
 async function deleteMitarbeiter(name){
@@ -3016,11 +3112,11 @@ async function deleteMitarbeiter(name){
   }catch(err){toast('Fehler: '+(err instanceof Error?err.message:String(err)));}
 }
 function showRestoreModal(name,backup){
-  document.getElementById('restore-name').textContent=name;
+  dom.muss('restore-name').textContent=name;
   const bs={};Object.values(backup).forEach(d=>Object.keys(d).forEach(s=>{bs[s]=(bs[s]||0)+1;}));
   let html='<b>'+Object.keys(backup).length+'</b> Tage:<br>';
   Object.entries(bs).forEach(([s,c])=>{html+='&nbsp;&nbsp;'+(SHIFT_LABEL[s]||s)+': <b>'+c+'×</b><br>';});
-  document.getElementById('restore-stats').innerHTML=html;openModal('restore-modal');
+  dom.muss('restore-stats').innerHTML=html;openModal('restore-modal');
 }
 async function confirmRestore(doRestore){
   closeModal('restore-modal');if(!pendingRestore)return;
@@ -3089,38 +3185,40 @@ function renderStats(){
 // ══════════════════════════════════════════════════════════════
 function openProfile(name){
   const m=mitarbeiter.find(x=>x.name===name);if(!m)return;
-  profOldName=name;profColor=m.color;profEmoji=m.icon||'';
+  profOldName=name;profColor=m.color??null;profEmoji=m.icon||'';
   profPrefs=Object.fromEntries(Object.entries(m.prefs||{}).map(([k,v])=>[parseInt(k),v]));
   dom.eingabe('prof-name').value=m.name;
   dom.auswahl('prof-team').value=m.team||'DE';
-  document.getElementById('prof-cur-name').textContent=m.name;
-  document.getElementById('prof-cur-team').textContent=m.team==='DE'?'🇩🇪 Deutschland':'🇮🇳 Indien';
-  document.getElementById('prof-err').style.display='none';
+  dom.muss('prof-cur-name').textContent=m.name;
+  dom.muss('prof-cur-team').textContent=m.team==='DE'?'🇩🇪 Deutschland':'🇮🇳 Indien';
+  dom.muss('prof-err').style.display='none';
   updateProfAvatar();
-  const cr=document.getElementById('prof-colors');
+  const cr=dom.muss('prof-colors');
   cr.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch-big${c===profColor?' sel':''}" style="background:${c}" data-pc="${c}"></div>`).join('');
-  dom.alle(cr,'[data-pc]').forEach(sw=>sw.addEventListener('click',()=>{profColor=sw.dataset.pc;cr.querySelectorAll('[data-pc]').forEach(s=>s.classList.toggle('sel',s===sw));updateProfAvatar();}));
-  const eg=document.getElementById('prof-emojis');
+  dom.alle(cr,'[data-pc]').forEach(sw=>sw.addEventListener('click',()=>{profColor=sw.dataset.pc??'';cr.querySelectorAll('[data-pc]').forEach(s=>s.classList.toggle('sel',s===sw));updateProfAvatar();}));
+  const eg=dom.muss('prof-emojis');
   eg.innerHTML=`<span class="emoji-none${profEmoji===''?' sel':''}" data-pe="">Kein Icon</span>`+EMOJIS.map(e=>`<span class="emoji-opt${e===profEmoji?' sel':''}" data-pe="${e}">${e}</span>`).join('');
-  dom.alle(eg,'[data-pe]').forEach(el=>el.addEventListener('click',()=>{profEmoji=el.dataset.pe;eg.querySelectorAll('[data-pe]').forEach(x=>x.classList.toggle('sel',x===el));updateProfAvatar();}));
+  dom.alle(eg,'[data-pe]').forEach(el=>el.addEventListener('click',()=>{profEmoji=el.dataset.pe??'';eg.querySelectorAll('[data-pe]').forEach(x=>x.classList.toggle('sel',x===el));updateProfAvatar();}));
   updatePrefButtons();
   dom.alle(document,'.pref-btn').forEach(btn=>btn.addEventListener('click',()=>{
-    const dow=parseInt(btn.dataset.dow),val=btn.dataset.val;
+    const dow=parseInt(btn.dataset.dow??''),val=btn.dataset.val??'';
+    // Ohne data-val wurde vorher undefined als Wunsch gespeichert und beim
+    // Speichern mitgeschickt; ein fehlender Wert heisst jetzt "kein Wunsch".
     if(val==='')delete profPrefs[dow];else profPrefs[dow]=val;updatePrefButtons();
   }));
   openModal('prof-modal');
-  document.getElementById('prof-name').focus();
-  document.getElementById('prof-name').oninput=updateProfAvatar;
+  dom.eingabe('prof-name').focus();
+  dom.eingabe('prof-name').oninput=updateProfAvatar;
 }
 function updateProfAvatar(){
-  const av=document.getElementById('prof-av');av.style.background=profColor;
-  document.getElementById('prof-emoji-disp').textContent=profEmoji;
+  const av=dom.muss('prof-av');av.style.background=profColor??'';
+  dom.muss('prof-emoji-disp').textContent=profEmoji;
   const name=dom.eingabe('prof-name').value.trim();
-  document.getElementById('prof-init-disp').textContent=profEmoji?'':name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  dom.muss('prof-init-disp').textContent=profEmoji?'':name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 }
 function updatePrefButtons(){
   dom.alle(document,'.pref-btn').forEach(btn=>{
-    const dow=parseInt(btn.dataset.dow),val=btn.dataset.val,cur=profPrefs[dow]??'';
+    const dow=parseInt(btn.dataset.dow??''),val=btn.dataset.val,cur=profPrefs[dow]??'';
     const isActive=(val===''&&cur==='')||(val!==''&&cur===val);
     let cls='pref-btn';
     if(isActive) cls+= val===''?' sel-f':val==='frueh'?' sel-f':val==='spaet'?' sel-s':val==='ruf'?' sel-r':' sel-frei';
@@ -3129,21 +3227,21 @@ function updatePrefButtons(){
 }
 async function saveProfile(){
   const newName=dom.eingabe('prof-name').value.trim(),team=dom.auswahl('prof-team').value;
-  const errEl=document.getElementById('prof-err');
+  const errEl=dom.muss('prof-err');
   if(!newName){errEl.textContent='Name darf nicht leer sein.';errEl.style.display='block';return;}
-  const d=await api('/api/mitarbeiter/'+encodeURIComponent(profOldName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newName,team,color:profColor,icon:profEmoji})});
+  const d=await api('/api/mitarbeiter/'+encodeURIComponent(String(profOldName)),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newName,team,color:profColor,icon:profEmoji})});
   if(d.error){errEl.textContent=d.error;errEl.style.display='block';return;}
   if(d.ok) await api('/api/mitarbeiter/'+encodeURIComponent(newName)+'/prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefs:profPrefs})});
   const m=mitarbeiter.find(x=>x.name===profOldName);
-  if(m){m.name=newName;m.team=team;m.color=profColor;m.icon=profEmoji;m.prefs={...profPrefs};}
+  if(m){m.name=newName;m.team=team;m.color=profColor??undefined;m.icon=profEmoji??undefined;m.prefs={...profPrefs};}
   if(newName!==profOldName){
     // Den neuen Namen überall dort einsetzen, wo der alte stand.
     for(const k in schichten)
       for(const s in schichten[k])
         if(Array.isArray(schichten[k][s]))
           schichten[k][s]=schichten[k][s].map(n=>n===profOldName?newName:n);
-    if(selectedPerson?.name===profOldName)selectedPerson=m;
-    if(selectedPersons.delete(profOldName))selectedPersons.add(newName);
+    if(selectedPerson?.name===profOldName)selectedPerson=m??null;
+    if(profOldName!==null&&selectedPersons.delete(profOldName))selectedPersons.add(newName);
     // Kopierter Tag und Rückgängig-Stapel stammen aus einer Welt, in der es
     // den alten Namen noch gab. Würden sie später eingefügt oder
     // zurückgesprungen, stünde er wieder im Kalender - neben dem neuen und
@@ -3189,6 +3287,7 @@ function platziere(el, anker){
 // ── TAGESMENUE ────────────────────────────────────────────────
 // Vier Knöpfe in jeder Zelle waren bis zu 168 Klickziele im Monat. Jetzt
 // öffnet ein Knopf - oder der Rechtsklick - dieselbe kurze Liste.
+/** @type {HTMLElement|null} */
 let dayMenuEl=null;
 function closeDayMenu(){ if(dayMenuEl){ dayMenuEl.remove(); dayMenuEl=null; } }
 function openDayMenu(key,anchor,x,y){
@@ -3248,9 +3347,11 @@ async function leereTage(tage){
 }
 
 function renderCalendar(){
-  const grid = document.getElementById('cal-grid');
+  const grid = dom.muss('cal-grid');
   // Alles bis auf die acht Kopfzellen entfernen (KW + Mo..So)
-  while(grid.children.length > 8) grid.removeChild(grid.lastChild);
+  // children.length > 8 heisst: es gibt Kindknoten - das break ist unerreichbar
+  // und steht nur da, damit lastChild nicht als moeglicherweise null gilt.
+  while(grid.children.length > 8){ const letztes=grid.lastChild; if(!letztes) break; grid.removeChild(letztes); }
 
   const {zellen:allCells, wochen} = RK.monatsRaster(curYear, curMonth);
 
@@ -3521,6 +3622,15 @@ async function applyToDateList(dates,names,action,schicht=selectedShift){
   pushUndo();let entered=0,replaced=0,skipped=0;
   for(const name of names){
     const res=await postSchicht(dates,action,schicht,name);
+    // Meldet der Server einen Fehler statt Ergebnissen - unbekannter Name,
+    // unmoegliches Datum, Schreibfehler -, gibt es nichts zu verteilen.
+    // Vorher warf Object.entries(undefined) mitten im Klick, nach bereits
+    // gesetztem Rueckgaengig-Punkt.
+    if(!res||!res.results){
+      if(!entered&&!replaced) verwerfeUndo();
+      toast('Fehler: '+((res&&res.error)||'keine Antwort vom Server'));
+      return;
+    }
     const holDays=Object.entries(res.results).filter(([,r])=>r.error==='holiday_conflict');
     const confirmDays=Object.entries(res.results).filter(([,r])=>r.error==='needs_confirm');
     const okR=Object.fromEntries(Object.entries(res.results).filter(([,r])=>!r.error));
@@ -3591,8 +3701,10 @@ async function handleDrop(toKey){
 // RANGE
 // ══════════════════════════════════════════════════════════════
 function getRangeDates(){
-  const end=previewEnd||rangeStart;
-  return datesInRange(rangeStart<end?rangeStart:end, rangeStart<end?end:rangeStart);
+  // String() nur fuer die Typpruefung: getRangeDates laeuft nur mit gesetzter
+  // Strecke - und waere sie null, meldet alsDatum() weiter "bekommen: null".
+  const von=String(rangeStart), bis=String(previewEnd||rangeStart);
+  return datesInRange(von<bis?von:bis, von<bis?bis:von);
 }
 
 async function clearRangeAll(){
@@ -3672,7 +3784,7 @@ document.addEventListener('mouseover',e=>{
   if(e.shiftKey&&letzterKlick&&!frozenRangeEnd){
     if(!cell) return;
     rangeStart=letzterKlick;
-    if(cell.dataset.key!==previewEnd){ previewEnd=cell.dataset.key; updateRangePreview(); }
+    if(cell.dataset.key!==previewEnd){ previewEnd=cell.dataset.key??null; updateRangePreview(); }
     return;
   }
   if(rangeStart&&!frozenRangeEnd){ rangeStart=null; previewEnd=null; updateRangePreview(); }
@@ -3728,8 +3840,8 @@ function updateCheckChip(){
 function showCalendarView(){
   document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
-  document.querySelector('[data-view="cal"]').classList.add('active');
-  document.querySelector('[data-panel="cal"]').classList.add('active');
+  dom.einsMuss(document,'[data-view="cal"]').classList.add('active');
+  dom.einsMuss(document,'[data-panel="cal"]').classList.add('active');
   activeView='cal';
   updateContextBar();
   updatePrintHead();
@@ -3750,8 +3862,8 @@ function jumpToDate(key){
 
 function showUnderstaffedReport(){
   const issues=understaffedDays();
-  document.getElementById('under-label').textContent=MONTHS[curMonth-1]+' '+curYear;
-  const cont=document.getElementById('under-content');
+  dom.muss('under-label').textContent=MONTHS[curMonth-1]+' '+curYear;
+  const cont=dom.muss('under-content');
   if(!issues.length){cont.innerHTML='<div style="padding:14px;color:var(--frueh);font-size:14px;text-align:center">✓ Alle Tage vollständig besetzt!</div>';}
   else{
     const date=k=>{const dt=new Date(k+'T00:00:00');return dt.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});};
@@ -3765,9 +3877,9 @@ function showUnderstaffedReport(){
 // ══════════════════════════════════════════════════════════════
 function openDayModal(key){
   activeDayKey=key;const d=new Date(key+'T00:00:00');
-  document.getElementById('dm-title').textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  dom.muss('dm-title').textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const slot=getSlot(key),absents=new Set(getConflicts(slot,key).schichtC);
-  document.getElementById('dm-slots').innerHTML=ALL_SHIFTS.map(s=>{
+  dom.muss('dm-slots').innerHTML=ALL_SHIFTS.map(s=>{
     const color=`var(${SHIFT_VAR[s]})`,people=slot[s]||[];
     const ph=people.length?people.map(name=>{const m=mitarbeiter.find(x=>x.name===name),av=m?m.color:'#64748b';const conf=WORK_SHIFTS.has(s)&&absents.has(name);const avC=m?.icon?`<span style="font-size:12px">${m.icon}</span>`:`<span>${initials(name)}</span>`;return `<div class="dm-chip" style="background:color-mix(in srgb,${color} 15%,transparent);color:${color}${conf?';outline:2px solid #f87171':''}"><div class="dm-av" style="background:${av}">${avC}</div>${esc(name)}${conf?' ⚠':''}</div>`;}).join(''):'<div class="dm-empty">Niemand</div>';
     return `<div class="dm-shift"><div class="dm-shift-hdr"><div class="dm-dot" style="background:${color}"></div><div class="dm-shift-name">${SHIFT_LABEL[s]}</div><div class="dm-meta">${SHIFT_TIME[s]}</div></div><div class="dm-people">${ph}</div></div>`;
@@ -3776,9 +3888,11 @@ function openDayModal(key){
   openModal('day-modal');
 }
 async function saveDayNote(){
+  const key=activeDayKey;
+  if(!key) return;
   const text=dom.textfeld('dm-note').value;
-  await api('/api/notiz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:activeDayKey,text})});
-  if(text)notizen[activeDayKey]=text;else delete notizen[activeDayKey];
+  await api('/api/notiz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:key,text})});
+  if(text)notizen[key]=text;else delete notizen[key];
   closeModal('day-modal');renderCalendar();toast('Notiz gespeichert');
 }
 
@@ -3912,7 +4026,7 @@ function fillTemplateFromPrefs(){
 }
 
 function renderTemplateTable(){
-  const tbl=document.getElementById('tmpl-table');
+  const tbl=dom.muss('tmpl-table');
   tbl.innerHTML='';
   // Header
   const hdrs=['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -3967,7 +4081,7 @@ function cellClass(val){ return TMPL_KLASSE[val]||''; }
 
 async function loadTemplates(){
   const d=await api('/api/templates');templates=d||{};
-  const wrap=document.getElementById('tmpl-saved');
+  const wrap=dom.muss('tmpl-saved');
   const current=dom.eingabe('tmpl-name-input').value.trim();
   wrap.innerHTML=Object.keys(templates).map(n=>`<div style="display:flex;gap:3px;align-items:center">
     <div class="tmpl-saved-btn${n===current?' active':''}" data-tmpl="${n}">${esc(n)}</div>
@@ -3979,7 +4093,7 @@ async function loadTemplates(){
     b.addEventListener('click',()=>deleteTemplate(b.dataset.tmplDel)));
   dom.alle(wrap,'[data-tmpl]').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      const name=btn.dataset.tmpl;
+      const name=String(btn.dataset.tmpl);
       dom.eingabe('tmpl-name-input').value=name;
       // Ein Template in den Editor laden
       const tmpl=templates[name]||{};
@@ -4053,6 +4167,7 @@ function exportRufCSV(){
 // ══════════════════════════════════════════════════════════════
 // Holi und Diwali wechseln jährlich das Datum und sind nur für einen
 // begrenzten Zeitraum hinterlegt - danach müssen sie von Hand ergänzt werden.
+/** @type {{in_movable_from:number,in_movable_to:number}|null} */
 let holidayCoverage=null;
 async function loadHolidayCoverage(){
   try{ holidayCoverage=await api('/api/holiday_coverage'); }catch(e){ holidayCoverage=null; }
@@ -4086,7 +4201,9 @@ function renderCoverageNote(){
 // laufende Nummer der Woche im Monatsraster. Eine Nummer statt eines
 // KW-Schlüssels, damit die Wahl den Monatswechsel überlebt - "die zweite
 // Woche" gibt es in jedem Monat, "KW 41" nicht.
-let mxWoche=null, mxSortierung='';
+/** @type {number|null} */
+let mxWoche=null;
+let mxSortierung='';
 
 // Die Tage, die die Tabelle zeigt. In der Wochenansicht volle Wochen von
 // Montag bis Sonntag, auch über den Monatsrand hinweg - eine Woche
@@ -4104,10 +4221,10 @@ function renderMatrix(){
   const tage=matrixTage();
   const heute=(()=>{const n=new Date();return dk(n.getFullYear(),n.getMonth()+1,n.getDate());})();
 
-  document.getElementById('mx-titel').textContent=`${MONTHS[curMonth-1]} ${curYear}`;
+  dom.muss('mx-titel').textContent=`${MONTHS[curMonth-1]} ${curYear}`;
   fuelleMatrixWahl();
 
-  const lg=document.getElementById('mx-legend');
+  const lg=dom.muss('mx-legend');
   lg.innerHTML=RK.ARBEITSSCHICHTEN.map(s=>
     `<span><i class="mx-band ${s}">${SHIFT_SHORT[s][0]}</i>${esc(SHIFT_LABEL[s])}</span>`).join('')
     +`<span><i class="mx-band doppelt">!</i>doppelt eingeteilt</span>`
@@ -4123,7 +4240,7 @@ function renderMatrix(){
   const leute=RK.sortiereMatrix(gezaehlt,mxSortierung);
 
   if(!leute.length){
-    document.getElementById('mx-zahl').textContent='';
+    dom.muss('mx-zahl').textContent='';
     tbl.innerHTML='<tbody><tr><td class="mx-name">Keine Mitarbeiter</td></tr></tbody>';
     return;
   }
@@ -4189,7 +4306,7 @@ function renderMatrix(){
 
   tbl.innerHTML=spalten+kopf.join('')+'<tbody>'+zeilen.join('')+fuss.join('')+'</tbody>';
   const zeitraum=mxWoche===null?'':' · '+(tage[0]?.kurzDatum||'')+'–'+(tage.at(-1)?.kurzDatum||'');
-  document.getElementById('mx-zahl').textContent=
+  dom.muss('mx-zahl').textContent=
     `${leute.length} Mitarbeiter · ${gesamtArbeit} Arbeitstage · ${gesamtRuf} Tage Rufbereitschaft${zeitraum}`;
 
   dom.alle(tbl,'[data-band][data-key]').forEach(el=>{
@@ -4204,6 +4321,7 @@ function renderMatrix(){
 // derselben Zeile und desselben Bandes: eine Person, eine Schichtart. Wer
 // jemand anderem einen Dienst geben will, trägt aus und ein - das ist eine
 // andere Entscheidung und soll auch anders aussehen.
+/** @type {{key:string,name:string,schicht:string}|null} */
 let mxDrag=null;
 
 function bindeMatrixZiehen(tbl){
@@ -4231,7 +4349,7 @@ function bindeMatrixZiehen(tbl){
     split.addEventListener('dragleave',()=>split.classList.remove('ziel'));
     split.addEventListener('drop',ev=>{
       split.classList.remove('ziel');
-      if(!passt()) return;
+      if(!passt()||!mxDrag) return;   // passt() prüft mxDrag schon mit - tsc sieht das nur hier
       ev.preventDefault();
       const {key:vonKey,name,schicht}=mxDrag;
       mxDrag=null;
@@ -4330,9 +4448,10 @@ function zeigeAnker(){
   const tbl=document.getElementById('mx-table');
   if(!tbl) return;
   tbl.querySelectorAll('.anker').forEach(el=>el.classList.remove('anker'));
-  if(!mxAnker) return;
-  const el=[...dom.alle(tbl,`[data-band="${mxAnker.band}"][data-key="${mxAnker.key}"]`)]
-    .find(e=>e.dataset.name===mxAnker.name);
+  const anker=mxAnker;   // als Konstante gilt die Prüfung auch im Rückruf darunter
+  if(!anker) return;
+  const el=[...dom.alle(tbl,`[data-band="${anker.band}"][data-key="${anker.key}"]`)]
+    .find(e=>e.dataset.name===anker.name);
   if(el) el.classList.add('anker');
 }
 
@@ -4348,6 +4467,7 @@ const schichtVonBand=band=>band==='ruf'?'rufbereitschaft':arbeitsschichtWahl();
 
 // Ausgangspunkt für Shift+Klick: der zuletzt geklickte Tag, samt Person,
 // Band und dem, was der Klick dort getan hat.
+/** @type {{key:string,name:string,band:string,aktion:'add'|'remove'|null}|null} */
 let mxAnker=null;
 
 // Ein Klick in der Monatsübersicht - derselbe Weg wie im Kalender, samt
@@ -4363,7 +4483,7 @@ async function matrixKlick(key,name,band,mitShift){
   // Die Absicht des ersten Klicks zieht durch die Strecke. Sonst liesse sich
   // ein Zeitraum nie leeren: der Ankertag waere ja schon ausgetragen, und die
   // Mehrheitsregel entschiede auf Eintragen.
-  const aktion=strecke ? mxAnker.aktion
+  const aktion=strecke&&mxAnker ? mxAnker.aktion   // eine Strecke gibt es nur mit Anker
     : RK.naechsteAktion([key],[name],schichten,schicht);
   mxAnker={key,name,band,aktion};
 
@@ -4417,8 +4537,8 @@ let bulkMode='mitarbeiter';
 
 function openBulk(mode){
   bulkMode=mode;
-  const titel=document.getElementById('bulk-title');
-  const hinweis=document.getElementById('bulk-hint');
+  const titel=dom.muss('bulk-title');
+  const hinweis=dom.muss('bulk-hint');
   const feld=dom.textfeld('bulk-input');
   if(mode==='mitarbeiter'){
     titel.textContent='Mehrere Mitarbeiter anlegen';
@@ -4481,7 +4601,7 @@ function parseBulk(text){
 }
 
 function updateBulkPreview(){
-  const el=document.getElementById('bulk-preview');
+  const el=dom.muss('bulk-preview');
   const {gut,fehler}=parseBulk(dom.textfeld('bulk-input').value);
   dom.knopf('bulk-go').disabled=gut.length===0;
   if(!gut.length&&!fehler.length){el.innerHTML='<span style="color:var(--text3)">Noch nichts eingetragen.</span>';return;}
@@ -4524,7 +4644,7 @@ async function runBulk(){
 
 function renderCustomHolidays(){
   renderCoverageNote();
-  const list=document.getElementById('hol-list');
+  const list=dom.muss('hol-list');
   if(!customHolidays.length){list.innerHTML='<div class="hol-empty">Noch keine eigenen Feiertage</div>';return;}
   const countryBadge={DE:'<span class="hol-item-country hol-de-badge">🇩🇪 DE</span>',IN:'<span class="hol-item-country hol-in-badge">🇮🇳 IN</span>','DE+IN':'<span class="hol-item-country hol-both-badge">🌍 Beide</span>'};
   list.innerHTML=customHolidays.map(h=>{
@@ -4568,17 +4688,17 @@ async function deleteCustomHoliday(date,name){
 // ICS
 // ══════════════════════════════════════════════════════════════
 function openIcsModal(){
-  document.getElementById('exp-person').innerHTML='<option value="">Alle</option>'+mitarbeiter.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
+  dom.muss('exp-person').innerHTML='<option value="">Alle</option>'+mitarbeiter.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
   const years=new Set(Object.keys(schichten).map(k=>k.slice(0,4)));years.add(String(curYear));
-  document.getElementById('exp-year').innerHTML='<option value="">Alle Jahre</option>'+[...years].sort().map(y=>`<option value="${y}"${Number(y)===curYear?' selected':''}>${y}</option>`).join('');
-  document.getElementById('exp-month').innerHTML='<option value="">Alle Monate</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
-  document.getElementById('imp-result').className='imp-result';
+  dom.muss('exp-year').innerHTML='<option value="">Alle Jahre</option>'+[...years].sort().map(y=>`<option value="${y}"${Number(y)===curYear?' selected':''}>${y}</option>`).join('');
+  dom.muss('exp-month').innerHTML='<option value="">Alle Monate</option>'+MONTH_SHORT.map((m,i)=>`<option value="${i+1}"${i+1==curMonth?' selected':''}>${m}</option>`).join('');
+  dom.muss('imp-result').className='imp-result';
   openModal('ics-modal');
 }
 function doExport(){const p=dom.auswahl('exp-person').value,y=dom.auswahl('exp-year').value,m=dom.auswahl('exp-month').value;let url='/api/export_ics?x=1';if(p)url+='&person='+encodeURIComponent(p);if(y)url+='&year='+y;if(m)url+='&month='+m;window.location.href=url;}
 async function doImport(){
-  const input=dom.eingabe('ics-file'),resEl=document.getElementById('imp-result');
-  if(!input.files.length){resEl.textContent='Datei auswählen.';resEl.className='imp-result err';return;}
+  const input=dom.eingabe('ics-file'),resEl=dom.muss('imp-result');
+  if(!input.files?.length){resEl.textContent='Datei auswählen.';resEl.className='imp-result err';return;}
   const fd=new FormData();fd.append('file',input.files[0]);
   const d=await fetch('/api/import_ics',{method:'POST',body:fd}).then(r=>r.json());
   if(d.error){resEl.textContent='Fehler: '+d.error;resEl.className='imp-result err';}
@@ -4599,7 +4719,7 @@ async function doImport(){
 // TOOLTIP
 // ══════════════════════════════════════════════════════════════
 function showTooltip(cellEl,key){
-  const slot=getSlot(key),hol=holidays[key],note=notizen[key],d=new Date(key+'T00:00:00'),tt=document.getElementById('tooltip');
+  const slot=getSlot(key),hol=holidays[key],note=notizen[key],d=new Date(key+'T00:00:00'),tt=dom.muss('tooltip');
   const{schichtC,holC}=getConflicts(slot,key);
   const row=(lbl,ppl,clr)=>ppl?.length?`<div class="tt-row"><span class="tt-lbl" style="color:${clr}">${lbl}</span><span class="tt-names">${ppl.map(esc).join(', ')}</span></div>`:'';
   // Besetzung je Schicht nach denselben Regeln wie ueberall: das Soll kommt
@@ -4622,7 +4742,7 @@ function showTooltip(cellEl,key){
   tt.classList.add('show');
   platziere(tt,cellEl);
 }
-function hideTooltip(){document.getElementById('tooltip').classList.remove('show');}
+function hideTooltip(){dom.muss('tooltip').classList.remove('show');}
 
 // ══════════════════════════════════════════════════════════════
 // HOLIDAY WARNINGS
@@ -4647,10 +4767,10 @@ function confirmDialog(title,html,yesLabel='Ja'){
     // Aufrufer lesen ihre eigenen Eingabefelder aus dem Dialog aus, nachdem das
     // Versprechen erfüllt ist. Wird sofort entfernt, sind die Felder weg und
     // die Auswahl fällt stillschweigend auf die Vorgabe zurück.
-    dom.eins(dlg,'#_cdlg-yes').onclick=()=>{
+    dom.einsMuss(dlg,'#_cdlg-yes').onclick=()=>{
       dlg.style.display='none'; resolve(true); setTimeout(()=>dlg.remove(),0);
     };
-    dom.eins(dlg,'#_cdlg-no').onclick=()=>{dlg.remove();resolve(false);};
+    dom.einsMuss(dlg,'#_cdlg-no').onclick=()=>{dlg.remove();resolve(false);};
     dlg.addEventListener('click',e=>{if(e.target===dlg){dlg.remove();resolve(false);}});
   });
 }
@@ -4693,7 +4813,7 @@ function setZoom(stufe){
 
 // Seitenleiste ein- oder ausklappen; die Wahl wird gemerkt.
 function setSidebar(zu){
-  const m=document.getElementById('main'), btn=document.getElementById('sidebar-toggle');
+  const m=dom.muss('main'), btn=dom.muss('sidebar-toggle');
   m.classList.toggle('collapsed',zu);
   btn.classList.toggle('closed',zu);
   btn.textContent=zu?'▶':'◀';
@@ -4714,19 +4834,20 @@ function ladeZoom(){
   setZoom(isNaN(s)?1:s);
 }
 
-function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
+function toast(msg){const el=dom.muss('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
 async function doImportData(){
   // Felder des Sicherungsdialogs - der einzige Weg, der hierher fuehrt.
   const input=dom.eingabe('backup-file');
-  const resEl=document.getElementById('backup-result');
-  if(!input.files.length){
+  const resEl=dom.muss('backup-result');
+  const dateien=input.files;
+  if(!dateien?.length){
     resEl.style.cssText='display:block;background:rgba(248,113,113,.1);color:#f87171';
     resEl.textContent='Bitte eine .json Datei auswählen.'; return;
   }
   const ok=await confirmDialog('Wirklich importieren?',
     'Alle aktuellen Daten werden durch den Import <strong>vollständig ersetzt</strong>.<br>Diese Aktion kann nicht rückgängig gemacht werden.<br><br>Fortfahren?','Ja, importieren');
   if(!ok) return;
-  const fd=new FormData(); fd.append('file',input.files[0]);
+  const fd=new FormData(); fd.append('file',dateien[0]);
   const d=await fetch('/api/import_data',{method:'POST',body:fd}).then(r=>r.json());
   if(d.error){
     resEl.style.cssText='display:block;background:rgba(248,113,113,.1);color:#f87171';
@@ -4746,13 +4867,13 @@ async function doImportData(){
 function closeModal(id){
   const el=document.getElementById(id);
   const box=/** @type {HTMLElement|null|undefined} */ (el?.querySelector('.modal-box'));
-  if(box){box.style.animation='scaleIn .18s ease reverse';
+  if(el&&box){box.style.animation='scaleIn .18s ease reverse';
     setTimeout(()=>{el.classList.add('hidden');box.style.animation='';},160);}
   else el?.classList.add('hidden');
 }
 function closeAllModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.add('hidden'));}
 function openModal(id){
-  const el=document.getElementById(id);
+  const el=dom.muss(id);
   el.classList.remove('hidden');
   const box=dom.eins(el,'.modal-box');
   if(box){box.style.animation='none';void box.offsetWidth;box.style.animation='scaleIn .18s cubic-bezier(.34,1.2,.64,1)';}
