@@ -57,13 +57,18 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 - **Eine Leiste**: Ansichten, Monat und der Hinweis auf Unterbesetzung stehen
   nebeneinander im Kopf. Ansichten ohne Monatsbezug grauen die Datumssteuerung
   nur aus, statt sie verschwinden zu lassen; alles Seltene – ICS, Drucken,
-  Sicherung, Ordner, Anzeigegröße, Theme – liegt im Menü ⋯ rechts
+  Sicherung, Ordner, Anzeigegröße, Theme, Anleitung – liegt im Menü ⋯ rechts
 - **Ein Werkzeug**: Person(en) und Schicht stehen zusammen oben in der
   Seitenleiste. Klick trägt ein oder aus, Shift+Klick zieht die gleiche
   Absicht über einen Zeitraum, Strg+Klick sammelt einzelne Tage. Tasten 1–4
   wählen die Schicht, ← → blättern den Monat, T springt auf heute
 - **Ein Tagesmenü**: Notiz, Kopieren, Einfügen und Leeren stecken hinter ⋯ in
   der Tageskarte oder hinter dem Rechtsklick
+- **Anleitung** im Menü ⋯ oder mit `F1`: jede Ansicht und jeder Bedienweg in
+  zehn Kapiteln, links die Gliederung, oben eine Suche, die Kapitel ohne
+  Treffer ausblendet. Der Text steht fest im Markup – und
+  `tests/anleitung.test.mjs` lässt weder eine neue Ansicht noch einen neuen
+  Knopf im Menü ⋯ unerklärt durchgehen
 - **Druckansicht** im Querformat: nur die offene Ansicht, mit Kopfzeile,
   ausgeschriebenen Notizen und derselben Legende wie im Fenster – unabhängig
   vom Theme immer auf Weiß
