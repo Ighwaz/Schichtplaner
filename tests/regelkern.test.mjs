@@ -582,3 +582,168 @@ describe('popupPlatz ohne Fenstermaße', () => {
     assert.equal(p.maxHoehe, 400);
   });
 });
+
+describe('matrixZelle', () => {
+  const tag = {
+    frueh: ['Bauer, Martin'],
+    normal: [],
+    spaet: ['Wolf, Tim'],
+    rufbereitschaft: ['Bauer, Martin', 'Nair, Anita'],
+  };
+  // Kurzschreibweise fuer ein einzelnes Band einer Zelle.
+  const band = (slot, name, id) => RK.matrixBand(RK.matrixZelle(slot, name), id);
+
+  test('liefert ein Band je Schichtart, die nebeneinander laufen kann', () => {
+    const z = RK.matrixZelle(tag, 'Bauer, Martin');
+    assert.deepEqual(z.baender.map(b => b.id), RK.MATRIX_BAENDER.map(b => b.id));
+  });
+
+  test('meldet Arbeitsschicht und Rufbereitschaft getrennt', () => {
+    // Der gemeldete Fall: beides am selben Tag. Eine Zelle kann dafuer nicht
+    // eine Farbe haben - sie braucht ein Feld je Art.
+    assert.equal(band(tag, 'Bauer, Martin', 'arbeit').schicht, 'frueh');
+    assert.equal(band(tag, 'Bauer, Martin', 'ruf').schicht, 'rufbereitschaft');
+    assert.equal(RK.matrixZelle(tag, 'Bauer, Martin').leer, false);
+  });
+
+  test('Rufbereitschaft allein laesst das obere Band leer', () => {
+    assert.equal(band(tag, 'Nair, Anita', 'arbeit').schicht, null);
+    assert.equal(band(tag, 'Nair, Anita', 'ruf').schicht, 'rufbereitschaft');
+    assert.equal(RK.matrixZelle(tag, 'Nair, Anita').leer, false,
+      'ein Tag mit Rufbereitschaft ist nicht leer');
+  });
+
+  test('Arbeit allein laesst das untere Band leer', () => {
+    assert.equal(band(tag, 'Wolf, Tim', 'arbeit').schicht, 'spaet');
+    assert.equal(band(tag, 'Wolf, Tim', 'ruf').schicht, null);
+  });
+
+  test('zwei Arbeitsschichten sind ein Fehler, keine zwei Farben', () => {
+    const b = band({ frueh: ['A'], normal: [], spaet: ['A'], rufbereitschaft: [] }, 'A', 'arbeit');
+    assert.equal(b.doppelt, true);
+    assert.deepEqual(b.alle, ['frueh', 'spaet']);
+    assert.equal(b.schicht, 'frueh', 'die erste Schicht bleibt die angezeigte');
+  });
+
+  test('doppelt gilt je Band - Rufbereitschaft daneben ist kein Fehler', () => {
+    const slot = { frueh: ['A'], normal: [], spaet: [], rufbereitschaft: ['A'] };
+    assert.equal(band(slot, 'A', 'arbeit').doppelt, false, 'Frueh + Rufbereitschaft ist erlaubt');
+    assert.equal(band(slot, 'A', 'ruf').doppelt, false);
+  });
+
+  test('ein unbekannter Tag ist leer statt ein Absturz', () => {
+    for (const nichts of [undefined, null, {}, { frueh: null }]) {
+      const z = RK.matrixZelle(nichts, 'A');
+      assert.equal(z.leer, true, String(nichts));
+      assert.deepEqual(z.baender.map(b => b.schicht), z.baender.map(() => null));
+    }
+  });
+
+  test('haelt kaputte Listen aus', () => {
+    const slot = { frueh: 'Bauer', spaet: 42, rufbereitschaft: ['Bauer'] };
+    assert.equal(band(slot, 'Bauer', 'arbeit').schicht, null,
+      'eine Zeichenkette ist keine Namensliste');
+    assert.equal(band(slot, 'Bauer', 'ruf').schicht, 'rufbereitschaft');
+  });
+
+  test('ein Name wie constructor faellt nicht durch', () => {
+    const slot = { frueh: ['constructor'], normal: [], spaet: [], rufbereitschaft: [] };
+    assert.equal(band(slot, 'constructor', 'arbeit').schicht, 'frueh');
+  });
+
+  test('matrixBand meldet ein unbekanntes Band als null', () => {
+    assert.equal(RK.matrixBand(RK.matrixZelle(tag, 'Bauer, Martin'), 'urlaub'), null);
+    assert.equal(RK.matrixBand(null, 'arbeit'), null);
+  });
+});
+
+describe('matrixFuss', () => {
+  const SOLL_TAG = { frueh: 1, normal: 0, spaet: 1, rufbereitschaft: 1 };
+  const fuss = (slot, key) => Object.fromEntries(
+    RK.matrixFuss(slot, key, SOLL_TAG).map(b => [b.id, b]));
+
+  test('zaehlt je Band getrennt', () => {
+    const f = fuss(vollerTag(), '2026-09-03');
+    assert.equal(f.arbeit.zahl, 2, 'Frueh + Spaet');
+    assert.equal(f.ruf.zahl, 1);
+    assert.equal(f.arbeit.fehlt, false);
+    assert.equal(f.ruf.fehlt, false);
+  });
+
+  test('meldet eine fehlende Rufbereitschaft, auch wenn die Arbeit steht', () => {
+    const f = fuss({ frueh: ['A'], normal: [], spaet: ['B'], rufbereitschaft: [] }, '2026-09-03');
+    assert.equal(f.arbeit.fehlt, false);
+    assert.equal(f.ruf.fehlt, true, 'sonst geht sie in der Summe unter');
+  });
+
+  test('am Wochenende wird nur die Rufbereitschaft angemahnt', () => {
+    // 2026-09-05 ist ein Samstag.
+    const f = fuss({ frueh: [], normal: [], spaet: [], rufbereitschaft: ['A'] }, '2026-09-05');
+    assert.equal(f.arbeit.fehlt, false);
+    assert.equal(f.ruf.fehlt, false);
+  });
+
+  test('ein leerer Tag meldet beide Baender', () => {
+    const f = fuss(null, '2026-09-03');
+    assert.equal(f.arbeit.zahl, 0);
+    assert.equal(f.ruf.zahl, 0);
+    assert.equal(f.arbeit.fehlt, true);
+    assert.equal(f.ruf.fehlt, true);
+  });
+});
+
+describe('sortiereMatrix', () => {
+  const zeilen = [
+    { name: 'Wolf, Tim', team: 'DE', zaehl: { frueh: 2, spaet: 9, rufbereitschaft: 0 } },
+    { name: 'Bauer, Martin', team: 'IN', zaehl: { frueh: 9, spaet: 1, rufbereitschaft: 7 } },
+    { name: 'Nair, Anita', team: 'DE', zaehl: { frueh: 9, spaet: 3, rufbereitschaft: 7 } },
+  ];
+  const namen = liste => liste.map(z => z.name);
+
+  test('ohne Kriterium bleibt die Reihenfolge der Mitarbeiterliste', () => {
+    assert.deepEqual(namen(RK.sortiereMatrix(zeilen, '')), namen(zeilen));
+    assert.deepEqual(namen(RK.sortiereMatrix(zeilen)), namen(zeilen));
+  });
+
+  test('nach Namen aufsteigend', () => {
+    assert.deepEqual(namen(RK.sortiereMatrix(zeilen, 'name')),
+      ['Bauer, Martin', 'Nair, Anita', 'Wolf, Tim']);
+  });
+
+  test('nach einer Schicht absteigend - wer am meisten hat, steht oben', () => {
+    assert.deepEqual(namen(RK.sortiereMatrix(zeilen, 'spaet')),
+      ['Wolf, Tim', 'Nair, Anita', 'Bauer, Martin']);
+  });
+
+  test('bei Gleichstand entscheidet der Name', () => {
+    // Bauer und Nair haben beide 9 Fruehschichten.
+    assert.deepEqual(namen(RK.sortiereMatrix(zeilen, 'frueh')),
+      ['Bauer, Martin', 'Nair, Anita', 'Wolf, Tim']);
+  });
+
+  test('nach Team, darin nach Namen', () => {
+    assert.deepEqual(namen(RK.sortiereMatrix(zeilen, 'team')),
+      ['Nair, Anita', 'Wolf, Tim', 'Bauer, Martin']);
+  });
+
+  test('veraendert die Eingabe nicht', () => {
+    const vorher = namen(zeilen);
+    RK.sortiereMatrix(zeilen, 'name');
+    assert.deepEqual(namen(zeilen), vorher);
+  });
+
+  test('haelt Unsinn aus', () => {
+    assert.deepEqual(RK.sortiereMatrix(null, 'name'), []);
+    assert.deepEqual(RK.sortiereMatrix(undefined), []);
+    assert.deepEqual(namen(RK.sortiereMatrix(zeilen, 'gibtsnicht')), namen(zeilen));
+    // Eine fehlende Zaehlung gilt als 0, nicht als Absturz.
+    const luecke = [{ name: 'B' }, { name: 'A', zaehl: { frueh: 3 } }];
+    assert.deepEqual(RK.sortiereMatrix(luecke, 'frueh').map(z => z.name), ['A', 'B']);
+  });
+
+  test('sortiert deutsche Umlaute an der erwarteten Stelle', () => {
+    const liste = [{ name: 'Zimmer' }, { name: 'Ärzte' }, { name: 'Bauer' }];
+    assert.deepEqual(RK.sortiereMatrix(liste, 'name').map(z => z.name),
+      ['Ärzte', 'Bauer', 'Zimmer']);
+  });
+});

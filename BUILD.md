@@ -36,6 +36,14 @@ Verträge, die das Frontend erwartet – Konfliktregeln, KW-Plan, Umbenennen,
 Löschen/Wiederherstellen, ICS- und Backup-Export sowie die einmalige Migration
 der alten JSON-Datei.
 
+Die Oberfläche hat eigene Tests und eine Typprüfung; beides braucht Node,
+die fertige EXE nicht:
+
+```bash
+npm install    # einmalig: jsdom und TypeScript
+npm test       # erst Typprüfung (tsc über JSDoc), dann alle Tests der Oberfläche
+```
+
 ## Release Build (EXE)
 
 ```bash
@@ -62,7 +70,8 @@ schichtplaner/
 │   ├── store/         # SQLite: Schema, Transaktionen, Änderungsverlauf
 │   ├── httpapi/       # Anfragen entgegennehmen, Antworten schreiben
 │   └── config/        # merkt den zuletzt benutzten Datenordner
-├── tests/             # Tests der Oberfläche (Node + jsdom)
+├── tests/             # Tests und Typprüfung der Oberfläche (Node, jsdom, tsc)
+├── tsconfig*.json     # Strenge der Typprüfung, mit Begründung
 ├── go.mod
 ├── wails.json
 └── frontend/

@@ -1,0 +1,25 @@
+// Typpruefung des Regelkerns - der Block <script id="regelkern"> in
+// frontend/index.html, herausgeschnitten von tests/typpruefung.mjs.
+//
+// Volle Strenge: hier stehen die Planungsregeln, und ihre Typen tragen bis in
+// jeden Aufruf der Oberflaeche. Dazu nur die ES-Bibliothek, kein DOM - der
+// Regelkern arbeitet ohne Fenster, und so bleibt es: wer darin nach document
+// oder fetch greift, bekommt einen Typfehler statt einer Stilfrage.
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": [],
+    "skipLibCheck": true,
+
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "files": ["tests/.typen/regelkern.js"]
+}

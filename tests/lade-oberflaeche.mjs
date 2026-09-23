@@ -41,8 +41,14 @@ const namenDerWoche = roh =>
  * und beantwortet genau die Wege, die die Oberflaeche aufruft. Jeder Aufruf
  * wird in .aufrufe mitgeschrieben, damit Tests pruefen koennen, was die
  * Oberflaeche geschickt haette.
+ *
+ * autoplan ist die Antwort auf /api/autoplan, je Aufruf einmal aufgerufen.
+ * Die echte Antwort ist {planned, ersetzt, skipped_*, unbekannt} oder
+ * {error}; welche Tage dabei entstehen, entscheidet der Go-Teil - deshalb
+ * legt der Test das hier selbst fest.
  */
-export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage = {} } = {}) {
+export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage = {},
+                          autoplan = null, schichtFehler = null } = {}) {
   const zustand = {
     mitarbeiter: [...mitarbeiter],
     schichten: JSON.parse(JSON.stringify(schichten)),
@@ -112,6 +118,11 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
       return { ok: true, applied: angelegt };
     }
 
+    if (pfad === '/api/schicht' && schichtFehler) {
+      // Der Go-Teil antwortet bei einem unbekannten Namen oder einem
+      // unmoeglichen Datum mit {error}, ohne "results".
+      return { error: schichtFehler(koerper) };
+    }
     if (pfad === '/api/schicht') {
       // Dieselben vier Aktionen wie im Go-Teil - und dieselbe Rückfrage bei
       // einer zweiten Arbeitsschicht am selben Tag. Ohne die prüfen Tests
@@ -123,8 +134,13 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
         const drin = t[schicht] && t[schicht].includes(name);
 
         if ((action === 'add' || action === 'toggle') && !drin) {
-          const blockierend = ARBEITSSCHICHTEN
-            .filter(s => s !== schicht && (t[s] || []).includes(name));
+          // Die Rufbereitschaft laeuft daneben her: sie wird nicht blockiert
+          // und blockiert selbst nichts. Genau wie blockingShifts in
+          // internal/domain/slot.go. Ohne diese Ausnahme meldet die Attrappe
+          // eine Rueckfrage, die es in Wirklichkeit nicht gibt - und ein Test
+          // haengt an einem Dialog, den das Programm nie oeffnet.
+          const blockierend = schicht === 'rufbereitschaft' ? []
+            : ARBEITSSCHICHTEN.filter(s => s !== schicht && (t[s] || []).includes(name));
           if (blockierend.length && !force) {
             results[d] = { error: 'needs_confirm', blocking: blockierend };
             continue;
@@ -140,6 +156,9 @@ export function baueAPI({ mitarbeiter = [], schichten = {}, soll = {}, feiertage
         results[d] = kopie(t);
       }
       return { results, hol_warnings: {} };
+    }
+    if (pfad === '/api/autoplan') {
+      return autoplan ? autoplan(koerper, zustand) : { planned: 0 };
     }
     if (pfad === '/api/paste') {
       for (const d of koerper.dates) {

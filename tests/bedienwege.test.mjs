@@ -348,6 +348,52 @@ describe('Ziehen auf einen belegten Tag', () => {
     zielZelle.dispatchEvent(drop);
   }
 
+  test('ein abgebrochener Zug lässt Wiederholen stehen', async () => {
+    // pushUndo() leert den Wiederholen-Stapel. Wurde die Rückfrage dann
+    // abgebrochen, nahm der Code nur den Rückgängig-Schritt zurück - und
+    // Wiederholen war weg, obwohl sich nichts geändert hatte.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+
+    o.fenster.waehleSchicht('frueh');
+    await o.fenster.schichtAufTagen(['2026-09-21'], ['Krüger, Sina']);
+    await o.fenster.doUndo();
+    await warteBis(() => !o.$('#btn-redo').disabled, 'einen Schritt zum Wiederholen');
+
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await warteBis(() => o.$('#_cdlg'), 'die Rückfrage');
+    klick(o.$('#_cdlg-no'));
+    await ruhe(); await ruhe();
+
+    assert.ok(!o.$('#btn-redo').disabled, 'Wiederholen ist nach dem Abbruch verloren');
+  });
+
+  test('die Rückfrage nennt die gezogene Schicht, nicht die gewählte', async () => {
+    // Gefunden bei der Typisierung: handleDrop rief die Rückfrage ohne
+    // Schicht auf, und die fiel auf die aus der Leiste zurück.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-03': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+        '2026-09-10': { frueh: [], normal: [], spaet: ['Bauer, Martin'], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.waehleSchicht('normal');   // etwas anderes als die gezogene Frühschicht
+
+    ziehe(o, o.$('.day-cell[data-key="2026-09-03"] .chip'), o.$('.day-cell[data-key="2026-09-10"]'));
+    await warteBis(() => o.$('#_cdlg'), 'die Rückfrage');
+    const text = o.$('#_cdlg').textContent;
+    assert.match(text, /Durch Frühschicht ersetzen/, text);
+    assert.doesNotMatch(text, /Normaldienst/, 'die Rückfrage nennt die Schicht aus der Leiste');
+  });
+
   test('ein Chip geht beim Ziehen in einen Konflikt nicht verloren', async () => {
     // Bauer hat am 3.9. Früh und am 10.9. bereits Spät. Wird die Frühschicht
     // auf den 10. gezogen, stünde er in zwei Arbeitsschichten - dieselbe
@@ -390,5 +436,85 @@ describe('Ziehen auf einen belegten Tag', () => {
     await warteBis(() => frueh(o, '2026-09-03').length === 0, 'den Ausgangstag');
     // Die abgegebene Spätschicht ist die, die ersetzt wurde.
     assert.equal((o.api.zustand.schichten['2026-09-10'].spaet || []).length, 0);
+  });
+});
+
+describe('Zeitraum leeren', () => {
+  // Ohne Werkzeug spannt Klick + Shift-Klick einen Zeitraum zum Löschen auf.
+  async function spanneAuf(o) {
+    klick(o.$('.day-cell[data-key="2026-09-07"]'));
+    await ruhe();
+    klick(o.$('.day-cell[data-key="2026-09-11"]'), { shiftKey: true });
+    await ruhe();
+  }
+
+  test('ein Abbruch lässt die Strecke stehen', async () => {
+    // clearRangeAll setzte frozenRangeEnd vor der Rückfrage auf null. Bei
+    // einem Abbruch blieb der Löschblock zwar stehen, der Zustand dahinter
+    // war aber weg - der nächste Klick darin traf ins Leere.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: {
+        '2026-09-09': { frueh: ['Bauer, Martin'], normal: [], spaet: [], rufbereitschaft: [] },
+      },
+    });
+    await zeigeMonat(o, 2026, 9);
+    await spanneAuf(o);
+    assert.match(o.$('#sel-info').textContent, /5 Tage/, o.$('#sel-info').textContent);
+
+    o.fenster.clearRangeAll();
+    await warteBis(() => o.$('#_cdlg'), 'die Rückfrage');
+    klick(o.$('#_cdlg-no'));
+    await ruhe(); await ruhe();
+
+    // Nichts gelöscht ...
+    assert.deepEqual(o.api.zustand.schichten['2026-09-09'].frueh, ['Bauer, Martin']);
+    // ... und die Strecke steht noch, samt Löschblock.
+    o.fenster.updateSelInfo();
+    assert.match(o.$('#sel-info').textContent, /5 Tage/,
+      'die Strecke ist nach dem Abbruch verschwunden');
+  });
+});
+
+describe('Auswahlfelder der Rufbereitschaft', () => {
+  test('es ist immer nur eines offen', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: TEAM });
+    klick(o.$('.vtab[data-view="ruf"]'));
+    await ruhe();
+    const anker = o.$('.vtab[data-view="ruf"]');
+
+    o.fenster.openRufTagPicker('2026-09-14', anker);
+    assert.ok(!o.$('#ruftag-picker').classList.contains('hidden'), 'das Tagesfeld ging nicht auf');
+
+    o.fenster.openRufKWPicker('2026-W38', anker);
+    assert.ok(o.$('#ruftag-picker').classList.contains('hidden'),
+      'das Tagesfeld blieb neben dem Wochenfeld offen');
+    assert.ok(!o.$('#rufkw-picker').classList.contains('hidden'));
+
+    o.fenster.openRufTagPicker('2026-09-15', anker);
+    assert.ok(o.$('#rufkw-picker').classList.contains('hidden'),
+      'das Wochenfeld blieb neben dem Tagesfeld offen');
+  });
+});
+
+describe('Wenn der Server einen Fehler meldet', () => {
+  test('ein Klick stürzt nicht ab und lässt keinen Rückgängig-Schritt zurück', async () => {
+    // /api/schicht antwortet bei einem unbekannten Namen oder einem
+    // unmöglichen Datum mit {error} und ohne "results". applyToDateList lief
+    // darauf in Object.entries(undefined) - mitten im Klick, nach bereits
+    // gesetztem Rückgängig-Punkt.
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichtFehler: () => 'unbekannter Mitarbeiter',
+    });
+    await zeigeMonat(o, 2026, 9);
+    o.fenster.waehleSchicht('frueh');
+
+    await o.fenster.schichtAufTagen(['2026-09-07', '2026-09-08'], ['Bauer, Martin']);
+
+    assert.match(o.$('#toast').textContent, /unbekannter Mitarbeiter/,
+      'der Fehler wird nicht gemeldet');
+    assert.ok(o.$('#btn-undo').disabled,
+      'es blieb ein Rückgängig-Schritt stehen, obwohl nichts geschehen ist');
   });
 });

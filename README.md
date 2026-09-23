@@ -16,9 +16,20 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   die immer zusätzlich dazu läuft und nie nachfragt
 - **Kalender**: jeder Tag zeigt immer alle Schichten in derselben
   Reihenfolge, mit Besetzung als `1/1` je Zeile – rot, sobald das Soll fehlt
-- **Monatsübersicht**: eine Zeile je Person, eine Spalte je Tag. Zeigt Lücken,
-  Häufungen und Doppelbelegungen auf einen Blick; Klick auf eine Zelle trägt
-  die gewählte Schicht ein
+- **Monatsübersicht**: eine Zeile je Person, eine Spalte je Tag. Jeder Tag ist
+  geteilt – oben die Arbeitsschicht, unten die Rufbereitschaft, weil beides am
+  selben Tag nebeneinander läuft. Ein Klick auf das obere Feld trägt die
+  gewählte Arbeitsschicht ein oder aus, ein Klick auf den unteren Streifen die
+  Rufbereitschaft. **Shift+Klick** zieht vom zuletzt geklickten Tag bis hierher
+  auf – nur innerhalb derselben Zeile und desselben Bandes, also eine ganze
+  Woche Rufbereitschaft in zwei Klicks, ohne je eine fremde Zeile zu treffen.
+  Ein belegtes Feld lässt sich auf einen anderen Tag **ziehen**, ebenfalls nur
+  in derselben Zeile. Die Zeilen lassen sich **sortieren** (Name, Team oder
+  „meiste Spätschichten“), und statt des ganzen Monats lässt sich eine
+  **einzelne Woche** zeigen – Montag bis Sonntag, auch über den Monatsrand
+  hinweg. Beides wird gemerkt. Rechts die Summen F/N/S/R je Person, unten die
+  Besetzung je Tag – ebenfalls getrennt, damit eine fehlende Rufbereitschaft
+  nicht in der Summe der Arbeitsschichten untergeht
 - **Feiertage** DE (BW) und IN inkl. Brückentagen und eigenen Feiertagen.
   Ein Eintrag am Feiertag des eigenen Teams wird abgefragt, nicht verhindert
 - **Konfliktprüfung**: wer schon in einer anderen Schicht steht, wird nur nach
@@ -65,9 +76,10 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
 
 ```
 go test ./...       # API, Speicher, Feiertage, ICS, Nebenläufigkeit
-npm install         # einmalig, holt jsdom
-npm test            # Planungsregeln und Oberfläche
-npm run coverage    # dasselbe mit Deckungsgrad
+npm install         # einmalig, holt jsdom und TypeScript
+npm test            # Typprüfung, dann Planungsregeln und Oberfläche
+npm run typen       # nur die Typprüfung
+npm run coverage    # Tests mit Deckungsgrad
 ```
 
 Die Planungsregeln stehen in `frontend/index.html` im Block
@@ -78,6 +90,33 @@ startet stattdessen die ganze Seite in jsdom und hängt eine erfundene API
 davor, sodass Klickwege wie im Fenster laufen. Die Oberfläche bleibt dabei
 eine einzige Datei ohne Laufzeitabhängigkeiten – jsdom ist reine
 Entwicklungsausstattung und landet nicht in der EXE.
+
+### Typprüfung
+
+Die Oberfläche bleibt JavaScript ohne Build-Schritt – die EXE bettet genau
+`frontend/index.html` ein. Geprüft wird trotzdem mit dem TypeScript-Compiler:
+die Typen stehen als JSDoc-Kommentare im Code, `tests/typpruefung.mjs`
+schneidet beide `<script>`-Blöcke zeilengenau heraus und lässt `tsc` darüber
+laufen, ohne etwas zu erzeugen. Jede Meldung zeigt direkt auf eine Zeile in
+`index.html`. TypeScript ist wie jsdom reine Entwicklungsausstattung.
+
+| Teil | Strenge | Warum |
+|---|---|---|
+| Regelkern | `strict`, nur ES-Bibliothek | Hier stehen die Regeln; ihre Typen tragen bis in jeden Aufruf. Ohne DOM-Bibliothek ist „der Regelkern greift nicht ins Fenster“ eine Regel, die tsc durchsetzt. |
+| Oberfläche | `strict` ohne `noImplicitAny` | Der eine fehlende Schalter verlangt einen Typ an jedem Parameter (rund 480 Stellen) und ist ein eigener Durchgang. `strictNullChecks` kam als zweite Stufe dazu. |
+
+Die Einstellungen stehen mit Begründung in `tsconfig.json` und
+`tsconfig.regelkern.json`. Das DOM liefert allgemeine Typen – `getElementById`
+kennt kein `.value` –, deshalb gibt es oben in der Oberfläche eine Handvoll
+Griffe (`dom.eingabe(id)`, `dom.auswahl(id)`, …), die tsc sagen, was an der
+Stelle steht. `tests/typpruefung.test.mjs` gleicht jeden davon gegen das Markup
+ab: ein Griff, der ein `<input>` verspricht, wo ein `<select>` steht, fällt
+dort auf. `@ts-ignore` und Casts auf `any` gibt es nicht; auch das prüft der Test.
+
+Mit `strictNullChecks` kommen `dom.muss(id)` und `dom.einsMuss(wurzel, wahl)`
+dazu: sie sprechen aus, was der Code ohnehin annimmt – das Element steht fest
+im Markup. Fehlt es doch, werfen sie sofort mit dem Namen im Text, statt drei
+Zeilen später an einer Eigenschaft von `null`.
 
 ## Datenhaltung
 
