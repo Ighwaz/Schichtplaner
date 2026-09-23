@@ -1870,6 +1870,13 @@ const EMOJIS = ['👩','👨','👩‍💻','👨‍💻','👩‍🔧','👨‍
  * Ein Template: je Wochentag, wer dort welche Schicht hat.
  * @typedef {Record<string, Record<string, string>>} Wochentemplate
  */
+/**
+ * Eine Kalenderwoche, wie getISOWeeks sie liefert. kwKey ist "JJJJ-Www",
+ * isoYear das Jahr, in das der Donnerstag dieser Woche faellt - das ist an
+ * der Jahresgrenze nicht immer das Jahr von start.
+ * @typedef {{kw: number, kwKey: string, isoYear: number,
+ *            start: Date, end: Date}} KwWoche
+ */
 
 let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
 /** @type {Mitarbeiter[]} */
@@ -1912,9 +1919,9 @@ let copiedDay=null;
 /** @type {string|null} */
 let activeDayKey=null;
 /** Gesicherte Schichten geloeschter Mitarbeiter, bis zum Wiederherstellen. */
-/** @type {Record<string, Record<string, unknown>>} */
+/** @type {Record<string, Plan>} */
 let deletedBackups={};
-/** @type {{name: string, team: string, color: string|null}|null} */
+/** @type {{name: string, team: string, color: string}|null} */
 let pendingRestore=null;
 /** @type {{name: string, fromKey: string, fromShift: Schicht}|null} */
 let dragState=null;
@@ -1937,9 +1944,11 @@ let profEmoji=null;
 /** @type {Record<number, string>} */
 let profPrefs={};
 // Zustand des Template-Editors: {Name: {Wochentag: Schicht}}
+/** @type {Record<string, Record<string, string>>} */
 let tmplData={};
 // Beim Löschen gemerkte Mitarbeiterdaten (Team/Farbe/Icon/Wünsche),
 // damit ein Wiederherstellen nicht nur die Einträge zurückbringt.
+/** @type {Record<string, Mitarbeiter>} */
 let deletedProfiles={};
 let activeView='cal';
 
@@ -1950,6 +1959,10 @@ let activeView='cal';
 // ══════════════════════════════════════════════════════════════
 // RUF-KW PLAN
 // ══════════════════════════════════════════════════════════════
+/**
+ * @param {number} year
+ * @returns {KwWoche[]}
+ */
 function getISOWeeks(year){
   // Alle Kalenderwochen, deren Donnerstag in dieses Jahr fällt
   const weeks=[];
@@ -1974,7 +1987,9 @@ function getISOWeeks(year){
   }
   return weeks;
 }
+/** @param {Date} d */
 function fmtDate(d){return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
+/** @param {Date} d */
 function fmtDateShort(d){return d.toLocaleDateString('de-DE',{day:'numeric',month:'short'});}
 function getTodayKwKey(){
   const d=new Date();
@@ -2017,6 +2032,7 @@ function initRufKWYear(){
 const MIN_TAGE_FUER_WOCHE = 3;
 
 async function syncRufKWFromCalendar(){
+  /** @type {Record<string, Record<string, number>>} */
   const tageJeWoche = {};   // {kwKey: {Name: Anzahl Tage}}
   Object.entries(schichten).forEach(([dateKey, slot]) => {
     const leute = slot.rufbereitschaft || [];
@@ -2046,6 +2062,10 @@ async function syncRufKWFromCalendar(){
   toast(uebernommen + ' Woche(n) aus dem Kalender übernommen');
 }
 
+/**
+ * @param {number} kw
+ * @param {string[]} weekDates
+ */
 function showKwRufDialog(kw, weekDates){
   // Der Dialog bearbeitet den KW-Plan (setzeKwPersonen), also zeigt das
   // Haekchen auch den Plan. Vorher kam es aus dem Kalender - das aendert
@@ -2074,7 +2094,9 @@ function showKwRufDialog(kw, weekDates){
   if(liste) liste.addEventListener('click', async ev=>{
     const el = dom.naechstes(ev, '.kw-ruf-person');
     if(!el) return;
-    await toggleKwPersonKey(kwKey, el.dataset.name);
+    const wer=el.dataset.name;
+    if(!wer) return;
+    await toggleKwPersonKey(kwKey, wer);
     liste.innerHTML = items()||leer;
   });
   return fertig.then(()=>{ renderRufKWTable(); });
@@ -2091,6 +2113,10 @@ function showKwRufDialog(kw, weekDates){
  */
 function csvFeld(w){ return '"' + String(w == null ? '' : w).replace(/"/g, '""') + '"'; }
 
+/**
+ * @param {string} kwKey
+ * @returns {string[]}
+ */
 function kwNamen(kwKey){
   const roh=rufKW[kwKey];
   return roh?(Array.isArray(roh)?[...roh]:[roh]):[];
@@ -2098,6 +2124,10 @@ function kwNamen(kwKey){
 
 // Schlüssel der Woche, in der ein Tag liegt - gleiche Schreibweise wie
 // isoWeekKey im Go-Teil.
+/**
+ * @param {Date} datum
+ * @returns {string}  "JJJJ-Www"
+ */
 function kwSchluessel(datum){
   const tmp=new Date(Date.UTC(datum.getFullYear(),datum.getMonth(),datum.getDate()));
   const wt=tmp.getUTCDay()||7; tmp.setUTCDate(tmp.getUTCDate()+4-wt);
@@ -2107,18 +2137,30 @@ function kwSchluessel(datum){
 // Jede Aenderung am KW-Plan wird sofort gespeichert. Der Server liest beim
 // Uebertragen den abgelegten Plan, nicht den Schirm - ohne das Speichern
 // trug "In den Kalender übertragen" den vorherigen Stand ein.
+/**
+ * @param {string} kwKey
+ * @param {string[]} namen
+ */
 async function setzeKwPersonen(kwKey,namen){
   if(namen&&namen.length) rufKW[kwKey]=namen; else delete rufKW[kwKey];
   renderRufKWTable();
   await saveRufKW({still:true});
 }
 
+/**
+ * @param {string} kwKey
+ * @param {string} name
+ */
 async function toggleKwPersonKey(kwKey,name){
   const namen=kwNamen(kwKey), i=namen.indexOf(name);
   if(i===-1) namen.push(name); else namen.splice(i,1);
   await setzeKwPersonen(kwKey,namen);
 }
 
+/**
+ * @param {string} name
+ * @param {string[]} weekDates
+ */
 async function toggleKwPerson(name, weekDates){
   await toggleKwPersonKey(kwSchluessel(new Date(weekDates[0]+'T00:00:00')),name);
 }
@@ -2179,7 +2221,10 @@ function renderRufKWTable(){
     cell.appendChild(addBtn);
     cell.addEventListener('click',e=>{
       const rm=dom.naechstes(e,'[data-rm-kw]');
-      if(rm){e.stopPropagation();removeRufKWPerson(rm.dataset.rmKw,rm.dataset.rmName);return;}
+      // Beide Angaben setzt renderRufKWTable; ohne sie waere der Knopf
+      // sinnlos - und ein fehlender Schluessel landete als "undefined" im Plan.
+      if(rm&&rm.dataset.rmKw&&rm.dataset.rmName){
+        e.stopPropagation();removeRufKWPerson(rm.dataset.rmKw,rm.dataset.rmName);return;}
       openRufKWPicker(w.kwKey,addBtn);
     });
     tdP.appendChild(cell); tr.appendChild(tdP);
@@ -2230,6 +2275,7 @@ function renderRufKWTable(){
 // RUFBEREITSCHAFT REIHUM
 // ══════════════════════════════════════════════════════════════
 // Reihenfolge der Personen für die Rotation; überlebt das Schließen.
+/** @type {{name: string, an: boolean}[]} */
 let reihumFolge=[];
 
 function openRufReihum(){
@@ -2239,6 +2285,7 @@ function openRufReihum(){
   mitarbeiter.forEach(m=>{ if(!reihumFolge.some(r=>r.name===m.name)) reihumFolge.push({name:m.name,an:true}); });
   reihumFolge=reihumFolge.filter(r=>mitarbeiter.some(m=>m.name===r.name));
 
+  /** @param {KwWoche} w */
   const opt=w=>`<option value="${w.kwKey}">KW ${w.kw} · ${fmtDateShort(w.start)}</option>`;
   const von=dom.auswahl('reihum-von'), bis=dom.auswahl('reihum-bis');
   von.innerHTML=wochen.map(opt).join('');
@@ -2280,6 +2327,7 @@ function renderReihumListe(){
 }
 
 // Platz in der Rotation (nur die aktiven zählen mit)
+/** @param {number} i */
 function nummerVon(i){ return reihumFolge.slice(0,i+1).filter(r=>r.an).length; }
 
 // Welche Wochen würden gefüllt - und mit wem?
@@ -2290,7 +2338,10 @@ function reihumPlan(){
   const i=wochen.findIndex(w=>w.kwKey===von), j=wochen.findIndex(w=>w.kwKey===bis);
   const leute=reihumFolge.filter(r=>r.an).map(r=>r.name);
   const ueber=dom.eingabe('reihum-ueber')?.checked;
-  const plan=[], uebersprungen=[];
+  /** @type {{kwKey: string, kw: number, name: string}[]} */
+  const plan=[];
+  /** @type {number[]} */
+  const uebersprungen=[];
   if(i<0||j<0||j<i||!leute.length) return {plan,uebersprungen,leute};
   let n=0;
   for(let k=i;k<=j;k++){
@@ -2337,6 +2388,10 @@ const offeneWochen=new Set();
 // Die sieben Tage einer Woche als eigene Zeilen. Die Wochenzeile darüber ist
 // der Plan; hier steht, was wirklich im Kalender eingetragen ist, und hier
 // trägt man eine Vertretung für einen einzelnen Tag ein.
+/**
+ * @param {KwWoche} w
+ * @param {string[]} geplant
+ */
 function tageZeilen(w,geplant){
   const zeilen=[];
   const wochentage=['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -2373,7 +2428,8 @@ function tageZeilen(w,geplant){
     zelle.appendChild(plus);
     zelle.addEventListener('click',async e=>{
       const rm=dom.naechstes(e,'[data-rm-tag]');
-      if(rm){ e.stopPropagation(); await setzeTagRuf(rm.dataset.rmTag,rm.dataset.rmName,false); return; }
+      if(rm&&rm.dataset.rmTag&&rm.dataset.rmName){
+        e.stopPropagation(); await setzeTagRuf(rm.dataset.rmTag,rm.dataset.rmName,false); return; }
       openRufTagPicker(key,plus);
     });
     tdTagP.appendChild(zelle); tr.appendChild(tdTagP);
@@ -2387,6 +2443,11 @@ function tageZeilen(w,geplant){
 }
 
 // Rufbereitschaft eines einzelnen Tages im Kalender setzen oder entfernen.
+/**
+ * @param {string} key
+ * @param {string} name
+ * @param {boolean} eintragen
+ */
 async function setzeTagRuf(key,name,eintragen){
   pushUndo();
   const res=await postSchicht([key],eintragen?'add':'remove','rufbereitschaft',name,true);
@@ -2404,7 +2465,12 @@ function schliesseRufPicker(id){
 }
 
 // Personenauswahl für einen einzelnen Tag.
+/** @type {string|null} */
 let _rufTagKey=null;
+/**
+ * @param {string} key
+ * @param {HTMLElement} anchor
+ */
 function openRufTagPicker(key,anchor){
   _rufTagKey=key;
   schliesseRufPicker('rufkw-picker');
@@ -2440,7 +2506,9 @@ function openRufTagPicker(key,anchor){
 }
 
 // Rufbereitschaft, die für die Tage dieser Woche wirklich im Kalender steht.
+/** @param {KwWoche} w */
 function kwImKalender(w){
+  /** @type {Record<string, number>} */
   const zaehler={};
   for(let i=0;i<7;i++){
     const d=new Date(w.start); d.setDate(w.start.getDate()+i);
@@ -2450,7 +2518,12 @@ function kwImKalender(w){
   return zaehler;
 }
 
+/** @type {string|null} */
 let _rufkwPickerKey=null;
+/**
+ * @param {string} kwKey
+ * @param {HTMLElement} anchor
+ */
 function openRufKWPicker(kwKey,anchor){
   _rufkwPickerKey=kwKey;
   schliesseRufPicker('ruftag-picker');
@@ -2474,13 +2547,19 @@ function openRufKWPicker(kwKey,anchor){
     el.addEventListener('click',async e=>{
       e.stopPropagation();
       picker.classList.add('hidden');
-      await toggleKwPersonKey(_rufkwPickerKey,el.dataset.pname);
+      const wer=el.dataset.pname;
+      if(!_rufkwPickerKey||!wer) return;
+      await toggleKwPersonKey(_rufkwPickerKey,wer);
     });
   });
   picker.classList.remove('hidden');
   platziere(picker,anchor);
 }
 
+/**
+ * @param {string} kwKey
+ * @param {string} name
+ */
 async function removeRufKWPerson(kwKey,name){
   await setzeKwPersonen(kwKey,kwNamen(kwKey).filter(n=>n!==name));
 }
@@ -2544,6 +2623,12 @@ async function reloadSchichten(){
   return d;
 }
 
+/**
+ * Uebernimmt, was /api/data liefert. Die Antwort ist ungepruefte JSON-Struktur
+ * vom Server - jedes Feld wird hier einzeln herausgelesen und notfalls durch
+ * eine leere Form ersetzt.
+ * @param {Record<string, any>} d
+ */
 function applyData(d){
   mitarbeiter=d.mitarbeiter||[]; schichten=d.schichten||{};
   notizen=d.notizen||{}; soll=d.soll||{frueh:1,normal:0,spaet:1,rufbereitschaft:1};
@@ -2584,6 +2669,7 @@ async function init(){
 
   // Daten mit Wiederholung laden - beim Start der EXE steht der Server
   // manchmal noch nicht bereit
+  /** @type {Record<string, any>} */
   let d={};
   for(let i=0; i<10; i++){
     try{
@@ -2610,6 +2696,15 @@ async function init(){
   if(!dir.folder) toast('⚠ Kein Datenordner – bitte „Wechseln" klicken');
 }
 
+/**
+ * Ein Aufruf an den Go-Teil. Was zurueckkommt, hat je nach Weg eine andere
+ * Form und wird hier NICHT geprueft - die Aufrufer lesen einzelne Felder
+ * heraus und fangen einen {error} selbst ab. Deshalb any: alles andere waere
+ * an dieser Stelle eine Behauptung ueber fremde Daten.
+ * @param {string} url
+ * @param {RequestInit} [opts]
+ * @returns {Promise<any>}
+ */
 async function api(url,opts={}){
   for(let attempt=0; attempt<10; attempt++){
     try{
@@ -2621,6 +2716,7 @@ async function api(url,opts={}){
     }
   }
 }
+/** @param {number} y */
 async function loadHolidays(y){ const h=await api('/api/holidays/'+y); Object.assign(holidays,h); }
 function randColor(){ return AVATAR_COLORS[Math.floor(Math.random()*AVATAR_COLORS.length)]; }
 
@@ -2682,12 +2778,12 @@ function bindEvents(){
   // Schichtwahl - per Maus und per Tastatur bedienbar
   const bar=dom.muss('modebar');
   bar.addEventListener('click',e=>{
-    const p=dom.naechstes(e,'[data-shift]'); if(p) waehleSchicht(p.dataset.shift);
+    const p=dom.naechstes(e,'[data-shift]'); if(p) waehleSchicht(p.dataset.shift??'');
   });
   bar.addEventListener('keydown',e=>{
     if(e.key!=='Enter'&&e.key!==' ')return;
     const p=dom.naechstes(e,'[data-shift]'); if(!p) return;
-    e.preventDefault(); waehleSchicht(p.dataset.shift);
+    e.preventDefault(); waehleSchicht(p.dataset.shift??'');
   });
 
   // Mehr-Menü öffnen und schließen
@@ -2727,7 +2823,7 @@ function bindEvents(){
   });
 
   dom.muss('member-list').addEventListener('click',handleMemberClick);
-  dom.muss('new-color').addEventListener('click',e=>{e.stopPropagation();showColorPicker(e.target,null);});
+  dom.muss('new-color').addEventListener('click',e=>{e.stopPropagation();showColorPicker(dom.ziel(e),null);});
 
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();doUndo();}
@@ -2931,6 +3027,10 @@ async function doRedo(){const danach=redoStack.pop();if(!danach)return;undoStack
 // ══════════════════════════════════════════════════════════════
 // COLOR PICKER
 // ══════════════════════════════════════════════════════════════
+/**
+ * @param {HTMLElement} anchor
+ * @param {string|null} memberName  null beim Anlegen eines neuen Mitarbeiters
+ */
 function showColorPicker(anchor,memberName){
   const pop=dom.muss('cpop');
   pop.innerHTML=AVATAR_COLORS.map(c=>`<div class="cswatch" style="background:${c}" data-c="${c}" data-m="${esc(memberName||'')}"></div>`).join('');
@@ -2951,7 +3051,9 @@ function showColorPicker(anchor,memberName){
 // ══════════════════════════════════════════════════════════════
 // MEMBERS
 // ══════════════════════════════════════════════════════════════
+/** @param {string} name */
 function initials(name){return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+/** @param {Mitarbeiter} m */
 function avContent(m){return m.icon?`<span style="font-size:17px;line-height:1">${m.icon}</span>`:`<span>${initials(m.name)}</span>`;}
 
 // Suche und Team-Filter der Seitenleiste gelten auch für die Monatsübersicht.
@@ -2986,34 +3088,40 @@ function renderMembers(){
   }).join('');
 }
 
+/** @param {MouseEvent} e */
 async function handleMemberClick(e){
-  if(e.target.classList.contains('member-cb')){
-    e.stopPropagation();const name=e.target.dataset.cb;
-    if(e.target.checked){selectedPersons.add(name);selectedPerson=null;}else selectedPersons.delete(name);
+  const ziel=dom.ziel(e);
+  if(ziel.classList.contains('member-cb')){
+    e.stopPropagation();
+    const name=ziel.dataset.cb;
+    if(!name) return;
+    if(/** @type {HTMLInputElement} */ (ziel).checked){selectedPersons.add(name);selectedPerson=null;}
+    else selectedPersons.delete(name);
     renderMembers();updateSelInfo();return;
   }
-  const cdel=e.target.closest('[data-cdel]');
-  if(cdel){e.stopPropagation();await deleteMitarbeiter(cdel.dataset.cdel);return;}
-  const cno=e.target.closest('[data-cno]');
+  const cdel=dom.naechstes(e,'[data-cdel]');
+  if(cdel&&cdel.dataset.cdel){e.stopPropagation();await deleteMitarbeiter(cdel.dataset.cdel);return;}
+  const cno=dom.naechstes(e,'[data-cno]');
   if(cno){
     e.stopPropagation();
     const conf=document.querySelector(`[data-cfor="${esc(cno.dataset.cno)}"]`);
     const btns=/** @type {HTMLElement} */ (conf?.previousElementSibling);
     if(conf)conf.classList.remove('show');if(btns)btns.style.display='';return;
   }
-  const del=e.target.closest('[data-del]');
+  const del=dom.naechstes(e,'[data-del]');
   if(del){
     e.stopPropagation();const name=del.dataset.del;
     const btns=dom.eins(document,`.member-item[data-member="${esc(name)}"] .member-btns`);
     const conf=document.querySelector(`[data-cfor="${esc(name)}"]`);
     if(btns)btns.style.display='none';if(conf)conf.classList.add('show');return;
   }
-  const edit=e.target.closest('[data-edit]');
-  if(edit){e.stopPropagation();openProfile(edit.dataset.edit);return;}
-  const item=e.target.closest('[data-member]');
-  if(item)selectPerson(item.dataset.member);
+  const edit=dom.naechstes(e,'[data-edit]');
+  if(edit&&edit.dataset.edit){e.stopPropagation();openProfile(edit.dataset.edit);return;}
+  const item=dom.naechstes(e,'[data-member]');
+  if(item&&item.dataset.member)selectPerson(item.dataset.member);
 }
 
+/** @param {string} name */
 function selectPerson(name){
   selectedPersons.clear();
   selectedPerson=selectedPerson?.name===name?null:(mitarbeiter.find(m=>m.name===name)??null);
@@ -3028,6 +3136,7 @@ function selectPerson(name){
 function updateSelInfo(){
   const el=dom.muss('sel-info');
   const hintEl=document.getElementById('tool-hint');
+  /** @param {string} t */
   const setHint=t=>{ if(hintEl) hintEl.innerHTML=t; };
   const basisHinweis='<kbd>Klick</kbd> ein-/austragen &middot; <kbd>Shift</kbd> Zeitraum &middot; <kbd>Strg</kbd> mehrere Tage';
 
@@ -3047,6 +3156,7 @@ function updateSelInfo(){
     if(rangeStart&&frozenRangeEnd){
       // Ohne Werkzeug, aber mit Strecke: hier wird gelöscht.
       const dates=getRangeDates();
+      /** @param {string} k */
       const fmt=k=>new Date(k+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});
       const lbl=dates.length===1?fmt(dates[0]):fmt(dates[0])+' – '+fmt(dates[dates.length-1]);
       const allNames=new Set();
@@ -3082,9 +3192,16 @@ function updateSelInfo(){
 async function addMitarbeiter(){
   const name=dom.eingabe('new-name').value.trim(),team=dom.auswahl('new-team').value;
   if(!name)return;
-  if(deletedBackups[name]&&Object.keys(deletedBackups[name]).length>0){pendingRestore={name,team,color:newColor};showRestoreModal(name,deletedBackups[name]);return;}
-  await doAdd(name,team,newColor);
+  if(deletedBackups[name]&&Object.keys(deletedBackups[name]).length>0){pendingRestore={name,team,color:newColor??randColor()};showRestoreModal(name,deletedBackups[name]);return;}
+  // newColor setzt init() beim Start und der Farbwähler bei jeder Auswahl;
+  // ??randColor() hält nur den Typ fest und liefert sonst dasselbe.
+  await doAdd(name,team,newColor??randColor());
 }
+/**
+ * @param {string} name
+ * @param {string} team
+ * @param {string} color
+ */
 async function doAdd(name,team,color){
   const d=await api('/api/mitarbeiter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,team,color})});
   if(d.error){toast(d.error);return;}
@@ -3094,6 +3211,7 @@ async function doAdd(name,team,color){
   dom.muss('add-form').classList.remove('open');dom.muss('add-toggle').classList.remove('open');
   renderMembers();renderCalendar();renderTemplateTable();toast(name+' hinzugefügt');
 }
+/** @param {string} name */
 async function deleteMitarbeiter(name){
   try{
     const d=await api('/api/mitarbeiter/'+encodeURIComponent(name),{method:'DELETE'});
@@ -3103,7 +3221,10 @@ async function deleteMitarbeiter(name){
     mitarbeiter=mitarbeiter.filter(m=>m.name!==name);
     if(selectedPerson?.name===name){selectedPerson=null;updateSelInfo();}
     selectedPersons.delete(name);
-    for(const k in schichten)for(const s in schichten[k]){const a=schichten[k][s];const i=a.indexOf(name);if(i!==-1)a.splice(i,1);}
+    for(const k in schichten){
+      const belegung=/** @type {Record<string, string[]>} */ (schichten[k]);
+      for(const s in belegung){const a=belegung[s];const i=a.indexOf(name);if(i!==-1)a.splice(i,1);}
+    }
     // Wie beim Umbenennen: der Rueckgaengig-Stapel und ein kopierter Tag
     // tragen den Namen noch. Ein Schritt zurueck holte sonst Chips einer
     // Person zurueck, die es nicht mehr gibt.
@@ -3111,13 +3232,19 @@ async function deleteMitarbeiter(name){
     renderMembers();renderCalendar();renderTemplateTable();toast(name+' entfernt');
   }catch(err){toast('Fehler: '+(err instanceof Error?err.message:String(err)));}
 }
+/**
+ * @param {string} name
+ * @param {Plan} backup  die gesicherten Schichten dieser Person
+ */
 function showRestoreModal(name,backup){
   dom.muss('restore-name').textContent=name;
+  /** @type {Record<string, number>} */
   const bs={};Object.values(backup).forEach(d=>Object.keys(d).forEach(s=>{bs[s]=(bs[s]||0)+1;}));
   let html='<b>'+Object.keys(backup).length+'</b> Tage:<br>';
-  Object.entries(bs).forEach(([s,c])=>{html+='&nbsp;&nbsp;'+(SHIFT_LABEL[s]||s)+': <b>'+c+'×</b><br>';});
+  Object.entries(bs).forEach(([s,c])=>{html+='&nbsp;&nbsp;'+(RK.istSchicht(s)?SHIFT_LABEL[s]:s)+': <b>'+c+'×</b><br>';});
   dom.muss('restore-stats').innerHTML=html;openModal('restore-modal');
 }
+/** @param {boolean} doRestore */
 async function confirmRestore(doRestore){
   closeModal('restore-modal');if(!pendingRestore)return;
   const{name,team,color}=pendingRestore;pendingRestore=null;
@@ -3163,6 +3290,7 @@ async function saveSoll(){
 // ══════════════════════════════════════════════════════════════
 function renderStats(){
   const wrap=document.getElementById('stats-wrap');if(!wrap)return;
+  /** @type {Record<string, Record<string, number>>} */
   const counts={};mitarbeiter.forEach(m=>{counts[m.name]={};ALL_SHIFTS.forEach(s=>counts[m.name][s]=0);});
   const pre=curYear+'-'+String(curMonth).padStart(2,'0');
   Object.entries(schichten).forEach(([k,slot])=>{if(!k.startsWith(pre))return;ALL_SHIFTS.forEach(s=>(slot[s]||[]).forEach(n=>{if(counts[n])counts[n][s]++;}));});
@@ -3183,6 +3311,7 @@ function renderStats(){
 // ══════════════════════════════════════════════════════════════
 // PROFILE
 // ══════════════════════════════════════════════════════════════
+/** @param {string} name */
 function openProfile(name){
   const m=mitarbeiter.find(x=>x.name===name);if(!m)return;
   profOldName=name;profColor=m.color??null;profEmoji=m.icon||'';
@@ -3236,10 +3365,12 @@ async function saveProfile(){
   if(m){m.name=newName;m.team=team;m.color=profColor??undefined;m.icon=profEmoji??undefined;m.prefs={...profPrefs};}
   if(newName!==profOldName){
     // Den neuen Namen überall dort einsetzen, wo der alte stand.
-    for(const k in schichten)
-      for(const s in schichten[k])
-        if(Array.isArray(schichten[k][s]))
-          schichten[k][s]=schichten[k][s].map(n=>n===profOldName?newName:n);
+    for(const k in schichten){
+      const belegung=/** @type {Record<string, string[]>} */ (schichten[k]);
+      for(const s in belegung)
+        if(Array.isArray(belegung[s]))
+          belegung[s]=belegung[s].map(n=>n===profOldName?newName:n);
+    }
     if(selectedPerson?.name===profOldName)selectedPerson=m??null;
     if(profOldName!==null&&selectedPersons.delete(profOldName))selectedPersons.add(newName);
     // Kopierter Tag und Rückgängig-Stapel stammen aus einer Welt, in der es
@@ -3258,8 +3389,13 @@ const dk       = RK.tagKey;
 const isoWeek  = RK.isoWoche;
 
 // Schichtwahl an einer Stelle - Maus, Tastatur und Kürzel laufen hier zusammen.
+/**
+ * @param {string} shift  alles andere als eine der vier wird abgewiesen
+ */
 function waehleSchicht(shift){
-  if(!ALL_SHIFTS.includes(shift)) return;
+  // istSchicht statt ALL_SHIFTS.includes: dieselben vier Werte, aber der
+  // Typwächter grenzt danach auch den Typ ein.
+  if(!RK.istSchicht(shift)) return;
   selectedShift=shift;
   // Die Monatsübersicht braucht oben eine Arbeitsschicht, auch wenn gerade
   // Rufbereitschaft gewählt ist.
@@ -3271,6 +3407,12 @@ function waehleSchicht(shift){
 // Setzt ein Auswahlfeld so ans Fenster, dass es ganz sichtbar bleibt. Die
 // Rechnung steht im Regelkern (RK.popupPlatz), hier wird nur gemessen und
 // gesetzt.
+/**
+ * @param {HTMLElement} el
+ * @param {{getBoundingClientRect: () => {left: number, right: number, top: number, bottom: number}}} anker
+ *   ein Element - oder beim Rechtsklick ein Ersatz, der nur den Zeigerpunkt
+ *   als Rechteck meldet.
+ */
 function platziere(el, anker){
   el.style.maxHeight='none';
   const a=anker.getBoundingClientRect();
@@ -3290,6 +3432,12 @@ function platziere(el, anker){
 /** @type {HTMLElement|null} */
 let dayMenuEl=null;
 function closeDayMenu(){ if(dayMenuEl){ dayMenuEl.remove(); dayMenuEl=null; } }
+/**
+ * @param {string} key
+ * @param {Element|null} anchor
+ * @param {number} [x]
+ * @param {number} [y]
+ */
 function openDayMenu(key,anchor,x,y){
   closeDayMenu();
   const slot=getSlot(key);
@@ -3300,6 +3448,12 @@ function openDayMenu(key,anchor,x,y){
   kopf.className='dm-head';
   kopf.textContent=d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'long'});
   m.appendChild(kopf);
+  /**
+   * @param {string} icon
+   * @param {string} text
+   * @param {() => void} fn
+   * @param {{aus?: boolean, rot?: boolean}} [opt]
+   */
   const item=(icon,text,fn,{aus=false,rot=false}={})=>{
     const b=document.createElement('button');
     b.className='mm-item'+(rot?' red':'');
@@ -3323,13 +3477,16 @@ function openDayMenu(key,anchor,x,y){
     platziere(m,anchor);
   }else{
     // Aus dem Rechtsklick: der Zeiger ist der Anker.
-    platziere(m,{getBoundingClientRect:()=>({left:x,right:x,top:y,bottom:y})});
+    // In diesem Zweig gibt es keinen Anker, also kamen x und y mit; ??0
+    // haelt nur den Typ fest.
+    platziere(m,{getBoundingClientRect:()=>({left:x??0,right:x??0,top:y??0,bottom:y??0})});
   }
   dayMenuEl=m;
   setTimeout(()=>document.addEventListener('click',closeDayMenu,{once:true}),0);
 }
 
 // Mehrere Tage auf einmal leeren - der Weg für Entf auf einer Auswahl.
+/** @param {string[]} tage */
 async function leereTage(tage){
   if(!tage.length) return;
   const ok=await confirmDialog('Tage leeren?',
@@ -3382,20 +3539,22 @@ function renderCalendar(){
 
 // Vorschau: solange ein Werkzeug gewählt ist, zeigt die Zelle unter dem
 // Zeiger als gestrichelter Chip, was der nächste Klick eintragen würde.
+/** @param {HTMLElement} el */
 function zeigeVorschau(el){
   const namen=selectedPersons.size>0?[...selectedPersons]:selectedPerson?[selectedPerson.name]:[];
   if(!namen.length) return;
   const row=el.querySelector(`.chips-row[data-shift="${selectedShift}"] .chips`);
   if(!row) return;
-  const drin=(getSlot(el.dataset.key)[selectedShift]||[]);
+  const drin=(getSlot(el.dataset.key??'')[selectedShift]||[]);
   const offen=namen.filter(n=>!drin.includes(n));
   if(!offen.length) return;
   const chip=document.createElement('span');
   chip.className='chip vorschau '+SHIFT_CSS[selectedShift];
   chip.textContent='+ '+(offen.length>1?offen.length+' Pers.':RK.kurzName(offen[0]));
   row.appendChild(chip);
-  row.parentElement.classList.remove('leer');   // Vorschau nicht ausgrauen
+  row.parentElement?.classList.remove('leer');   // Vorschau nicht ausgrauen
 }
+/** @param {HTMLElement} el */
 function raeumeVorschau(el){
   el.querySelectorAll('.chip.vorschau').forEach(c=>{
     const row=c.closest('.chips-row');
@@ -3404,6 +3563,11 @@ function raeumeVorschau(el){
   });
 }
 
+/**
+ * @param {string} key
+ * @param {number} dayNum
+ * @param {boolean} other  ein Tag aus dem Nachbarmonat
+ */
 function makeCell(key,dayNum,other){
   const d=new Date(key+'T00:00:00'),dow=d.getDay();
   const today=new Date(),isToday=d.toDateString()===today.toDateString();
@@ -3429,7 +3593,7 @@ function makeCell(key,dayNum,other){
   const el=document.createElement('div');el.className=cls;el.dataset.key=key;
   const numRow=document.createElement('div');numRow.className='day-num';
   const numLeft=document.createElement('div');numLeft.style.cssText='display:flex;align-items:center;gap:4px';
-  const numSpan=document.createElement('span');numSpan.className='day-number'+(isToday?' is-today':'');numSpan.textContent=dayNum;
+  const numSpan=document.createElement('span');numSpan.className='day-number'+(isToday?' is-today':'');numSpan.textContent=String(dayNum);
   numLeft.appendChild(numSpan);
   if(!other&&note){const p=document.createElement('span');p.style.cssText='width:5px;height:5px;border-radius:50%;background:var(--spaet);display:inline-block';numLeft.appendChild(p);}
   if(!other&&isMulti){const p=document.createElement('span');p.textContent='✓';p.style.cssText='font-size:9px;color:var(--ruf);font-weight:700';numLeft.appendChild(p);}
@@ -3517,21 +3681,29 @@ function makeCell(key,dayNum,other){
 // ══════════════════════════════════════════════════════════════
 // CELL CLICK
 // ══════════════════════════════════════════════════════════════
+/**
+ * @param {MouseEvent} e
+ * @param {string} key
+ */
 async function handleCellClick(e,key){
-  const btn=e.target.closest('[data-action]');
+  const btn=dom.naechstes(e,'[data-action]');
   if(btn){
     e.stopPropagation();
-    if(btn.dataset.action==='menu') openDayMenu(btn.dataset.key,btn);
+    if(btn.dataset.action==='menu'&&btn.dataset.key) openDayMenu(btn.dataset.key,btn);
     return;
   }
   // Das Kreuz am Chip traegt aus. Mit Shift oder Strg zaehlt auch das als
   // Klick auf den Tag - sonst loescht ein Zeitraum, der ueber einen Chip
   // fuehrt, versehentlich fremde Eintraege.
-  const weg=e.target.closest('[data-weg]');
+  const weg=dom.naechstes(e,'[data-weg]');
   if(weg&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey){
     e.stopPropagation();
     pushUndo();
-    await applySchicht([weg.dataset.key],'remove',weg.dataset.shift,weg.dataset.name);
+    // Alle drei Angaben setzt renderCalendar am Chip; fehlt eine, waere das
+    // Kreuz ohnehin sinnlos.
+    const {key:wegKey,shift:wegSchicht,name:wegName}=weg.dataset;
+    if(!wegKey||!wegName||!RK.istSchicht(wegSchicht)) return;
+    await applySchicht([wegKey],'remove',wegSchicht,wegName);
     return;
   }
 
@@ -3571,6 +3743,11 @@ async function handleCellClick(e,key){
 
 // Ein Klick auf einen Tag - für eine wie für mehrere Personen derselbe
 // Ablauf, damit sich beide Auswahlarten nicht widersprechen.
+/**
+ * @param {string} key
+ * @param {boolean} ctrl
+ * @param {string[]} namen
+ */
 async function handleDayClick(key,ctrl,namen){
   if(!namen.length) return undefined;
   if(ctrl){
@@ -3592,6 +3769,12 @@ async function handleDayClick(key,ctrl,namen){
 // schicht ist ausdruecklich, weil die Monatsuebersicht das untere Band
 // immer als Rufbereitschaft eintraegt - unabhaengig davon, was in der
 // Leiste gewaehlt ist. Ohne Angabe gilt weiter die gewaehlte Schicht.
+/**
+ * @param {string[]} tage
+ * @param {string[]} namen
+ * @param {'add'|'remove'|null} [modus]  ohne Angabe entscheidet die Regel
+ * @param {Schicht} [schicht]
+ */
 async function schichtAufTagen(tage,namen,modus,schicht=selectedShift){
   const aktion=modus||RK.naechsteAktion(tage,namen,schichten,schicht);
   if(!aktion) return undefined;
@@ -3608,16 +3791,33 @@ async function schichtAufTagen(tage,namen,modus,schicht=selectedShift){
 }
 
 // Beide Konfliktdialoge - vom Einzelklick und vom Bereich gemeinsam genutzt.
+/**
+ * @param {string} name
+ * @param {string[]} blocking  die Schichten, in denen die Person schon steht
+ * @param {Schicht} [schicht]
+ */
 function confirmReplaceShift(name,blocking,schicht=selectedShift){
-  const blockNames=[...new Set(blocking)].map(s=>SHIFT_LABEL[s]).join(', ');
+  const blockNames=[...new Set(blocking)].map(s=>RK.istSchicht(s)?SHIFT_LABEL[s]:s).join(', ');
   return confirmDialog('Schicht ersetzen?',`<strong>${esc(name)}</strong> ist bereits als <strong>${esc(blockNames)}</strong> eingetragen.<br>Durch <strong>${esc(SHIFT_LABEL[schicht])}</strong> ersetzen?<br><small style="color:var(--text3)">(Rufbereitschaft bleibt erhalten)</small>`,'Ja, ersetzen');
 }
+/**
+ * @param {[string, {holiday?: string, country?: string}][]} holDays
+ *   die betroffenen Tage als Paare aus Tagesschluessel und Serverantwort
+ * @param {string} name
+ * @param {Schicht} [schicht]
+ */
 function confirmHolidayEntry(name,holDays,schicht=selectedShift){
   const h=holDays[0][1],flag=h.country==='DE'?'🇩🇪':h.country==='IN'?'🇮🇳':'🌍';
   return confirmDialog('Feiertag – trotzdem eintragen?',
     `${flag} <strong>${esc(h.holiday)}</strong> ist ein Feiertag für das Team von <strong>${esc(name)}</strong> (${holDays.length} Tag(e)).<br>Trotzdem als <strong>${esc(SHIFT_LABEL[schicht])}</strong> eintragen?`,'Ja, eintragen');
 }
 
+/**
+ * @param {string[]} dates
+ * @param {string[]} names
+ * @param {'add'|'remove'} action
+ * @param {Schicht} [schicht]
+ */
 async function applyToDateList(dates,names,action,schicht=selectedShift){
   pushUndo();let entered=0,replaced=0,skipped=0;
   for(const name of names){
@@ -3654,12 +3854,37 @@ async function applyToDateList(dates,names,action,schicht=selectedShift){
 
 // force = Rückfrage bestätigt; replace = es war die Ersetzen-Rückfrage,
 // nur dann gibt die Person ihre bisherige Arbeitsschicht an dem Tag ab.
+/**
+ * @param {string[]} dates
+ * @param {'add'|'remove'|'toggle'|'clear_shift'} action
+ * @param {Schicht} schicht
+ * @param {string} name
+ * @param {boolean} [force]    die Rueckfrage wurde bestaetigt
+ * @param {boolean} [replace]  ... und zwar die Rueckfrage "Schicht ersetzen?"
+ */
 async function postSchicht(dates,action,schicht,name,force=false,replace=false){
   return api('/api/schicht',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dates,schicht,name,action,force,replace})});
 }
+/**
+ * @param {string[]} dates
+ * @param {'add'|'remove'|'toggle'|'clear_shift'} action
+ * @param {Schicht} schicht
+ * @param {string} name
+ */
 async function applySchicht(dates,action,schicht,name){const res=await postSchicht(dates,action,schicht,name);if(res)applyResults(res.results);}
+/**
+ * Uebernimmt, was /api/schicht je Tag zurueckmeldet: entweder der neue Stand
+ * des Tages oder {error} mit einer Rueckfrage. Ungeprueft, weil es vom Server
+ * kommt - die Faelle werden hier einzeln abgefragt.
+ * @param {Record<string, any>} results
+ */
 function applyResults(results){if(!results)return;Object.entries(results).forEach(([k,v])=>{if(!v.error)schichten[k]=v;});renderCalendar();renderStats();}
+/** @param {string} key */
 async function clearDay(key){pushUndo();const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:emptyDay(),dates:[key],mode:'replace'})});if(r.ok){schichten[key]=emptyDay();renderCalendar();toast('Tag geleert');}}
+/**
+ * @param {string[]} dates
+ * @param {'replace'|'merge'} mode
+ */
 async function pasteDay(dates,mode){if(!copiedDay)return;const r=await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot:copiedDay.slot,dates,mode})});if(r.ok){await reloadSchichten();renderCalendar();toast(dates.length+' Tag(e) eingefügt');}}
 // Einen Chip auf einen anderen Tag ziehen.
 //
@@ -3668,6 +3893,7 @@ async function pasteDay(dates,mode){if(!copiedDay)return;const r=await api('/api
 // "needs_confirm", war der Eintrag am Ausgangstag weg und kam am Zieltag nie
 // an. Deshalb wird jetzt zuerst der Zieltag geklärt und erst danach der
 // Ausgangstag geräumt.
+/** @param {string} toKey */
 async function handleDrop(toKey){
   if(!dragState) return;
   const {name,fromKey,fromShift}=dragState;
@@ -3726,6 +3952,7 @@ async function clearRangeAll(){
   toast(dates.length+' Tag(e) vollständig geleert');
 }
 
+/** @param {Schicht} shift */
 async function clearRangeShift(shift){
   frozenRangeEnd=null;   const dates=getRangeDates(); pushUndo();
   dates.forEach(k=>{if(schichten[k]&&schichten[k][shift]) schichten[k][shift]=[];});
@@ -4571,7 +4798,13 @@ function bulkDatum(s){
 
 // Zeilen einlesen und prüfen, bevor irgendetwas gespeichert wird.
 function parseBulk(text){
-  const gut=[], fehler=[], gesehen=new Set();
+  /** @type {({name: string, team: string, color: string}
+   *          |{date: string, name: string, country: string})[]} */
+  const gut=[];
+  /** @type {string[]} */
+  const fehler=[];
+  /** @type {Set<string>} */
+  const gesehen=new Set();
   text.split('\n').forEach((roh,i)=>{
     const zeile=roh.trim();
     if(!zeile) return;
@@ -4633,7 +4866,10 @@ async function runBulk(){
         body:JSON.stringify({feiertage:gut})});
       if(d.error){toast('Fehler: '+d.error);return;}
       customHolidays=await api('/api/custom_holidays');
-      const jahre=[...new Set(gut.map(h=>parseInt(h.date.slice(0,4))))];
+      // 'date' in h grenzt die Liste auf die Feiertagseintraege ein - in
+      // diesem Zweig sind es ohnehin nur solche, aber so steht es da, statt
+      // behauptet zu werden.
+      const jahre=[...new Set(gut.flatMap(h=>'date' in h?[parseInt(h.date.slice(0,4))]:[]))];
       for(const j of jahre) Object.assign(holidays,await api('/api/holidays/'+j));
       renderCustomHolidays();renderCalendar();
       toast(`${d.angelegt} Feiertage angelegt`+(d.uebersprungen?`, ${d.uebersprungen} übersprungen`:''));
@@ -4749,6 +4985,7 @@ function hideTooltip(){dom.muss('tooltip').classList.remove('show');}
 // ══════════════════════════════════════════════════════════════
 function showHolWarnings(warnings){
   if(!warnings?.length)return;
+  /** @type {Record<string, {date: string, name: string, holiday: string, country: string}[]>} */
   const byDate={};warnings.forEach(w=>{if(!byDate[w.date])byDate[w.date]=[];byDate[w.date].push(w);});
   Object.entries(byDate).slice(0,3).forEach(([dt,ws])=>{const d=new Date(dt+'T00:00:00').toLocaleDateString('de-DE',{day:'numeric',month:'short'});const flag=ws[0].country==='DE'?'🇩🇪':'🇮🇳';toast(`${flag} ${ws.map(w=>w.name).join(', ')} arbeitet an Feiertag „${ws[0].holiday}" (${d})`);});
 }
@@ -4786,7 +5023,18 @@ function doExportData(){
 
 
 
-function getSlot(key){const s=schichten[key]||{};return ALL_SHIFTS.reduce((o,k)=>{o[k]=s[k]||[];return o;},{});}
+/**
+ * Die Belegung eines Tages, immer mit allen vier Schichten - auch denen, die
+ * der Server weglaesst, weil sie leer sind.
+ * @param {string} key
+ * @returns {Belegung}
+ */
+function getSlot(key){const s=schichten[key]||{};return ALL_SHIFTS.reduce((o,k)=>{o[k]=s[k]||[];return o;},/** @type {Belegung} */({}));}
+/**
+ * Text fuer HTML entschaerfen. Nimmt alles - was hineinkommt, ist oft ein
+ * Feld, das auch fehlen kann.
+ * @param {unknown} s
+ */
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 // ══════════════════════════════════════════════════════════════
 // ANZEIGEGRÖSSE
