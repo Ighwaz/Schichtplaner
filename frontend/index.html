@@ -781,6 +781,45 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 .day-act-btn{background:var(--surface2);border:1.5px solid var(--border);color:var(--text2);border-radius:5px;cursor:pointer;font-size:11px;padding:1px 5px;transition:background .1s,transform .1s}
 .day-act-btn:hover{background:var(--surface3);color:var(--text)}
 .day-act-btn:active{transform:scale(.92)}
+/* ANLEITUNG: der Hilfedialog aus dem Mehr-Menue. Links die Kapitel, rechts
+   der Text - beide Spalten rollen fuer sich. */
+.hilfe-box{width:960px;max-width:96vw;height:82vh;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.hilfe-kopf{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:2px solid var(--border);flex-shrink:0}
+.hilfe-suche{flex:1;min-width:0;background:var(--surface2);border:2px solid var(--border);color:var(--text);
+  padding:6px 10px;border-radius:8px;font-size:12.5px;font-family:inherit}
+.hilfe-suche:focus{outline:none;border-color:var(--blue)}
+.hilfe-rumpf{display:flex;flex:1;min-height:0}
+.hilfe-nav{width:212px;flex-shrink:0;overflow-y:auto;padding:10px 8px;background:var(--surface2);
+  border-right:2px solid var(--border)}
+.hilfe-nav button{display:block;width:100%;text-align:left;background:none;border:none;border-left:3px solid transparent;
+  color:var(--text2);font-family:inherit;font-size:12px;font-weight:600;padding:6px 9px;border-radius:7px;
+  cursor:pointer;transition:background .12s,color .12s}
+.hilfe-nav button:hover{background:var(--surface3);color:var(--text)}
+.hilfe-nav button.aktiv{background:var(--blue-soft);color:var(--blue);border-left-color:var(--blue)}
+.hilfe-nav button.weg{display:none}
+.hilfe-inhalt{flex:1;overflow-y:auto;padding:16px 24px 60px;scroll-behavior:smooth}
+.hilfe-inhalt section.weg{display:none}
+.hilfe-inhalt h3{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--text);
+  margin:24px 0 9px;padding-bottom:6px;border-bottom:2px solid var(--border)}
+.hilfe-inhalt section:first-of-type h3{margin-top:0}
+.hilfe-inhalt h4{font-size:10.5px;font-weight:700;color:var(--text3);margin:15px 0 6px;
+  text-transform:uppercase;letter-spacing:.8px;font-family:'JetBrains Mono',monospace}
+.hilfe-inhalt p{font-size:13px;line-height:1.7;color:var(--text2);margin:0 0 9px}
+.hilfe-inhalt b,.hilfe-inhalt strong{color:var(--text);font-weight:700}
+.hilfe-inhalt code{background:var(--surface2);border:1px solid var(--border);padding:1px 5px;border-radius:4px;
+  font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.hilfe-inhalt kbd{font-family:'JetBrains Mono',monospace;font-size:10.5px;background:var(--surface3);
+  border:1px solid var(--border2);border-bottom-width:2px;border-radius:4px;padding:1px 5px;
+  color:var(--text);white-space:nowrap}
+.hlf-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 15px;margin:0 0 10px;align-items:baseline}
+.hlf-dl dt{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap}
+.hlf-dl dd{margin:0;font-size:12.5px;line-height:1.65;color:var(--text2)}
+.hlf-tipp{background:var(--blue-soft);border:1px solid color-mix(in srgb,var(--blue) 25%,transparent);
+  border-radius:9px;padding:9px 12px;margin:11px 0;font-size:12.5px;line-height:1.65;color:var(--text2)}
+.hlf-punkt{display:inline-flex;align-items:center;gap:5px}
+.hlf-punkt i{width:9px;height:9px;border-radius:3px;display:inline-block;flex-shrink:0}
+.hilfe-leer{font-size:13px;color:var(--text3);padding:10px 0}
+.hilfe-leer.hidden{display:none}
 /* Member name */
 .member-name{font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
@@ -831,6 +870,8 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     <button class="fbtn ic" id="btn-zoom-in" title="Größer darstellen">A+</button>
     <button class="fbtn" id="btn-theme" title="Hell/Dunkel" style="margin-left:auto">🌙 Theme</button>
   </div>
+  <div class="mm-sep"></div>
+  <button class="mm-item" id="btn-hilfe"><span class="mm-ic">❓</span>Anleitung<span style="margin-left:auto;font-size:10px;color:var(--text3)">F1</span></button>
 </div>
 
 <button class="sidebar-toggle" id="sidebar-toggle">◀</button>
@@ -1220,6 +1261,353 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
     <button class="rbtn rbtn-yes" onclick="confirmRestore(true)">✓ Einträge wiederherstellen</button>
     <button class="rbtn rbtn-no" onclick="confirmRestore(false)">+ Neu beginnen</button>
     <button class="rbtn rbtn-cancel" onclick="cancelRestore()">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ANLEITUNG: alles, was die Oberflaeche kann. Erreichbar ueber das
+     Mehr-Menue und ueber F1. Der Text steht fest im Markup - so findet ihn
+     die Suche des Dialogs, und tests/anleitung.test.mjs prueft, dass kein
+     Bedienelement undokumentiert bleibt. -->
+<div class="modal-bg hidden" id="hilfe-modal">
+  <div class="modal-box hilfe-box">
+    <div class="hilfe-kopf">
+      <div class="modal-title">❓ Anleitung</div>
+      <input class="hilfe-suche" id="hilfe-suche" placeholder="Im Text suchen…" spellcheck="false">
+      <button class="modal-close" onclick="closeModal('hilfe-modal')">✕</button>
+    </div>
+    <div class="hilfe-rumpf">
+      <nav class="hilfe-nav" id="hilfe-nav">
+        <button data-zu="hilfe-start">Schnellstart</button>
+        <button data-zu="hilfe-werkzeug">Werkzeug &amp; Team</button>
+        <button data-zu="hilfe-cal">📅 Kalender</button>
+        <button data-zu="hilfe-matrix">▦ Monatsübersicht</button>
+        <button data-zu="hilfe-ruf">🔔 Rufbereitschaft</button>
+        <button data-zu="hilfe-tmpl">⚙ Template</button>
+        <button data-zu="hilfe-hol">🎉 Feiertage</button>
+        <button data-zu="hilfe-daten">💾 Daten &amp; Ausgabe</button>
+        <button data-zu="hilfe-ansicht">🌙 Darstellung</button>
+        <button data-zu="hilfe-tasten">⌨ Tastenkürzel</button>
+      </nav>
+      <div class="hilfe-inhalt" id="hilfe-inhalt">
+        <div class="hilfe-leer hidden" id="hilfe-leer">Kein Kapitel enthält diesen Text.</div>
+
+        <section id="hilfe-start">
+          <h3>Schnellstart</h3>
+          <p>Drei Schritte, dann steht der erste Plan.</p>
+          <dl class="hlf-dl">
+            <dt>1. Mitarbeiter</dt>
+            <dd>In der Seitenleiste <b>+ Mitarbeiter hinzufügen</b>: Name, Team
+              (🇩🇪 oder 🇮🇳) und Farbe. Über <b>⇊ Liste</b> lassen sich
+              mehrere auf einmal anlegen.</dd>
+            <dt>2. Werkzeug</dt>
+            <dd>Oben in der Seitenleiste eine Schicht wählen
+              (<b>F N S R</b>), darunter in der Liste die Person anklicken.</dd>
+            <dt>3. Tage</dt>
+            <dd>Im Kalender auf einen Tag klicken – das trägt ein. Ein zweiter
+              Klick auf denselben Tag trägt wieder aus.</dd>
+          </dl>
+          <div class="hlf-tipp">Der Werkzeug-Kasten ganz oben in der Seitenleiste sagt in
+            einem Satz, <b>wer</b> eingetragen wird und <b>was der nächste Klick tut</b>.
+            Wer sich unsicher ist, wo er gerade steht, schaut dorthin.</div>
+          <h4>Die vier Schichten</h4>
+          <dl class="hlf-dl">
+            <dt><span class="hlf-punkt"><i style="background:var(--frueh)"></i>F – Früh</span></dt>
+            <dd>06–14 Uhr</dd>
+            <dt><span class="hlf-punkt"><i style="background:var(--normal)"></i>N – Normaldienst</span></dt>
+            <dd>Gleitzeit, ohne feste Zeiten</dd>
+            <dt><span class="hlf-punkt"><i style="background:var(--spaet)"></i>S – Spät</span></dt>
+            <dd>14–22 Uhr</dd>
+            <dt><span class="hlf-punkt"><i style="background:var(--ruf)"></i>R – Rufbereitschaft</span></dt>
+            <dd>22–06 Uhr</dd>
+          </dl>
+          <p>Früh, Normaldienst und Spät schließen einander aus – niemand steht an
+            einem Tag in zweien davon. Die <b>Rufbereitschaft läuft daneben her</b>:
+            sie darf zu jeder Arbeitsschicht am selben Tag dazukommen.</p>
+        </section>
+
+        <section id="hilfe-werkzeug">
+          <h3>Werkzeug &amp; Team</h3>
+          <h4>Werkzeug</h4>
+          <dl class="hlf-dl">
+            <dt>Schicht wählen</dt>
+            <dd>Klick auf <b>F</b>, <b>N</b>, <b>S</b> oder <b>R</b> – oder die Tasten
+              <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd>.</dd>
+            <dt>Person wählen</dt>
+            <dd>Klick auf einen Namen in der Liste. Nochmal klicken hebt die Wahl auf.</dd>
+            <dt>Mehrere Personen</dt>
+            <dd>Die Kästchen links am Namen. Ein Klick auf einen Tag trägt dann
+              <b>alle</b> gewählten Personen ein.</dd>
+          </dl>
+          <h4>Team</h4>
+          <dl class="hlf-dl">
+            <dt>Suchen</dt>
+            <dd>Feld über der Liste, Taste <kbd>/</kbd> springt hinein. Daneben der
+              Filter nach 🇩🇪 oder 🇮🇳.</dd>
+            <dt>✎ Bearbeiten</dt>
+            <dd>Profil: Name, Team, Farbe, Icon und die <b>täglichen Präferenzen</b> –
+              welche Schicht jemand an welchem Wochentag bevorzugt. Daraus füllt das
+              Template seine Zeilen.</dd>
+            <dt>🗑 Entfernen</dt>
+            <dd>Fragt einmal nach. Die Einträge bleiben gesichert: legt man denselben
+              Namen später wieder an, fragt die App, ob sie zurückkommen sollen.</dd>
+            <dt>Statistik</dt>
+            <dd>Reiter neben <b>Team</b>: zählt je Person die Schichten des offenen Monats.</dd>
+          </dl>
+          <h4>Soll / Tag</h4>
+          <p>Unten in der Seitenleiste steht, wie viele Leute eine Schicht braucht.
+            Tage darunter werden im Kalender markiert und oben rechts gezählt
+            (<b>⚠</b>). Am <b>Wochenende gilt für Früh, Normaldienst und Spät kein
+            Soll</b> – die Rufbereitschaft zählt an jedem Tag.</p>
+        </section>
+
+        <section id="hilfe-cal">
+          <h3>📅 Kalender</h3>
+          <p>Der Monat als Raster, jede Zelle ein Tag. Jeder Tag zeigt immer alle vier
+            Schichten in derselben Reihenfolge – auch die leeren, damit Lücken beim
+            Überfliegen auffallen. Die Zahl neben dem Kürzel sagt
+            <b>eingetragen / gebraucht</b>.</p>
+          <h4>Eintragen und austragen</h4>
+          <dl class="hlf-dl">
+            <dt><kbd>Klick</kbd></dt>
+            <dd>Trägt die gewählte Person in die gewählte Schicht ein – oder wieder aus,
+              wenn sie schon dort steht.</dd>
+            <dt><kbd>Shift</kbd>+Klick</dt>
+            <dd>Zieht einen <b>Zeitraum</b> auf: vom zuletzt geklickten Tag bis hierher.</dd>
+            <dt><kbd>Strg</kbd>+Klick</dt>
+            <dd>Sammelt <b>einzelne Tage</b> (✓ an der Tageszahl). Der nächste Klick
+              trägt alle auf einmal ein.</dd>
+            <dt><b>✕</b> am Chip</dt>
+            <dd>Trägt genau diesen einen Eintrag aus.</dd>
+            <dt>Chip ziehen</dt>
+            <dd>Verschiebt den Eintrag auf einen anderen Tag.</dd>
+          </dl>
+          <h4>Löschen ohne gewählte Person</h4>
+          <p>Ist <b>kein</b> Mitarbeiter gewählt und trotzdem ein Zeitraum aufgezogen,
+            wird der Werkzeug-Kasten zum Löschwerkzeug: alle Einträge des Zeitraums,
+            nur eine Schicht, oder nur eine bestimmte Person.</p>
+          <h4>Der einzelne Tag</h4>
+          <dl class="hlf-dl">
+            <dt><b>⋯</b> oder Rechtsklick</dt>
+            <dd>Menü mit <b>Notiz &amp; Details</b>, <b>Tag kopieren</b>,
+              <b>Einfügen</b> und <b>Tag leeren</b>.</dd>
+            <dt><kbd>Entf</kbd></dt>
+            <dd>Leert alle mit <kbd>Strg</kbd> gewählten Tage – nach Rückfrage.</dd>
+            <dt>Punkt an der Zahl</dt>
+            <dd>An diesem Tag steht eine Notiz.</dd>
+            <dt>Feiertagsband</dt>
+            <dd>Name des Feiertags, eingefärbt nach Land. <b>★</b> kennzeichnet einen
+              eigenen Feiertag, <b>🌉</b> einen Brückentag.</dd>
+            <dt><b>⚠</b> in der Zelle</dt>
+            <dd>Konflikt: jemand steht in zwei Arbeitsschichten – oder an einem
+              Feiertag seines eigenen Landes.</dd>
+          </dl>
+          <h4>Prüfen</h4>
+          <p>Ist ein Tag unter Soll, erscheint oben rechts ein <b>⚠</b>-Chip mit der
+            Anzahl. Ein Klick darauf listet alle betroffenen Tage; ein Klick auf einen
+            Eintrag springt dorthin.</p>
+        </section>
+
+        <section id="hilfe-matrix">
+          <h3>▦ Monatsübersicht</h3>
+          <p>Personen als Zeilen, Tage als Spalten – die Ansicht für die Frage
+            „wer wann“ über einen ganzen Monat.</p>
+          <div class="hlf-tipp"><b>Jeder Tag ist geteilt:</b> oben die Arbeitsschicht,
+            unten die Rufbereitschaft. Beides läuft am selben Tag nebeneinander und
+            ist hier gleichzeitig zu sehen.</div>
+          <dl class="hlf-dl">
+            <dt>Klick oben</dt>
+            <dd>Trägt die gewählte <b>Arbeitsschicht</b> ein oder aus.</dd>
+            <dt>Klick unten</dt>
+            <dd>Trägt die <b>Rufbereitschaft</b> ein oder aus.</dd>
+            <dt><kbd>Shift</kbd>+Klick</dt>
+            <dd>Vom zuletzt geklickten Tag (blau umrandet) bis hierher – innerhalb
+              derselben Zeile. Eine ganze Woche Rufbereitschaft in zwei Klicks.</dd>
+            <dt>Ziehen</dt>
+            <dd>Ein belegtes Feld auf einen anderen Tag, ebenfalls nur in derselben Zeile.</dd>
+          </dl>
+          <h4>Kopfzeile</h4>
+          <dl class="hlf-dl">
+            <dt>Zeitraum</dt>
+            <dd>Ganzer Monat oder eine einzelne Kalenderwoche. Die Woche zeigt
+              breitere Spalten und mehr Platz für die Namen.</dd>
+            <dt>Reihenfolge</dt>
+            <dd>Wie in der Liste, <b>Name A–Z</b>, <b>Team</b>, oder
+              <b>Meiste …</b> je Schicht – wer die meisten Spätdienste hat, steht dann oben.</dd>
+            <dt>Legende</dt>
+            <dd>Welche Farbe welche Schicht ist – dieselben Töne wie im Kalender.</dd>
+          </dl>
+          <p>Die unterste Zeile zählt je Tag und je Band, wie viele Leute dort stehen.
+            Zeitraum und Reihenfolge bleiben über einen Neustart erhalten.</p>
+        </section>
+
+        <section id="hilfe-ruf">
+          <h3>🔔 Rufbereitschaft</h3>
+          <p>Die Rufbereitschaft wird <b>wochenweise</b> geplant: je Kalenderwoche eine
+            oder mehrere Personen. Aus diesem Plan werden dann die einzelnen Tage im
+            Kalender.</p>
+          <h4>Planen</h4>
+          <dl class="hlf-dl">
+            <dt><b>＋</b> oder Klick</dt>
+            <dd>Auf eine Zelle der Spalte <b>Geplant</b>: Person zuweisen.
+              <b>✕</b> am Namen nimmt sie wieder heraus.</dd>
+            <dt>Klick auf die KW</dt>
+            <dd>Klappt die sieben Tage der Woche auf – dort lassen sich einzelne
+              Vertretungen eintragen.</dd>
+            <dt><b>⟳ Reihum</b></dt>
+            <dd>Verteilt die Wochen der Reihe nach an mehrere Personen: Reihenfolge
+              festlegen, Zeitraum <b>von – bis</b> wählen, und entscheiden, ob bereits
+              zugewiesene Wochen überschrieben werden.</dd>
+          </dl>
+          <h4>Abgleich mit dem Kalender</h4>
+          <dl class="hlf-dl">
+            <dt>Geplant</dt>
+            <dd>Was der Wochenplan vorsieht.</dd>
+            <dt>Im Kalender</dt>
+            <dd>Was tatsächlich in den Tagen steht, als <b>n/7</b>.</dd>
+            <dt>Abgleich</dt>
+            <dd><b>✓ übertragen</b>, <b>nur teilweise</b>, <b>weicht ab</b> oder
+              <b>nicht übertragen</b>.</dd>
+            <dt><b>▶ In den Kalender übertragen</b></dt>
+            <dd>Schreibt den Plan in die Tage – wahlweise für ein ganzes Jahr oder
+              einen Monat. Bereits vorhandene Einträge bleiben stehen.</dd>
+            <dt><b>↙ Aus Kalender</b></dt>
+            <dd>Der umgekehrte Weg: liest bestehende Rufbereitschafts-Tage in den
+              Wochenplan ein.</dd>
+            <dt>nur Abweichungen</dt>
+            <dd>Blendet alle Wochen aus, die schon sauber übertragen sind.</dd>
+            <dt><b>↓ Wochen</b> / <b>↓ Tage</b></dt>
+            <dd>Der Wochenplan bzw. die eingetragenen Tage als CSV.</dd>
+          </dl>
+        </section>
+
+        <section id="hilfe-tmpl">
+          <h3>⚙ Template</h3>
+          <p>Ein Template hält fest, welche Schicht jemand an welchem <b>Wochentag</b>
+            hat. Der Autoplan trägt genau dieses Muster in einen Monat ein.</p>
+          <dl class="hlf-dl">
+            <dt>Zelle klicken</dt>
+            <dd>Wechselt durch <b>Früh → Normaldienst → Spät → Frei → leer</b>.</dd>
+            <dt>Rufbereitschaft</dt>
+            <dd>Steht hier <b>nicht</b> – sie wird im Reiter
+              <b>🔔 Rufbereitschaft</b> wochenweise geplant.</dd>
+            <dt>Wochenenden</dt>
+            <dd>Heller dargestellt. Eintragen lässt sich dort dasselbe, verlangt wird es nicht.</dd>
+            <dt><b>↙ Aus Profil-Präferenzen</b></dt>
+            <dd>Füllt die Tabelle aus den Präferenzen der Mitarbeiterprofile.</dd>
+            <dt><b>💾 Speichern</b></dt>
+            <dd>Unter einem Namen. Mehrere Templates können nebeneinander stehen;
+              ein Klick auf einen gespeicherten Namen lädt ihn.</dd>
+          </dl>
+          <h4>Anwenden</h4>
+          <p><b>▶ Template anwenden</b> fragt zuerst, wie weit es gehen soll:</p>
+          <dl class="hlf-dl">
+            <dt>Nur ergänzen</dt>
+            <dd>Füllt nur Tage, an denen die Person noch nicht eingeteilt ist.</dd>
+            <dt>Angleichen</dt>
+            <dd>Bringt den Plan auf das Template – ändert also auch Tage, die schon
+              anders geplant sind.</dd>
+          </dl>
+          <p>Feiertage und Konflikte werden übersprungen; hinterher steht da, wie viele
+            Tage geplant, ersetzt oder ausgelassen wurden.</p>
+        </section>
+
+        <section id="hilfe-hol">
+          <h3>🎉 Feiertage</h3>
+          <p>Die gesetzlichen Feiertage für Deutschland und Indien bringt die App mit.
+            Dieser Reiter ist für alles andere: Betriebsferien, Brückentage,
+            regionale Tage.</p>
+          <dl class="hlf-dl">
+            <dt>Anlegen</dt>
+            <dd>Datum, Name und Land (<b>🇩🇪 DE</b>, <b>🇮🇳 IN</b>
+              oder <b>🌍 Beide</b>), dann <b>+ Hinzufügen</b>.</dd>
+            <dt><b>⇊ Liste</b></dt>
+            <dd>Mehrere auf einmal, eine Zeile je Tag:
+              <code>Datum;Name</code>, optional noch <code>;DE</code>, <code>;IN</code>
+              oder <code>;DE+IN</code>. Das Datum geht als <code>2026-12-24</code>
+              oder <code>24.12.2026</code>.</dd>
+            <dt>Im Kalender</dt>
+            <dd>Eigene Feiertage tragen ein <b>★</b>. Wer an einem Feiertag seines
+              eigenen Landes eingeteilt ist, bekommt ein <b>⚠</b>.</dd>
+          </dl>
+        </section>
+
+        <section id="hilfe-daten">
+          <h3>💾 Daten &amp; Ausgabe</h3>
+          <p>Alles Folgende steht im Menü <b>⋯</b> oben rechts.</p>
+          <dl class="hlf-dl">
+            <dt>📆 ICS</dt>
+            <dd><b>Export</b> nach Person, Jahr und Monat – die Datei lässt sich in
+              Outlook oder einen anderen Kalender laden. Der <b>Import</b> erwartet
+              Termine der Form <code>Fruehschicht - Name</code>.</dd>
+            <dt>🖨 Drucken</dt>
+            <dd><kbd>Strg</kbd>+<kbd>P</kbd>. Gedruckt wird die offene Ansicht mit
+              Überschrift und Legende, ohne Bedienelemente.</dd>
+            <dt>💾 Sicherung</dt>
+            <dd><b>Backup herunterladen</b> schreibt alles in eine
+              <code>.json</code>-Datei: Mitarbeiter, Schichten, Templates, Feiertage und
+              den KW-Plan. <b>Backup einspielen</b> ersetzt den aktuellen Stand
+              vollständig.</dd>
+            <dt>↻ Neu laden</dt>
+            <dd>Holt die Daten noch einmal – nützlich, wenn jemand anders am selben
+              Bestand gearbeitet hat.</dd>
+            <dt>📁 Ordner wechseln</dt>
+            <dd>Wählt den Ordner, in dem die Datenbank liegt. Der aktuelle Pfad steht
+              unten rechts in der Fußleiste.</dd>
+          </dl>
+          <h4>Rückgängig</h4>
+          <p><b>↩</b> und <b>↪</b> oben rechts, oder
+            <kbd>Strg</kbd>+<kbd>Z</kbd> und <kbd>Strg</kbd>+<kbd>Y</kbd>. Bis zu
+            50 Schritte weit.</p>
+        </section>
+
+        <section id="hilfe-ansicht">
+          <h3>🌙 Darstellung</h3>
+          <dl class="hlf-dl">
+            <dt>A− / A+</dt>
+            <dd>Anzeigegröße in mehreren Stufen – mehr Tage auf den Schirm oder
+              größere Schrift.</dd>
+            <dt>🌙 Theme</dt>
+            <dd>Schaltet zwischen hell und dunkel.</dd>
+            <dt><b>◀</b> am Rand</dt>
+            <dd>Blendet die Seitenleiste aus und gibt dem Plan die ganze Breite.</dd>
+          </dl>
+          <p>Anzeigegröße, Theme, die Seitenleiste und die Wahl in der
+            Monatsübersicht bleiben über einen Neustart erhalten.</p>
+        </section>
+
+        <section id="hilfe-tasten">
+          <h3>⌨ Tastenkürzel</h3>
+          <dl class="hlf-dl">
+            <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dt>
+            <dd>Früh, Normaldienst, Spät, Rufbereitschaft wählen</dd>
+            <dt><kbd>←</kbd> <kbd>→</kbd></dt>
+            <dd>Voriger / nächster Monat</dd>
+            <dt><kbd>T</kbd></dt>
+            <dd>Zurück zum heutigen Monat</dd>
+            <dt><kbd>/</kbd></dt>
+            <dd>In die Suche der Mitarbeiterliste springen</dd>
+            <dt><kbd>Shift</kbd>+Klick</dt>
+            <dd>Zeitraum aufziehen</dd>
+            <dt><kbd>Strg</kbd>+Klick</dt>
+            <dd>Einzelne Tage sammeln</dd>
+            <dt><kbd>Entf</kbd></dt>
+            <dd>Gewählte Tage leeren</dd>
+            <dt><kbd>Strg</kbd>+<kbd>Z</kbd></dt>
+            <dd>Rückgängig</dd>
+            <dt><kbd>Strg</kbd>+<kbd>Y</kbd></dt>
+            <dd>Wiederholen</dd>
+            <dt><kbd>Strg</kbd>+<kbd>P</kbd></dt>
+            <dd>Drucken</dd>
+            <dt><kbd>F1</kbd></dt>
+            <dd>Diese Anleitung</dd>
+            <dt><kbd>Esc</kbd></dt>
+            <dd>Dialog schließen, Auswahl aufheben</dd>
+          </dl>
+          <div class="hlf-tipp">Die Kürzel greifen nur, solange nicht gerade in ein Feld
+            getippt wird – wer im Suchfeld eine <b>4</b> schreibt, wechselt nicht die Schicht.</div>
+        </section>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2816,6 +3204,14 @@ function bindEvents(){
     const inp=/** @type {HTMLInputElement} */ (e.target); if(inp.files?.[0]) dom.muss('backup-drop-label').textContent='📂 '+inp.files[0].name;
   });
   dom.muss('btn-refresh').addEventListener('click',refreshData);
+  dom.muss('btn-hilfe').addEventListener('click',()=>openHilfe());
+  dom.muss('hilfe-nav').addEventListener('click',e=>{
+    const b=dom.naechstes(e,'[data-zu]');
+    if(b&&b.dataset.zu) zeigeHilfeKapitel(b.dataset.zu);
+  });
+  dom.muss('hilfe-inhalt').addEventListener('scroll',hilfeNavMitlesen);
+  dom.eingabe('hilfe-suche').addEventListener('input',e=>
+    hilfeFiltern(/** @type {HTMLInputElement} */ (e.target).value));
   // Das Anwenden hängt am onclick von btn-run-tmpl
 
   dom.alle(document,'.sb-tab').forEach(tab=>{
@@ -2832,6 +3228,7 @@ function bindEvents(){
   dom.muss('new-color').addEventListener('click',e=>{e.stopPropagation();showColorPicker(dom.ziel(e),null);});
 
   document.addEventListener('keydown',e=>{
+    if(e.key==='F1'){ e.preventDefault(); openHilfe(); return; }
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();doUndo();}
     if((e.ctrlKey||e.metaKey)&&(e.shiftKey&&e.key==='Z'||e.key==='y')){e.preventDefault();doRedo();}
     if(e.key==='Escape'){closeAllModals();closeDayMenu();dom.muss('more-menu').classList.add('hidden');clearAll();copiedDay=null;renderCalendar();}
@@ -5228,6 +5625,77 @@ async function doImportData(){
     setTimeout(()=>closeModal('backup-modal'),1800);
     toast('Daten erfolgreich importiert!');
   }
+}
+
+// ═════════════════════════════════════════════════════════════
+// ANLEITUNG
+// Der Text steht fest im Markup - hier steht nur, wie man sich darin
+// bewegt: springen, mitlesen, filtern.
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Öffnet die Anleitung, auf Wunsch gleich beim passenden Kapitel.
+ * @param {string} [kapitel]  id eines Abschnitts, z.B. 'hilfe-matrix'
+ */
+function openHilfe(kapitel){
+  openModal('hilfe-modal');
+  const suche=dom.eingabe('hilfe-suche');
+  suche.value='';
+  hilfeFiltern('');
+  zeigeHilfeKapitel(kapitel||'hilfe-start');
+  // Der Cursor steht im Suchfeld: wer die Anleitung aufschlägt, sucht meist
+  // etwas Bestimmtes. Nebenbei greifen die Einzeltasten dann nicht mehr.
+  setTimeout(()=>suche.focus(),80);
+}
+
+/**
+ * Rollt den Text zum Kapitel. Kein scrollIntoView - das scrollt auch, was
+ * darum herum liegt; hier soll sich nur die rechte Spalte bewegen.
+ * @param {string} id
+ */
+function zeigeHilfeKapitel(id){
+  const inhalt=dom.muss('hilfe-inhalt');
+  const abschnitt=document.getElementById(id);
+  if(!abschnitt) return;
+  inhalt.scrollTop=abschnitt.offsetTop-inhalt.offsetTop;
+  // Sofort markieren, nicht erst wenn das Rollen angekommen ist.
+  markiereHilfeNav(id);
+}
+
+/** @param {string} id */
+function markiereHilfeNav(id){
+  dom.alle(dom.muss('hilfe-nav'),'button').forEach(b=>
+    b.classList.toggle('aktiv',b.dataset.zu===id));
+}
+
+// Welches Kapitel gerade oben steht, leuchtet links in der Navigation.
+function hilfeNavMitlesen(){
+  const inhalt=dom.muss('hilfe-inhalt');
+  const offen=[...dom.alle(inhalt,'section')].filter(a=>!a.classList.contains('weg'));
+  if(!offen.length) return;
+  const grenze=inhalt.getBoundingClientRect().top+40;
+  let aktiv=offen[0];
+  offen.forEach(a=>{ if(a.getBoundingClientRect().top<=grenze) aktiv=a; });
+  markiereHilfeNav(aktiv.id);
+}
+
+/**
+ * Blendet aus, was den Suchtext nicht enthält - Kapitel wie Navigationspunkt.
+ * Gesucht wird im sichtbaren Text, also in genau dem, was der Leser sieht.
+ * @param {string} text
+ */
+function hilfeFiltern(text){
+  const wort=text.trim().toLowerCase();
+  const nav=dom.muss('hilfe-nav');
+  let treffer=0;
+  dom.alle(dom.muss('hilfe-inhalt'),'section').forEach(a=>{
+    const passt=!wort||(a.textContent||'').toLowerCase().includes(wort);
+    a.classList.toggle('weg',!passt);
+    dom.eins(nav,'[data-zu="'+a.id+'"]')?.classList.toggle('weg',!passt);
+    if(passt) treffer++;
+  });
+  dom.muss('hilfe-leer').classList.toggle('hidden',treffer>0);
+  hilfeNavMitlesen();
 }
 
 /** @param {string} id */
