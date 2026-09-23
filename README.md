@@ -103,7 +103,12 @@ laufen, ohne etwas zu erzeugen. Jede Meldung zeigt direkt auf eine Zeile in
 | Teil | Strenge | Warum |
 |---|---|---|
 | Regelkern | `strict`, nur ES-Bibliothek | Hier stehen die Regeln; ihre Typen tragen bis in jeden Aufruf. Ohne DOM-Bibliothek ist „der Regelkern greift nicht ins Fenster“ eine Regel, die tsc durchsetzt. |
-| Oberfläche | `strict` ohne `noImplicitAny` | Der eine fehlende Schalter verlangt einen Typ an jedem Parameter (rund 480 Stellen) und ist ein eigener Durchgang. `strictNullChecks` kam als zweite Stufe dazu. |
+| Oberfläche | `strict` | In drei Stufen erreicht: erst alles außer `noImplicitAny` und `strictNullChecks`, dann `strictNullChecks`, dann `noImplicitAny`. Jede Stufe hat echte Fehler gefunden. |
+
+Zwei Stellen sind ausdrücklich als ungeprüft gekennzeichnet: `api()` und
+`applyData()`. Was der Server schickt, hat je nach Weg eine andere Form; die
+Aufrufer lesen einzelne Felder heraus und fangen ein `{error}` selbst ab.
+Alles andere zu behaupten wäre eine Aussage über fremde Daten.
 
 Die Einstellungen stehen mit Begründung in `tsconfig.json` und
 `tsconfig.regelkern.json`. Das DOM liefert allgemeine Typen – `getElementById`

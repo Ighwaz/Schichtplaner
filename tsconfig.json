@@ -2,17 +2,12 @@
 // frontend/index.html, herausgeschnitten von tests/typpruefung.mjs.
 //
 // Der Regelkern ist mit dabei, weil die Oberflaeche ihn aufruft: seine Typen
-// sollen bis in jeden Aufruf durchgreifen. Streng geprueft wird er zusaetzlich
-// fuer sich allein, siehe tsconfig.regelkern.json.
+// sollen bis in jeden Aufruf durchgreifen. Zusaetzlich wird er fuer sich
+// allein geprueft, ohne DOM-Bibliothek - siehe tsconfig.regelkern.json.
 //
-// Fuer die Oberflaeche gilt alles aus "strict" bis auf einen Schalter:
-//
-//   noImplicitAny  verlangt einen Typ an jedem Parameter (rund 480 Stellen)
-//
-// Der lohnt sich, ist aber ein eigener Durchgang - Funktion fuer Funktion.
-// Alles andere aus "strict" ist unten einzeln an; strictNullChecks kam als
-// zweite Stufe dazu und hat dabei einen Absturz ans Licht gebracht
-// (Object.entries(undefined), wenn /api/schicht einen Fehler meldet).
+// Volles "strict", in drei Stufen erreicht: zuerst alles ausser noImplicitAny
+// und strictNullChecks, dann strictNullChecks, dann noImplicitAny. Jede Stufe
+// hat echte Fehler ans Licht gebracht, keine Stilfragen.
 {
   "compilerOptions": {
     "allowJs": true,
@@ -23,15 +18,7 @@
     "types": [],
     "skipLibCheck": true,
 
-    "strict": false,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictBuiltinIteratorReturn": true,
-    "noImplicitThis": true,
-    "useUnknownInCatchVariables": true,
-    "alwaysStrict": true,
-
+    "strict": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
