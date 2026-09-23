@@ -1871,6 +1871,12 @@ const EMOJIS = ['👩','👨','👩‍💻','👨‍💻','👩‍🔧','👨‍
  * @typedef {Record<string, Record<string, string>>} Wochentemplate
  */
 /**
+ * Ein Tag, wie tagInfo ihn fuer die Spaltenkoepfe der Monatsuebersicht
+ * beschreibt. fremd heisst: gehoert nicht zum offenen Monat.
+ * @typedef {{key: string, tag: number, kurz: string, we: boolean,
+ *            fremd: boolean, kurzDatum: string, lang: string}} TagInfo
+ */
+/**
  * Eine Kalenderwoche, wie getISOWeeks sie liefert. kwKey ist "JJJJ-Www",
  * isoYear das Jahr, in das der Donnerstag dieser Woche faellt - das ist an
  * der Jahresgrenze nicht immer das Jahr von start.
@@ -3175,7 +3181,7 @@ function updateSelInfo(){
         <button onclick="clearSelection()" style="width:100%;padding:3px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text3);font-size:10px;cursor:pointer">← Abbrechen</button>`;
       // Der Name steht in einem data-Attribut statt in einem onclick:
       // ein Apostroph (D'Souza) hatte den Aufruf zerbrochen.
-      dom.alle(el,'[data-rp]').forEach(b=>b.addEventListener('click',()=>clearRangePerson(b.dataset.rp)));
+      dom.alle(el,'[data-rp]').forEach(b=>b.addEventListener('click',()=>{const n=b.dataset.rp; if(n) clearRangePerson(n);}));
       setHint('Nur löschen – zum Eintragen erst einen Mitarbeiter wählen');
       return;
     }
@@ -3965,6 +3971,7 @@ async function clearRangeShift(shift){
   toast(dates.length+' Tag(e): '+SHIFT_LABEL[shift]+' geleert');
 }
 
+/** @param {string} name */
 async function clearRangePerson(name){
   frozenRangeEnd=null;   const dates=getRangeDates(); pushUndo();
   dates.forEach(k=>{
@@ -3991,6 +3998,7 @@ function clearAll(){
   rangeStart=null;previewEnd=null;frozenRangeEnd=null;letzterKlick=null;multiDays.clear();
   renderCalendar();updateSelInfo();
 }
+/** @param {string} key */
 function rangeClass(key){ return RK.zeitraumKlasse(key,rangeStart,previewEnd); }
 // Vorschau des Zeitraums: nur die Klassen der Tageszellen anpassen. Ein
 // kompletter renderCalendar() bei jeder Mausbewegung tauscht das DOM aus und
@@ -3999,7 +4007,7 @@ function updateRangePreview(){
   dom.alle(document,'.day-cell').forEach(cell=>{
     if(cell.classList.contains('other'))return;
     cell.classList.remove('in-range','range-start','range-end');
-    const rc=rangeClass(cell.dataset.key);
+    const rc=rangeClass(cell.dataset.key??'');
     if(rc)cell.classList.add(...rc.split(' '));
   });
 }
@@ -4025,6 +4033,10 @@ document.addEventListener('keyup',e=>{
 // ══════════════════════════════════════════════════════════════
 // CONFLICTS & UNDERSTAFFED
 // ══════════════════════════════════════════════════════════════
+/**
+ * @param {Belegung} slot
+ * @param {string} key
+ */
 function getConflicts(slot,key){
   const k=RK.konflikte(slot,key,key?holidays[key]:null,n=>mitarbeiter.find(x=>x.name===n)?.team);
   return {schichtC:k.doppelt, holC:k.amFeiertag, hasAny:k.hatKonflikt};
@@ -4032,7 +4044,15 @@ function getConflicts(slot,key){
 // Soll einer Schicht an einem bestimmten Tag. Am Wochenende wird nur
 // Rufbereitschaft besetzt - dieselbe Regel gilt für die Zähler in den
 // Tageszellen, in der Monatsübersicht und für die Unterbesetzung.
+/**
+ * @param {Schicht} shift
+ * @param {string} [key]
+ */
 function sollFor(shift,key){ return RK.sollAmTag(soll,shift,key); }
+/**
+ * @param {Belegung} slot
+ * @param {string} key
+ */
 function isUnderstaffed(slot,key){ return RK.unterSoll(slot,key,soll); }
 // Kalenderansicht aktivieren - von jumpToDate und vom Autoplan genutzt.
 // Monatsnavigation und Schichtauswahl gehören nur zu den Ansichten, die auch
@@ -4074,6 +4094,7 @@ function showCalendarView(){
   updatePrintHead();
 }
 
+/** @param {string} key */
 function jumpToDate(key){
   const d=new Date(key+'T00:00:00');
   curYear=d.getFullYear(); curMonth=d.getMonth()+1;
@@ -4093,7 +4114,8 @@ function showUnderstaffedReport(){
   const cont=dom.muss('under-content');
   if(!issues.length){cont.innerHTML='<div style="padding:14px;color:var(--frueh);font-size:14px;text-align:center">✓ Alle Tage vollständig besetzt!</div>';}
   else{
-    const date=k=>{const dt=new Date(k+'T00:00:00');return dt.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});};
+    /** @param {string} k */
+  const date=k=>{const dt=new Date(k+'T00:00:00');return dt.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});};
     cont.innerHTML=`<div class="under-panel"><h4>⚠ ${issues.length} Tage mit Unterbesetzung</h4><div class="under-list">${issues.map(({key,missing})=>`<div class="under-item" onclick="jumpToDate('${key}')" style="cursor:pointer" title="Im Kalender öffnen"><span class="under-date" style="color:var(--blue);text-decoration:underline dotted">${date(key)}</span><div class="under-shifts">${missing.map(m=>`<span class="under-tag" style="background:color-mix(in srgb,var(${SHIFT_VAR[m.s]}) 15%,transparent);color:var(${SHIFT_VAR[m.s]})">${SHIFT_SHORT[m.s][0]} ${m.ist}/${m.soll}</span>`).join('')}</div></div>`).join('')}</div></div>`;
   }
   openModal('under-modal');
@@ -4102,6 +4124,7 @@ function showUnderstaffedReport(){
 // ══════════════════════════════════════════════════════════════
 // DAY MODAL
 // ══════════════════════════════════════════════════════════════
+/** @param {string} key */
 function openDayModal(key){
   activeDayKey=key;const d=new Date(key+'T00:00:00');
   dom.muss('dm-title').textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -4178,6 +4201,8 @@ async function applyTemplateDirectly(){
 
   pushUndo();
   // Monat für Monat anwenden - jeder Aufruf ist eine eigene Transaktion.
+  /** @type {{planned: number, ersetzt: number, skipped_conflict: number,
+   *           skipped_holiday: number, unbekannt: Set<string>, error?: string}} */
   const d={planned:0,ersetzt:0,skipped_conflict:0,skipped_holiday:0,unbekannt:new Set()};
   for(let t=vonJ*12+vonM-1; t<=bisJ*12+bisM-1; t++){
     const j=Math.floor(t/12), m=t%12+1;
@@ -4186,7 +4211,7 @@ async function applyTemplateDirectly(){
     if(r.error){ d.error=r.error; break; }
     d.planned+=r.planned||0; d.ersetzt+=r.ersetzt||0;
     d.skipped_conflict+=r.skipped_conflict||0; d.skipped_holiday+=r.skipped_holiday||0;
-    (r.unbekannt||[]).forEach(n=>d.unbekannt.add(n));
+    (r.unbekannt||[]).forEach(/** @param {string} n */ n=>d.unbekannt.add(n));
   }
   const monate=bisJ*12+bisM-(vonJ*12+vonM)+1;
   if(d.error){
@@ -4301,10 +4326,19 @@ function renderTemplateTable(){
 
 // Beschriftung und Farbe einer Template-Zelle. Der Normaldienst fehlte hier -
 // er kam als rohes "normal" durch, klein geschrieben und ohne Farbe.
+/**
+ * Was in einer Template-Zelle stehen kann: eine Schicht oder "frei".
+ * @typedef {Schicht|'frei'} TmplWert
+ * @param {string} w
+ * @returns {w is TmplWert}
+ */
+function istTmplWert(w){ return w==='frei'||RK.istSchicht(w); }
 const TMPL_LABEL={frueh:'Früh',normal:'Normal',spaet:'Spät',rufbereitschaft:'Ruf',frei:'Frei'};
 const TMPL_KLASSE={frueh:'t-f',normal:'t-n',spaet:'t-s',rufbereitschaft:'t-r',frei:'t-frei'};
-function cellLabel(val){ return TMPL_LABEL[val]||'–'; }
-function cellClass(val){ return TMPL_KLASSE[val]||''; }
+/** @param {string} val */
+function cellLabel(val){ return istTmplWert(val)?TMPL_LABEL[val]:'–'; }
+/** @param {string} val */
+function cellClass(val){ return istTmplWert(val)?TMPL_KLASSE[val]:''; }
 
 async function loadTemplates(){
   const d=await api('/api/templates');templates=d||{};
@@ -4317,7 +4351,7 @@ async function loadTemplates(){
   // Der Name steht im data-Attribut, nicht in einem onclick - ein
   // Anfuehrungszeichen im Namen hatte das Attribut beendet.
   dom.alle(wrap,'[data-tmpl-del]').forEach(b=>
-    b.addEventListener('click',()=>deleteTemplate(b.dataset.tmplDel)));
+    b.addEventListener('click',()=>{const n=b.dataset.tmplDel; if(n) deleteTemplate(n);}));
   dom.alle(wrap,'[data-tmpl]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const name=String(btn.dataset.tmpl);
@@ -4337,12 +4371,17 @@ async function saveTemplate(){
   const name=dom.eingabe('tmpl-name-input').value.trim();
   if(!name){toast('Template-Name eingeben');return;}
   // Für JSON brauchen die Wochentage Zeichenketten als Schlüssel
+  /** @type {Record<string, Record<string, string>>} */
   const payload={};
-  Object.entries(tmplData).forEach(([person,days])=>{payload[person]={};Object.entries(days).forEach(([d,s])=>{payload[person][String(d)]=s;});});
+  Object.entries(tmplData).forEach(([person,days])=>{
+    /** @type {Record<string, string>} */
+    const tage={};payload[person]=tage;
+    Object.entries(days).forEach(([d,s])=>{tage[String(d)]=s;});});
   await api('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,template:payload})});
   templates[name]=payload;await loadTemplates();toast('Template "'+name+'" gespeichert');
 }
 
+/** @param {string} name */
 async function deleteTemplate(name){
   await api('/api/templates/'+encodeURIComponent(name),{method:'DELETE'});
   delete templates[name];await loadTemplates();toast('Template gelöscht');
@@ -4356,6 +4395,7 @@ function renderRufSummary(){
   const sumWrap=document.getElementById('ruf-summary');
   if(!sumWrap) return;
   const jahr=dom.auswahl('rufkw-year')?.value||String(curYear);
+  /** @type {Record<string, number>} */
   const proPerson={};
   Object.entries(schichten).forEach(([key,slot])=>{
     if(!key.startsWith(jahr)) return;
@@ -4372,6 +4412,7 @@ function renderRufSummary(){
 
 function exportRufCSV(){
   const pre=dom.auswahl('rufkw-year')?.value||String(curYear);
+  /** @type {string[][]} */
   const entries=[];
   Object.entries(schichten).forEach(([key,slot])=>{
     if(!key.startsWith(pre))return;
@@ -4479,6 +4520,7 @@ function renderMatrix(){
     tage.map(()=>'<col>').join('')+'<col style="width:96px"></colgroup>';
 
   // Klassen, die am Tag hängen - Kopf und Zellen brauchen dieselben.
+  /** @param {TagInfo} t */
   const tagKlasse=t=>[t.we?'we':'', holidays[t.key]&&!holidays[t.key].bridge?'hol':'',
     t.fremd?'fremd':''].filter(Boolean).join(' ');
 
@@ -4494,6 +4536,7 @@ function renderMatrix(){
   const zeilen=leute.map(({name,zaehl,m})=>{
     const zellen=tage.map(t=>{
       const z=RK.matrixZelle(schichten[t.key],name);
+      /** @type {string[]} */
       const teile=[];
       const felder=z.baender.map((b,i)=>{
         b.alle.forEach(s=>teile.push(SHIFT_LABEL[s]));
@@ -4537,7 +4580,10 @@ function renderMatrix(){
     `${leute.length} Mitarbeiter · ${gesamtArbeit} Arbeitstage · ${gesamtRuf} Tage Rufbereitschaft${zeitraum}`;
 
   dom.alle(tbl,'[data-band][data-key]').forEach(el=>{
-    el.addEventListener('click',ev=>matrixKlick(el.dataset.key,el.dataset.name,el.dataset.band,ev.shiftKey));
+    el.addEventListener('click',ev=>{
+      const {key,name,band}=el.dataset;
+      if(key&&name&&band) matrixKlick(key,name,band,ev.shiftKey);
+    });
   });
   bindeMatrixZiehen(tbl);
   zeigeAnker();
@@ -4549,38 +4595,43 @@ function renderMatrix(){
 // jemand anderem einen Dienst geben will, trägt aus und ein - das ist eine
 // andere Entscheidung und soll auch anders aussehen.
 /** @type {{key:string,name:string,schicht:string}|null} */
+/** @type {{key: string, name: string, schicht: Schicht}|null} */
 let mxDrag=null;
 
+/** @param {HTMLElement} tbl */
 function bindeMatrixZiehen(tbl){
-  tbl.querySelectorAll('.mx-band[draggable=true]').forEach(el=>{
-    el.addEventListener('dragstart',ev=>{
+  dom.alle(tbl,'.mx-band[draggable=true]').forEach(el=>{
+    el.addEventListener('dragstart',/** @param {DragEvent} ev */ ev=>{
       // Die Schicht, die dort wirklich steht - nicht die gewaehlte. Sonst
       // wuerde eine gezogene Spaetschicht als Frueh am Zieltag landen.
-      mxDrag={key:el.dataset.key,name:el.dataset.name,schicht:el.dataset.schicht};
+      const {key,name,schicht}=el.dataset;
+      if(!key||!name||!RK.istSchicht(schicht)) return;
+      mxDrag={key,name,schicht};
       if(ev.dataTransfer) ev.dataTransfer.effectAllowed='move';
       setTimeout(()=>el.classList.add('zieht'),0);
     });
     el.addEventListener('dragend',()=>{
       el.classList.remove('zieht'); mxDrag=null;
-      tbl.querySelectorAll('.mx-split.ziel').forEach(z=>z.classList.remove('ziel'));
+      dom.alle(tbl,'.mx-split.ziel').forEach(z=>z.classList.remove('ziel'));
     });
   });
 
-  tbl.querySelectorAll('.mx-split[data-key]').forEach(split=>{
+  dom.alle(tbl,'.mx-split[data-key]').forEach(split=>{
     const passt=()=>mxDrag&&mxDrag.name===split.dataset.name&&mxDrag.key!==split.dataset.key;
-    split.addEventListener('dragover',ev=>{
+    split.addEventListener('dragover',/** @param {DragEvent} ev */ ev=>{
       if(!passt()) return;          // fremde Zeile: kein gültiges Ziel
       ev.preventDefault();
       split.classList.add('ziel');
     });
     split.addEventListener('dragleave',()=>split.classList.remove('ziel'));
-    split.addEventListener('drop',ev=>{
+    split.addEventListener('drop',/** @param {DragEvent} ev */ ev=>{
       split.classList.remove('ziel');
       if(!passt()||!mxDrag) return;   // passt() prüft mxDrag schon mit - tsc sieht das nur hier
       ev.preventDefault();
       const {key:vonKey,name,schicht}=mxDrag;
+      const nachKey=split.dataset.key;
       mxDrag=null;
-      matrixZiehen(vonKey,split.dataset.key,name,schicht);
+      if(nachKey) matrixZiehen(vonKey,nachKey,name,schicht);
     });
   });
 }
@@ -4588,6 +4639,12 @@ function bindeMatrixZiehen(tbl){
 // Verschieben heißt: erst den Zieltag klären, dann den Ausgangstag räumen.
 // Andersherum wäre der Eintrag bei einer Rückfrage schon weg und käme am
 // Zieltag nie an - derselbe Fehler, der im Kalender schon einmal steckte.
+/**
+ * @param {string} vonKey
+ * @param {string} nachKey
+ * @param {string} name
+ * @param {Schicht} schicht
+ */
 async function matrixZiehen(vonKey,nachKey,name,schicht){
   if(vonKey===nachKey) return;
   pushUndo();
@@ -4690,6 +4747,7 @@ let letzteArbeitsschicht='frueh';
 function arbeitsschichtWahl(){
   return RK.ARBEITSSCHICHTEN.includes(selectedShift)?selectedShift:letzteArbeitsschicht;
 }
+/** @param {string} band */
 const schichtVonBand=band=>band==='ruf'?'rufbereitschaft':arbeitsschichtWahl();
 
 // Ausgangspunkt für Shift+Klick: der zuletzt geklickte Tag, samt Person,
@@ -4703,6 +4761,12 @@ let mxAnker=null;
 // Mit Shift wird vom letzten Klick bis hierher aufgezogen. Das geht nur
 // innerhalb derselben Zeile und desselben Bandes: eine Person, eine
 // Schichtart. Ein Shift-Klick kann damit nie fremde Einträge treffen.
+/**
+ * @param {string} key
+ * @param {string} name
+ * @param {string} band  'arbeit' oder 'ruf'
+ * @param {boolean} mitShift
+ */
 async function matrixKlick(key,name,band,mitShift){
   const schicht=schichtVonBand(band);
   const strecke=(mitShift && mxAnker && mxAnker.name===name && mxAnker.band===band)
@@ -4719,6 +4783,11 @@ async function matrixKlick(key,name,band,mitShift){
   zeigeAnker();
 }
 
+/**
+ * @param {string} key
+ * @param {string} name
+ * @param {Schicht} schicht
+ */
 async function matrixEinzelklick(key,name,schicht){
   pushUndo();
   const res=await postSchicht([key],'toggle',schicht,name);
@@ -4739,6 +4808,10 @@ async function matrixEinzelklick(key,name,schicht){
 // Ein Tag in der Form, die die Spaltenköpfe brauchen. fremd heißt: gehört
 // nicht zum offenen Monat - kommt nur in der Wochenansicht vor, wenn eine
 // Woche über den Monatsrand reicht.
+/**
+ * @param {string} key
+ * @returns {TagInfo}
+ */
 function tagInfo(key){
   const dt=RK.alsDatum(key), wd=dt.getDay();
   return {
@@ -4751,6 +4824,11 @@ function tagInfo(key){
 }
 
 // Tage des Monats mit Kurzform für die Spaltenköpfe
+/**
+ * @param {number} jahr
+ * @param {number} monat  1-12
+ * @returns {TagInfo[]}
+ */
 function daysOfMonth(jahr,monat){
   const out=[], letzter=new Date(jahr,monat,0).getDate();
   for(let d=1;d<=letzter;d++) out.push(tagInfo(dk(jahr,monat,d)));
@@ -4762,6 +4840,7 @@ function daysOfMonth(jahr,monat){
 // ══════════════════════════════════════════════════════════════
 let bulkMode='mitarbeiter';
 
+/** @param {'mitarbeiter'|'feiertage'} mode */
 function openBulk(mode){
   bulkMode=mode;
   const titel=dom.muss('bulk-title');
@@ -4785,9 +4864,19 @@ function openBulk(mode){
 }
 
 // Datum in ISO-Form bringen; akzeptiert 2026-12-24 und 24.12.2026.
+/**
+ * @param {string} s
+ * @returns {string|null}
+ */
 function bulkDatum(s){
+  /**
+   * @param {number} y
+   * @param {number} m
+   * @param {number} d
+   */
   const echt=(y,m,d)=>{const dt=new Date(Date.UTC(y,m-1,d));
     return dt.getUTCFullYear()===y&&dt.getUTCMonth()===m-1&&dt.getUTCDate()===d;};
+  /** @param {number} n */
   const zwei=n=>String(n).padStart(2,'0');
   let m=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
   if(m&&echt(+m[1],+m[2],+m[3])) return `${m[1]}-${zwei(+m[2])}-${zwei(+m[3])}`;
@@ -4797,6 +4886,7 @@ function bulkDatum(s){
 }
 
 // Zeilen einlesen und prüfen, bevor irgendetwas gespeichert wird.
+/** @param {string} text */
 function parseBulk(text){
   /** @type {({name: string, team: string, color: string}
    *          |{date: string, name: string, country: string})[]} */
@@ -4805,11 +4895,11 @@ function parseBulk(text){
   const fehler=[];
   /** @type {Set<string>} */
   const gesehen=new Set();
-  text.split('\n').forEach((roh,i)=>{
+  text.split('\n').forEach(/** @param {string} roh @param {number} i */ (roh,i)=>{
     const zeile=roh.trim();
     if(!zeile) return;
     const nr=i+1;
-    const f=zeile.split(/[\t;]/).map(x=>x.trim());
+    const f=zeile.split(/[\t;]/).map(/** @param {string} x */ x=>x.trim());
     if(bulkMode==='mitarbeiter'){
       const name=f[0], land=(f[1]||'DE').toUpperCase();
       if(!name){fehler.push(`Zeile ${nr}: kein Name`);return;}
@@ -4888,14 +4978,17 @@ function renderCustomHolidays(){
     return `<div class="hol-item">
       <span class="hol-item-date" onclick="jumpToDate('${h.date}')" style="cursor:pointer;color:var(--blue);text-decoration:underline dotted" title="Im Kalender anzeigen">${d}</span>
       <span class="hol-item-name">★ ${esc(h.name)}</span>
-      ${countryBadge[h.country]||countryBadge['DE']}
+      ${h.country==='IN'||h.country==='DE+IN'?countryBadge[h.country]:countryBadge['DE']}
       <button class="hol-del-btn" data-hol-datum="${h.date}" data-hol-name="${esc(h.name)}">✕</button>
     </div>`;
   }).join('');
   // Datum und Name im data-Attribut statt im onclick: ein Anfuehrungszeichen
   // im Namen hatte den Knopf zerbrochen.
   dom.alle(list,'.hol-del-btn').forEach(b=>
-    b.addEventListener('click',()=>deleteCustomHoliday(b.dataset.holDatum,b.dataset.holName)));
+    b.addEventListener('click',()=>{
+      const {holDatum,holName}=b.dataset;
+      if(holDatum&&holName) deleteCustomHoliday(holDatum,holName);
+    }));
 }
 
 async function addCustomHoliday(){
@@ -4913,6 +5006,10 @@ async function addCustomHoliday(){
   renderCustomHolidays();renderCalendar();toast('Feiertag hinzugefügt');
 }
 
+/**
+ * @param {string} date
+ * @param {string} name
+ */
 async function deleteCustomHoliday(date,name){
   await api('/api/custom_holidays/'+encodeURIComponent(date+'|'+name),{method:'DELETE'});
   customHolidays=customHolidays.filter(h=>!(h.date===date&&h.name===name));
@@ -4954,9 +5051,18 @@ async function doImport(){
 // ══════════════════════════════════════════════════════════════
 // TOOLTIP
 // ══════════════════════════════════════════════════════════════
+/**
+ * @param {HTMLElement} cellEl
+ * @param {string} key
+ */
 function showTooltip(cellEl,key){
   const slot=getSlot(key),hol=holidays[key],note=notizen[key],d=new Date(key+'T00:00:00'),tt=dom.muss('tooltip');
   const{schichtC,holC}=getConflicts(slot,key);
+  /**
+   * @param {string} lbl
+   * @param {string[]|undefined} ppl
+   * @param {string} clr
+   */
   const row=(lbl,ppl,clr)=>ppl?.length?`<div class="tt-row"><span class="tt-lbl" style="color:${clr}">${lbl}</span><span class="tt-names">${ppl.map(esc).join(', ')}</span></div>`:'';
   // Besetzung je Schicht nach denselben Regeln wie ueberall: das Soll kommt
   // aus RK.sollAmTag. Vorher stand hier soll[s]||1 - ein ausdrueckliches Soll
@@ -4983,6 +5089,9 @@ function hideTooltip(){dom.muss('tooltip').classList.remove('show');}
 // ══════════════════════════════════════════════════════════════
 // HOLIDAY WARNINGS
 // ══════════════════════════════════════════════════════════════
+/**
+ * @param {{date: string, name: string, holiday: string, country: string}[]} warnings
+ */
 function showHolWarnings(warnings){
   if(!warnings?.length)return;
   /** @type {Record<string, {date: string, name: string, holiday: string, country: string}[]>} */
@@ -4993,6 +5102,12 @@ function showHolWarnings(warnings){
 // ══════════════════════════════════════════════════════════════
 // CONFIRM DIALOG
 // ══════════════════════════════════════════════════════════════
+/**
+ * @param {string} title
+ * @param {string} html
+ * @param {string} [yesLabel]
+ * @returns {Promise<boolean>}
+ */
 function confirmDialog(title,html,yesLabel='Ja'){
   return new Promise(resolve=>{
     const ex=document.getElementById('_cdlg');if(ex)ex.remove();
@@ -5045,6 +5160,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 const ZOOM_STUFEN=[0.9,1,1.1,1.25,1.4,1.6];
 let zoomStufe=1;
 
+/** @param {number} stufe */
 function setZoom(stufe){
   zoomStufe=Math.max(0,Math.min(ZOOM_STUFEN.length-1,stufe));
   document.body.style.zoom=String(ZOOM_STUFEN[zoomStufe]);
@@ -5060,6 +5176,7 @@ function setZoom(stufe){
 }
 
 // Seitenleiste ein- oder ausklappen; die Wahl wird gemerkt.
+/** @param {boolean} zu */
 function setSidebar(zu){
   const m=dom.muss('main'), btn=dom.muss('sidebar-toggle');
   m.classList.toggle('collapsed',zu);
@@ -5082,6 +5199,7 @@ function ladeZoom(){
   setZoom(isNaN(s)?1:s);
 }
 
+/** @param {string} msg */
 function toast(msg){const el=dom.muss('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
 async function doImportData(){
   // Felder des Sicherungsdialogs - der einzige Weg, der hierher fuehrt.
@@ -5112,6 +5230,7 @@ async function doImportData(){
   }
 }
 
+/** @param {string} id */
 function closeModal(id){
   const el=document.getElementById(id);
   const box=/** @type {HTMLElement|null|undefined} */ (el?.querySelector('.modal-box'));
@@ -5120,6 +5239,7 @@ function closeModal(id){
   else el?.classList.add('hidden');
 }
 function closeAllModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.add('hidden'));}
+/** @param {string} id */
 function openModal(id){
   const el=dom.muss(id);
   el.classList.remove('hidden');
