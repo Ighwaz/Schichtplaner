@@ -2468,7 +2468,7 @@ function showKwRufDialog(kw, weekDates){
   const items = () => mitarbeiter.map(m=>{
     const sel = kwNamen(kwKey).includes(m.name);
     const av = m.icon?`<span style="font-size:14px">${m.icon}</span>`
-      :`<span style="font-size:10px;font-weight:700;color:#fff">${initials(m.name)}</span>`;
+      :`<span style="font-size:10px;font-weight:700;color:#fff">${esc(initials(m.name))}</span>`;
     return `<div class="kw-ruf-person" data-name="${esc(m.name)}"
       style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;
       background:${sel?'rgba(167,139,250,.15)':'var(--surface2)'};margin-bottom:3px;
@@ -2605,7 +2605,7 @@ function renderRufKWTable(){
     names.forEach(name=>{
       const m=mitarbeiter.find(x=>x.name===name);
       const chip=document.createElement('span'); chip.className='rufkw-person-chip';
-      const av=`<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'11px':'8px'};color:#fff;font-weight:700;flex-shrink:0">${m?.icon||initials(name)}</span>`;
+      const av=`<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'11px':'8px'};color:#fff;font-weight:700;flex-shrink:0">${m?.icon||esc(initials(name))}</span>`;
       chip.innerHTML=`${av}<span>${esc(name)}</span><span data-rm-kw="${w.kwKey}" data-rm-name="${esc(name)}" style="margin-left:3px;cursor:pointer;opacity:.6;font-size:10px;padding:0 2px">✕</span>`;
       cell.appendChild(chip);
     });
@@ -2701,7 +2701,7 @@ function renderReihumListe(){
     return `<div class="reihum-zeile${r.an?'':' aus'}">
       <input type="checkbox" data-an="${i}"${r.an?' checked':''}>
       <span class="reihum-nr">${r.an?nummerVon(i):'–'}</span>
-      <span class="avatar" style="background:${m?m.color:'#64748b'};width:20px;height:20px;font-size:9px">${m?.icon||initials(r.name)}</span>
+      <span class="avatar" style="background:${m?m.color:'#64748b'};width:20px;height:20px;font-size:9px">${m?.icon||esc(initials(r.name))}</span>
       <span class="reihum-name">${esc(r.name)}</span>
       <button class="reihum-pfeil" data-hoch="${i}" title="nach oben"${i===0?' disabled':''}>▲</button>
       <button class="reihum-pfeil" data-runter="${i}" title="nach unten"${i===reihumFolge.length-1?' disabled':''}>▼</button>
@@ -2812,7 +2812,7 @@ function tageZeilen(w,geplant){
     namen.forEach(name=>{
       const m=mitarbeiter.find(x=>x.name===name);
       const chip=document.createElement('span'); chip.className='rufkw-person-chip';
-      const av=`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:8px;color:#fff;font-weight:700">${m?.icon||initials(name)}</span>`;
+      const av=`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:8px;color:#fff;font-weight:700">${m?.icon||esc(initials(name))}</span>`;
       chip.innerHTML=`${av}<span>${esc(name)}</span><span data-rm-tag="${key}" data-rm-name="${esc(name)}" style="margin-left:3px;cursor:pointer;opacity:.6;font-size:10px;padding:0 2px">✕</span>`;
       zelle.appendChild(chip);
     });
@@ -2882,7 +2882,7 @@ function openRufTagPicker(key,anchor){
   picker.innerHTML='<div style="padding:6px 10px;font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--text3);font-family:\'JetBrains Mono\',monospace">'+
     fmtDateShort(new Date(key+'T00:00:00'))+'</div>'+
     (mitarbeiter.length?mitarbeiter.map(m=>`<div class="rufkw-picker-item${drin.has(m.name)?' selected':''}" data-pname="${esc(m.name)}">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m.color};font-size:9px;color:#fff;font-weight:700">${m.icon||initials(m.name)}</span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m.color};font-size:9px;color:#fff;font-weight:700">${m.icon||esc(initials(m.name))}</span>
       <span>${esc(m.name)}</span></div>`).join('')
       :'<div style="padding:8px 12px;font-size:12px;color:var(--text3)">Keine Mitarbeiter</div>');
   dom.alle(picker,'[data-pname]').forEach(el=>{
@@ -2934,7 +2934,7 @@ function openRufKWPicker(kwKey,anchor){
   const rawKW2=rufKW[kwKey]; const current=new Set(rawKW2?(Array.isArray(rawKW2)?rawKW2:[rawKW2]):[]);
   picker.innerHTML=`<div style="padding:6px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);font-family:'JetBrains Mono',monospace">Person wählen</div>`+
     (mitarbeiter.map(m=>`<div class="rufkw-picker-item${current.has(m.name)?' selected':''}" data-pname="${esc(m.name)}">
-      <div class="avatar" style="background:${m.color};width:24px;height:24px;font-size:${m.icon?'14px':'9px'};flex-shrink:0">${m.icon||initials(m.name)}</div>
+      <div class="avatar" style="background:${m.color};width:24px;height:24px;font-size:${m.icon?'14px':'9px'};flex-shrink:0">${m.icon||esc(initials(m.name))}</div>
       <span>${esc(m.name)}</span>${current.has(m.name)?'<span style="margin-left:auto;color:var(--ruf)">✓</span>':''}
     </div>`).join('')||'<div style="padding:10px;color:var(--text3);font-size:12px">Keine Mitarbeiter</div>');
   dom.alle(picker,'[data-pname]').forEach(el=>{
@@ -3454,10 +3454,17 @@ function showColorPicker(anchor,memberName){
 // ══════════════════════════════════════════════════════════════
 // MEMBERS
 // ══════════════════════════════════════════════════════════════
+// Die zwei Buchstaben im Avatar. Sie kommen aus dem Namen, also aus einer
+// freien Eingabe, und gehen an dreizehn Stellen per innerHTML ins Markup -
+// darum steht an jeder dieser Stellen esc() davor. Ohne das macht ein Name
+// wie "<b Mueller" aus "<M" ein angefangenes Tag, und die Nachbarelemente
+// rutschen hinein. tests/typpruefung.test.mjs haelt die Regel fest.
+// Erst schneiden, dann maskieren: umgekehrt zerschnitte slice(0,2) ein
+// "&lt;" mittendrin.
 /** @param {string} name */
 function initials(name){return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
 /** @param {Mitarbeiter} m */
-function avContent(m){return m.icon?`<span style="font-size:17px;line-height:1">${m.icon}</span>`:`<span>${initials(m.name)}</span>`;}
+function avContent(m){return m.icon?`<span style="font-size:17px;line-height:1">${m.icon}</span>`:`<span>${esc(initials(m.name))}</span>`;}
 
 // Suche und Team-Filter der Seitenleiste gelten auch für die Monatsübersicht.
 function visibleMembers(){
@@ -3546,7 +3553,7 @@ function updateSelInfo(){
   if(selectedPersons.size>0){
     const names=[...selectedPersons];
     const avs=names.map(n=>{const m=mitarbeiter.find(x=>x.name===n);
-      return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'13px':'9px'};font-weight:700;color:#fff;margin-right:2px">${m?.icon||initials(n)}</span>`;
+      return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${m?m.color:'#64748b'};font-size:${m?.icon?'13px':'9px'};font-weight:700;color:#fff;margin-right:2px">${m?.icon||esc(initials(n))}</span>`;
     }).join('');
     el.innerHTML=`<div style="margin-bottom:3px">${avs}</div>
       <span class="sel-name">${names.length} Mitarbeiter</span>
@@ -3707,7 +3714,7 @@ function renderStats(){
   wrap.innerHTML=mitarbeiter.map(m=>{
     const c=counts[m.name]||{},total=Object.values(c).reduce((a,b)=>a+b,0);
     const bars=ALL_SHIFTS.map(s=>`<div class="stat-bar-row"><div class="stat-bar-label">${slbl[s]}</div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(c[s]||0)/mx*100}%;background:${SHIFT_SHORT[s][1]}"></div></div><div class="stat-bar-count">${c[s]||0}</div></div>`).join('');
-    return `<div class="stat-row"><div class="stat-name"><div class="avatar" style="background:${m.color};width:22px;height:22px;font-size:${m.icon?'13px':'9px'};flex-shrink:0">${m.icon||initials(m.name)}</div>${esc(m.name)}<span style="color:var(--text3);font-size:11px;margin-left:auto">${total}</span></div><div>${bars}</div></div>`;
+    return `<div class="stat-row"><div class="stat-name"><div class="avatar" style="background:${m.color};width:22px;height:22px;font-size:${m.icon?'13px':'9px'};flex-shrink:0">${m.icon||esc(initials(m.name))}</div>${esc(m.name)}<span style="color:var(--text3);font-size:11px;margin-left:auto">${total}</span></div><div>${bars}</div></div>`;
   }).join('')||'<div style="padding:14px;color:var(--text3)">Keine Mitarbeiter</div>';
 }
 
@@ -4528,7 +4535,7 @@ function openDayModal(key){
   const slot=getSlot(key),absents=new Set(getConflicts(slot,key).schichtC);
   dom.muss('dm-slots').innerHTML=ALL_SHIFTS.map(s=>{
     const color=`var(${SHIFT_VAR[s]})`,people=slot[s]||[];
-    const ph=people.length?people.map(name=>{const m=mitarbeiter.find(x=>x.name===name),av=m?m.color:'#64748b';const conf=WORK_SHIFTS.has(s)&&absents.has(name);const avC=m?.icon?`<span style="font-size:12px">${m.icon}</span>`:`<span>${initials(name)}</span>`;return `<div class="dm-chip" style="background:color-mix(in srgb,${color} 15%,transparent);color:${color}${conf?';outline:2px solid #f87171':''}"><div class="dm-av" style="background:${av}">${avC}</div>${esc(name)}${conf?' ⚠':''}</div>`;}).join(''):'<div class="dm-empty">Niemand</div>';
+    const ph=people.length?people.map(name=>{const m=mitarbeiter.find(x=>x.name===name),av=m?m.color:'#64748b';const conf=WORK_SHIFTS.has(s)&&absents.has(name);const avC=m?.icon?`<span style="font-size:12px">${m.icon}</span>`:`<span>${esc(initials(name))}</span>`;return `<div class="dm-chip" style="background:color-mix(in srgb,${color} 15%,transparent);color:${color}${conf?';outline:2px solid #f87171':''}"><div class="dm-av" style="background:${av}">${avC}</div>${esc(name)}${conf?' ⚠':''}</div>`;}).join(''):'<div class="dm-empty">Niemand</div>';
     return `<div class="dm-shift"><div class="dm-shift-hdr"><div class="dm-dot" style="background:${color}"></div><div class="dm-shift-name">${SHIFT_LABEL[s]}</div><div class="dm-meta">${SHIFT_TIME[s]}</div></div><div class="dm-people">${ph}</div></div>`;
   }).join('');
   dom.textfeld('dm-note').value=notizen[key]||'';
@@ -4691,7 +4698,7 @@ function renderTemplateTable(){
   mitarbeiter.forEach(m=>{
     const tr=document.createElement('tr');
     const tdP=document.createElement('td');tdP.className='person-cell';
-    tdP.innerHTML=`<div class="tmpl-person-chip"><div class="avatar" style="background:${m.color};width:26px;height:26px;font-size:${m.icon?'14px':'10px'}">${m.icon||initials(m.name)}</div><span style="font-size:13px;font-weight:600">${esc(m.name)}</span></div>`;
+    tdP.innerHTML=`<div class="tmpl-person-chip"><div class="avatar" style="background:${m.color};width:26px;height:26px;font-size:${m.icon?'14px':'10px'}">${m.icon||esc(initials(m.name))}</div><span style="font-size:13px;font-weight:600">${esc(m.name)}</span></div>`;
     tr.appendChild(tdP);
 
     for(let dow=0;dow<7;dow++){
@@ -4801,7 +4808,7 @@ function renderRufSummary(){
   const namen=Object.keys(proPerson).sort((a,b)=>proPerson[b]-proPerson[a]);
   sumWrap.innerHTML=namen.length?namen.map(n=>{
     const m=mitarbeiter.find(x=>x.name===n);
-    return `<div class="ruf-sum-card"><span class="avatar" style="background:${m?m.color:'#64748b'};width:26px;height:26px;font-size:11px">${m?.icon||initials(n)}</span>`+
+    return `<div class="ruf-sum-card"><span class="avatar" style="background:${m?m.color:'#64748b'};width:26px;height:26px;font-size:11px">${m?.icon||esc(initials(n))}</span>`+
       `<div><div class="ruf-sum-name">${esc(n)}</div><div class="ruf-sum-sub">Tage ${jahr}</div></div>`+
       `<div class="ruf-sum-count">${proPerson[n]}</div></div>`;
   }).join(''):'<span style="font-size:12px;color:var(--text3)">Noch keine Rufbereitschaft im Kalender.</span>';
@@ -4951,7 +4958,7 @@ function renderMatrix(){
       return `<td class="mx-cell ${tagKlasse(t)}" title="${titel}">`+
         `<div class="mx-split${z.leer?'':' belegt'}" data-key="${t.key}" data-name="${esc(name)}">${felder}</div></td>`;
     });
-    const av=`<span class="avatar" style="background:${m.color};width:15px;height:15px;font-size:8px;display:inline-flex;vertical-align:-3px;margin-right:6px">${m.icon||initials(name)}</span>`;
+    const av=`<span class="avatar" style="background:${m.color};width:15px;height:15px;font-size:8px;display:inline-flex;vertical-align:-3px;margin-right:6px">${m.icon||esc(initials(name))}</span>`;
     const summe=['frueh','normal','spaet','rufbereitschaft'].map((s,i)=>
       `<b class="s-${['f','n','s','r'][i]}${zaehl[s]?' hat':''}">${zaehl[s]}</b>`).join('');
     return `<tr><td class="mx-name" title="${esc(name)}">${av}${esc(name)}<span class="mx-team">${esc(m.team||'')}</span></td>`+

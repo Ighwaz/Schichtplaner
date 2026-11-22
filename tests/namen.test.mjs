@@ -90,13 +90,67 @@ describe('Namen mit Sonderzeichen', () => {
   });
 
   test('der Tooltip zeigt einen Feiertagsnamen als Text, nicht als HTML', async () => {
+    // Die App oeffnet im laufenden Monat (index.html:2275), also muss der
+    // Tag aus dem laufenden Monat kommen. Vorher stand hier fest 2026-09-03;
+    // das lief, solange September 2026 der laufende Monat war, und schlug ab
+    // Oktober fehl, weil die Zelle dann gar nicht mehr gezeichnet wird.
+    const heute = new Date();
+    const tag = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, '0')}-15`;
     const o = await starteOberflaeche({
       mitarbeiter: TEAM,
-      feiertage: { '2026-09-03': { name: '<b>Fest</b>', country: 'DE', custom: true } },
+      feiertage: { [tag]: { name: '<b>Fest</b>', country: 'DE', custom: true } },
     });
-    o.fenster.showTooltip(o.$('.day-cell[data-key="2026-09-03"]'), '2026-09-03');
+    const zelle = o.$(`.day-cell[data-key="${tag}"]`);
+    assert.ok(zelle, `die Zelle ${tag} fehlt im laufenden Monat`);
+    o.fenster.showTooltip(zelle, tag);
     const tt = o.$('#tooltip');
     assert.equal(tt.querySelector('b'), null, 'der Name wurde als HTML ausgeführt');
     assert.match(tt.textContent, /<b>Fest<\/b>/);
+  });
+});
+
+// Der Name steckt nicht nur im Namensfeld, sondern auch in den zwei
+// Buchstaben des Avatars. Die kamen unmaskiert ins Markup: aus "<b Mueller"
+// macht initials() die Zeichenfolge "<M", und daraus baute der Browser ein
+// angefangenes Tag <m<, in das die Nachbarelemente rutschten. Der Avatar war
+// danach leer, die Zeile zerschossen.
+describe('Namen, die als Initialen ein Tag öffnen', () => {
+  const SPITZ = '<b Mueller';
+  const SPITZES_TEAM = [
+    { name: SPITZ, team: 'DE', color: '#4a9eff', icon: '', prefs: {} },
+    { name: 'Bauer, Martin', team: 'DE', color: '#22c55e', icon: '', prefs: {} },
+  ];
+
+  test('die Seitenleiste zeigt die Initialen als Text', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: SPITZES_TEAM });
+    const zeile = o.$(`.member-item[data-member="${SPITZ}"]`);
+    assert.ok(zeile, 'die Zeile fehlt ganz');
+    const avatar = zeile.querySelector('.avatar');
+    assert.ok(avatar, 'der Avatar fehlt');
+    assert.equal(avatar.textContent, '<M', 'die Initialen wurden als Markup gelesen');
+    assert.equal(zeile.querySelector('.member-name').textContent, SPITZ);
+  });
+
+  test('die Monatsübersicht trägt die Zeile unversehrt', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: SPITZES_TEAM });
+    klick(o.$('.vtab[data-view="matrix"]'));
+    await warteBis(() => o.$('.mx-table tbody .mx-name'), 'die Monatsübersicht');
+    // thead und die Fusszeile tragen dieselbe Klasse - hier zaehlen nur die
+    // Personenzeilen.
+    const zeilen = o.$$('.mx-table tbody tr:not(.mx-foot) .mx-name');
+    assert.equal(zeilen.length, 2, 'eine Personenzeile ist verschwunden');
+    const spitz = o.$(`.mx-table tbody .mx-name[title="${SPITZ}"]`);
+    assert.ok(spitz, 'die Zeile mit der spitzen Klammer fehlt');
+    assert.ok(spitz.textContent.includes(SPITZ), 'der Name steht nicht in der Zeile');
+    assert.equal(spitz.querySelector('.avatar').textContent, '<M');
+  });
+
+  test('die Statistik zeigt den Avatar neben dem Namen', async () => {
+    const o = await starteOberflaeche({ mitarbeiter: SPITZES_TEAM });
+    klick(o.$('.sb-tab[data-tab="stats"]'));
+    await warteBis(() => o.$('.stat-row'), 'die Statistik');
+    const reihe = o.$('.stat-row');
+    assert.equal(reihe.querySelector('.avatar').textContent, '<M');
+    assert.ok(reihe.querySelector('.stat-name').textContent.includes(SPITZ));
   });
 });

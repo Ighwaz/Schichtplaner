@@ -108,3 +108,27 @@ describe('Typpruefung bleibt ehrlich', () => {
     assert.deepEqual(griffe, []);
   });
 });
+
+// Die Oberflaeche setzt an vielen Stellen Text in Zeichenketten ein, die
+// danach als innerHTML ins Markup gehen. Bei allem, was aus einer freien
+// Eingabe stammt, muss esc() davor - sonst oeffnet ein Name ein Tag.
+// Genau das war dreizehnmal nicht der Fall: initials('<b Mueller') ergibt
+// "<M", und der Browser machte daraus ein angefangenes Element, in das die
+// Nachbarn rutschten. Dieser Test haelt die Regel fest, damit die
+// vierzehnte Stelle nicht wieder durchrutscht.
+describe('Freie Eingaben gehen maskiert ins Markup', () => {
+  // Die Definition selbst ("function initials(") ist keine Einsetzstelle.
+  const stellen = [...html.matchAll(/(esc\(|function )?initials\(/g)];
+
+  test('es gibt Einsetzstellen - sonst prueft dieser Test nichts', () => {
+    const aufrufe = stellen.filter(t => t[1] !== 'function ');
+    assert.ok(aufrufe.length >= 10, `nur ${aufrufe.length} Aufrufe von initials() gefunden`);
+  });
+
+  test('vor jedem initials() steht esc()', () => {
+    const roh = stellen
+      .filter(t => t[1] === undefined)
+      .map(t => `Zeile ${html.slice(0, t.index).split('\n').length}: initials() ohne esc()`);
+    assert.deepEqual(roh, []);
+  });
+});
