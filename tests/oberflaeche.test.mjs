@@ -115,7 +115,11 @@ describe('Kalenderraster', () => {
 });
 
 describe('Besetzung und Markierungen', () => {
-  test('Zaehler und Chips stehen an der Schicht', async () => {
+  test('die Zeilenmarke nennt die Schicht, der Zaehler nur die Luecke', async () => {
+    // Vorher trug jede Zeile ihren Buchstaben und ihr Soll, auch wenn alles
+    // stimmte - viermal je Zelle, 168-mal je Monat. Jetzt sagt der
+    // Stundenbalken, welche Schicht die Zeile ist, und die Zahl erscheint
+    // nur, wenn jemand fehlt.
     const o = await starteOberflaeche({
       mitarbeiter: TEAM,
       schichten: { '2026-09-01': tag(['Bauer, Martin'], [], ['Krüger, Sina'], ['Nair, Anita']) },
@@ -125,7 +129,32 @@ describe('Besetzung und Markierungen', () => {
     assert.deepEqual(chips(z, 'frueh'), ['Bauer']);       // ohne haengendes Komma
     assert.deepEqual(chips(z, 'spaet'), ['Krüger']);
     assert.deepEqual(chips(z, 'rufbereitschaft'), ['Nair']);
-    assert.match(zeile(z, 'frueh').querySelector('.chips-label').textContent, /1\/1/);
+
+    for (const sch of ['frueh', 'normal', 'spaet', 'rufbereitschaft'])
+      assert.ok(zeile(z, sch).querySelector(`.uhr.uhr-${sch}`), `Stundenbalken fehlt bei ${sch}`);
+    // Die Rufbereitschaft laeuft ueber Mitternacht und braucht darum zwei
+    // Stuecke - daran haengt die Aussage, die sie von den anderen trennt.
+    assert.equal(zeile(z, 'rufbereitschaft').querySelectorAll('.uhr-rufbereitschaft > i').length, 2);
+    assert.equal(zeile(z, 'frueh').querySelectorAll('.uhr-frueh > i').length, 1);
+
+    // Soll erfuellt: keine Zahl. Der Zaehler ist ein direktes Kind, die
+    // Segmente des Balkens liegen eine Ebene tiefer.
+    assert.equal(zeile(z, 'frueh').querySelector('.chips-label > i'), null,
+      'der Zaehler steht da, obwohl nichts fehlt');
+  });
+
+  test('eine unbesetzte Schicht meldet sich als einzige mit einer Zahl', async () => {
+    const o = await starteOberflaeche({
+      mitarbeiter: TEAM,
+      schichten: { '2026-09-02': tag(['Bauer, Martin'], [], [], ['Nair, Anita']) },
+    });
+    await zeigeMonat(o, SEP.jahr, SEP.monat);
+    const z = zelle(o, '2026-09-02');   // Mittwoch, also gilt das Soll
+    const marke = zeile(z, 'spaet').querySelector('.chips-label');
+    assert.ok(marke.classList.contains('unter'), 'die Luecke ist nicht markiert');
+    assert.match(marke.textContent, /0\/1/);
+    // ... und die besetzten Zeilen schweigen weiterhin.
+    assert.equal(zeile(z, 'frueh').querySelector('.chips-label > i'), null);
   });
 
   test('der Chip traegt Schichtfarbe und Personenfarbe', async () => {
