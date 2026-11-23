@@ -71,6 +71,16 @@ describe('Die Schriften werden überhaupt geladen', () => {
       'sonst verwirft der Browser es');
   });
 
+  test('hell ist die Vorgabe, schon im ersten Bild', async () => {
+    // Zwei Stellen entscheiden das: das Attribut im <html>-Tag malt das
+    // erste Bild, bevor init() laeuft, und init() setzt es danach aus dem
+    // gemerkten Wert. Standen die beiden auf verschiedenen Themen, blitzte
+    // beim Start kurz das falsche auf.
+    const o = await starteOberflaeche();
+    assert.equal(o.dokument.documentElement.dataset.theme, 'light');
+    assert.match(o.$('#btn-theme').textContent, /Theme/);
+  });
+
   test('ohne Netz greift eine Oberflächenschrift, nicht die Vorgabe des Browsers', async () => {
     // Das @import holt die Schrift aus dem Netz. Ein Arbeitsplatz ohne
     // Verbindung bekommt sie also nicht - und fiel vorher direkt auf
