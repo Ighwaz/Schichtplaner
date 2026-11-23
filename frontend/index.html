@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de" data-theme="dark">
+<html lang="de" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -138,6 +138,8 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
   border-top:1px solid var(--border);font-size:11.5px;color:var(--text3);flex-shrink:0;flex-wrap:wrap}
 .lg{display:flex;align-items:center;gap:5px;font-weight:600}
 .lg i{width:8px;height:8px;border-radius:2px;display:inline-block;font-style:normal;flex-shrink:0}
+.lg .uhr{width:34px;height:5px}
+.lg .uhr i{width:auto;height:auto;border-radius:0}
 .sb-folder{margin-left:auto;display:flex;align-items:center;gap:7px;min-width:0}
 .folder-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;max-width:34vw}
@@ -324,16 +326,44 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .si-bar{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
 .si-fill{height:100%;border-radius:2px;transition:width .2s}
 .chips-area{display:flex;flex-direction:column;gap:2px;flex:1}
+/* DER STUNDENBALKEN
+   Eine Schicht ist eine Tageszeit - das stand bisher nur in der Fussleiste
+   und in title-Attributen, und die Farbe musste es allein tragen. Der Balken
+   zeigt die eigenen Stunden auf einem Tag von 24: eine Stunde sind 4.1667 %.
+   Frueh 06-14, Spaet 14-22, Rufbereitschaft 22-06 - die laeuft ueber
+   Mitternacht und liegt deshalb an beiden Enden, was sie von den
+   Arbeitsschichten unterscheidet. Der Normaldienst ist Gleitzeit und hat
+   keine festen Zeiten; er bekommt darum eine Schraffur statt eines Blocks.
+   Dieselben Zeiten stehen ausgeschrieben in der Legende der Fussleiste -
+   dort lernt man das Zeichen. */
+.uhr{display:block;width:24px;height:4px;border-radius:1px;flex-shrink:0;
+  background:var(--surface3);position:relative;overflow:hidden}
+.uhr i{position:absolute;top:0;bottom:0;display:block;font-style:normal}
+.uhr-frueh i{left:25%;width:33.34%;background:var(--frueh)}
+.uhr-spaet i{left:58.34%;width:33.33%;background:var(--spaet)}
+.uhr-rufbereitschaft i:first-child{left:91.67%;width:8.33%;background:var(--ruf)}
+.uhr-rufbereitschaft i:last-child{left:0;width:25%;background:var(--ruf)}
+.uhr-normal i{left:33.34%;width:37.5%;
+  background:repeating-linear-gradient(90deg,var(--normal) 0 2px,transparent 2px 4px)}
 .chips-row{display:flex;align-items:flex-start;gap:3px}
 .chips-label{font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;flex-shrink:0;
-  display:flex;align-items:center;gap:3px;min-width:28px;padding-top:2px}
-.chips-label i{font-style:normal;font-size:7.5px;opacity:.7;letter-spacing:-.2px}
+  display:flex;align-items:center;gap:3px;min-width:24px;padding-top:4px}
+.chips-label>i{font-style:normal;font-size:7.5px;opacity:.7;letter-spacing:-.2px}
 .chips-label.unter{color:var(--krank)}
-.chips-label.unter i{opacity:1;font-weight:800}
+.chips-label.unter>i{opacity:1;font-weight:800}
 .chips-row.leer{opacity:.5}
+/* Eine leere Zeile behaelt ihren Platz - dieselbe Schicht steht in jeder
+   Zelle an derselben Stelle. Ihre Spur braucht sie dafuer nicht: am
+   Wochenende waeren das drei graue Balken je Tag fuer Schichten, die dort
+   kein Soll haben. Fehlt dagegen jemand, traegt die Marke .unter und bleibt
+   sichtbar. */
+.chips-row.leer .chips-label:not(.unter) .uhr{background:transparent}
 .chip-leer{font-size:9px;color:var(--text3);padding-left:2px}
 .chips{display:flex;flex-wrap:wrap;gap:2px;flex:1}
-.chip{font-size:10px;padding:2px 7px 2px 5px;border-radius:var(--radius-chip);font-weight:600;cursor:grab;white-space:nowrap;max-width:82px;transition:opacity .15s,transform .12s;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;line-height:1.4}
+.chip{font-size:11px;padding:1px 4px 1px 3px;border-radius:var(--radius-chip);font-weight:600;
+  cursor:grab;white-space:nowrap;max-width:100%;min-width:0;transition:opacity .15s,transform .12s;
+  overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:2px;
+  line-height:1.45;background:var(--surface3);color:var(--text);border:none}
 .chip:hover{filter:brightness(1.06)}
 /* Austragen: sichtbar, sobald der Zeiger auf dem Chip steht */
 .chip-weg{border:none;background:none;color:inherit;font:inherit;font-size:9px;line-height:1;
@@ -342,11 +372,12 @@ h1{font-size:14px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;flex-s
 .chip:hover .chip-weg,.chip:focus-within .chip-weg{opacity:.75;width:auto}
 .chip-weg:hover,.chip-weg:focus-visible{opacity:1}
 /* Vorschau: was der naechste Klick eintragen wuerde */
-.chip.vorschau{background:none;border-style:dashed;opacity:.75;cursor:default}
-.chip.frueh{background:var(--frueh-bg);color:var(--frueh-text);border:1px solid color-mix(in srgb,var(--frueh) 35%,transparent)}
-.chip.normal{background:var(--normal-bg);color:var(--normal-text);border:1px solid color-mix(in srgb,var(--normal) 35%,transparent)}
-.chip.spaet{background:var(--spaet-bg);color:var(--spaet-text);border:1px solid color-mix(in srgb,var(--spaet) 35%,transparent)}
-.chip.ruf{background:var(--ruf-bg);color:var(--ruf-text);border:1px solid color-mix(in srgb,var(--ruf) 35%,transparent)}
+.chip.vorschau{background:none;border:1px dashed var(--border2);opacity:.75;cursor:default}
+/* .chip.frueh, .normal, .spaet und .ruf setzt renderCalendar weiterhin - die
+   Klasse sagt, zu welcher Schicht der Chip gehoert, und Tests haengen daran.
+   Sie faerbt nur nichts mehr: das tut der Stundenbalken links der Zeile.
+   Wer hier wieder eine Flaechenfarbe einsetzt, hat zwei Zeichen fuer
+   dieselbe Aussage und nimmt sie dem Namen wieder weg. */
 
 /* ── RUFBEREITSCHAFT OVERVIEW ── */
 .ruf-wrap{overflow-y:auto;flex:1;padding:14px;background:var(--bg);height:100%}
@@ -1083,10 +1114,10 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 
 <!-- Fussleiste: die einzige Legende - im Fenster wie im Ausdruck -->
 <div class="statusbar" id="statusbar">
-  <span class="lg"><i style="background:var(--frueh)"></i>Früh 06–14</span>
-  <span class="lg"><i style="background:var(--normal)"></i>Normaldienst</span>
-  <span class="lg"><i style="background:var(--spaet)"></i>Spät 14–22</span>
-  <span class="lg"><i style="background:var(--ruf)"></i>Rufbereitschaft 22–06</span>
+  <span class="lg"><span class="uhr uhr-frueh"><i></i></span>Früh 06–14</span>
+  <span class="lg"><span class="uhr uhr-normal"><i></i></span>Normaldienst, Gleitzeit</span>
+  <span class="lg"><span class="uhr uhr-spaet"><i></i></span>Spät 14–22</span>
+  <span class="lg"><span class="uhr uhr-rufbereitschaft"><i></i><i></i></span>Rufbereitschaft 22–06</span>
   <span class="sb-folder"><span class="folder-label" id="folder-label">Lade…</span></span>
 </div>
 
@@ -3060,8 +3091,12 @@ function renderAll(){
 }
 
 async function init(){
-  // Theme
-  const theme=localStorage.getItem('sp-theme')||'dark';
+  // Theme. Hell ist die Vorgabe: das Werkzeug steht tagsueber im Buero
+  // offen, und auf fast schwarzem Grund gluehen die Schichtfarben. Dunkel
+  // bleibt eine Wahl - sie steht im Mehr-Menue und ueberlebt den Neustart.
+  // Dieselbe Vorgabe steht als data-theme im <html>-Tag, damit das erste
+  // Bild schon stimmt.
+  const theme=localStorage.getItem('sp-theme')||'light';
   document.documentElement.dataset.theme=theme;
   dom.muss('btn-theme').textContent=(theme==='dark'?'🌙':'☀️')+' Theme';
 
@@ -4055,8 +4090,9 @@ function makeCell(key,dayNum,other){
       const people=slot[s]||[], tgt=sollFor(s,key), fehlt=people.length<tgt;
       const row=document.createElement('div');row.className='chips-row'+(people.length?'':' leer');row.dataset.shift=s;
       const lbl=document.createElement('span');lbl.className='chips-label'+(fehlt?' unter':'');
-      lbl.style.color=fehlt?'':SHIFT_SHORT[s][1];
-      lbl.innerHTML=`${SHIFT_SHORT[s][0]}<i>${tgt?people.length+'/'+tgt:people.length||''}</i>`;
+      // Der Balken sagt, welche Schicht die Zeile ist - die Zahl nur noch,
+      // wenn sie nicht stimmt. Die Regel schweigt, die Ausnahme meldet sich.
+      lbl.innerHTML=uhrBalken(s)+(fehlt?`<i>${people.length}/${tgt}</i>`:'');
       lbl.title=tgt?`${SHIFT_LABEL[s]}: ${people.length} von ${tgt}`
                   :`${SHIFT_LABEL[s]}: ${people.length} (am Wochenende kein Soll)`;
       row.appendChild(lbl);
@@ -4753,6 +4789,18 @@ function renderTemplateTable(){
 function istTmplWert(w){ return w==='frei'||RK.istSchicht(w); }
 const TMPL_LABEL={frueh:'Früh',normal:'Normal',spaet:'Spät',rufbereitschaft:'Ruf',frei:'Frei'};
 const TMPL_KLASSE={frueh:'t-f',normal:'t-n',spaet:'t-s',rufbereitschaft:'t-r',frei:'t-frei'};
+/** @param {string} val */
+/**
+ * Der Stundenbalken einer Schicht als Markup. Die Rufbereitschaft braucht
+ * zwei Stuecke, weil sie ueber Mitternacht laeuft; die uebrigen eins.
+ * @param {Schicht} schicht
+ * @returns {string}
+ */
+function uhrBalken(schicht){
+  const stuecke = schicht==='rufbereitschaft' ? '<i></i><i></i>' : '<i></i>';
+  return `<span class="uhr uhr-${schicht}">${stuecke}</span>`;
+}
+
 /** @param {string} val */
 function cellLabel(val){ return istTmplWert(val)?TMPL_LABEL[val]:'–'; }
 /** @param {string} val */
