@@ -9,7 +9,27 @@
 // pruefen statt als Zeichenkette im Quelltext.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { starteOberflaeche } from './lade-oberflaeche.mjs';
+
+const hier = dirname(fileURLToPath(import.meta.url));
+const html = readFileSync(join(hier, '..', 'frontend', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
+
+// Der <style>-Block ohne den Druckteil. Papier hat eigene, bewusst dichtere
+// Groessen und steht darum nicht unter derselben Regel.
+function stilOhneDruck() {
+  const stil = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  const di = stil.indexOf('@media print');
+  if (di < 0) return stil;
+  let tiefe = 0, ende = di;
+  for (let k = stil.indexOf('{', di); k < stil.length; k++) {
+    if (stil[k] === '{') tiefe++;
+    else if (stil[k] === '}' && --tiefe === 0) { ende = k + 1; break; }
+  }
+  return stil.slice(0, di) + stil.slice(ende);
+}
 
 describe('Der Tooltip ist sichtbar, wenn er gezeigt wird', () => {
   // Frueher stand das Element zweimal im Stilblatt: .tooltip (Deckkraft 0,
@@ -93,5 +113,46 @@ describe('Die Schriften werden überhaupt geladen', () => {
     assert.match(schrift, /system-ui|Segoe UI/,
       'zwischen Inter und sans-serif fehlt eine Schrift, die es auf dem Rechner gibt');
     assert.match(schrift, /sans-serif/, 'die allgemeine Ersatzschrift fehlt als letzte Stufe');
+  });
+});
+
+// Achtzehn verschiedene Schriftgroessen standen im Stilblatt, zwoelf davon
+// zwischen 7.5 und 13 Pixeln. Hierarchie entsteht aus Verhaeltnissen, und
+// 11 zu 11.5 ist keines - das war eine Reihe von Einzelentscheidungen, kein
+// System. Diese Tests halten die fuenf Stufen fest, damit es nicht wieder
+// zerfasert: wer eine Groesse braucht, nimmt eine Marke oder begruendet die
+// Ausnahme hier.
+describe('Die Schriftskala bleibt eine Skala', () => {
+  // Emoji in einem Avatar und im Auswahlgitter sind Grafik, keine Schrift.
+  const GRAFIK = ['.prof-av-big', '.emoji-opt'];
+
+  test('die fünf Stufen sind erklärt und haben Abstand', () => {
+    const stufen = [...html.matchAll(/--t([1-5]):([0-9.]+)px/g)]
+      .map(t => ({ nr: Number(t[1]), px: Number(t[2]) }))
+      .sort((a, b) => a.nr - b.nr);
+    assert.equal(stufen.length, 5, 'es sollen genau fünf Stufen sein');
+    for (let i = 1; i < stufen.length; i++) {
+      const faktor = stufen[i].px / stufen[i - 1].px;
+      assert.ok(faktor >= 1.1,
+        `--t${stufen[i].nr} (${stufen[i].px}px) steht zu dicht an --t${stufen[i - 1].nr} ` +
+        `(${stufen[i - 1].px}px): Faktor ${faktor.toFixed(2)}`);
+    }
+  });
+
+  test('keine feste Schriftgröße außerhalb der Skala', () => {
+    const stil = stilOhneDruck();
+    const roh = [];
+    for (const m of stil.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+      const selektor = m[1].split('*/').pop().trim();
+      if (GRAFIK.some(g => selektor.includes(g))) continue;
+      for (const f of m[2].matchAll(/font-size:([0-9.]+)px/g))
+        roh.push(`${selektor || '?'} → ${f[1]}px`);
+    }
+    assert.deepEqual(roh, []);
+  });
+
+  test('die Ausnahmen gibt es wirklich - sonst prüft die Liste nichts', () => {
+    for (const g of GRAFIK)
+      assert.ok(html.includes(g), `${g} steht nicht mehr im Markup - Ausnahme streichen`);
   });
 });
