@@ -156,3 +156,61 @@ describe('Die Schriftskala bleibt eine Skala', () => {
       assert.ok(html.includes(g), `${g} steht nicht mehr im Markup - Ausnahme streichen`);
   });
 });
+
+// Farben nur noch als Marke, und die Schrift muss lesbar sein.
+//
+// Beides war verletzt, und zwar systematisch: 58 Farbliterale standen in
+// themenneutralen Regeln, und jedes einzelne war ein Dunkel-Wert - sie
+// entstanden, als es nur das dunkle Thema gab. rgba(248,113,113) hat auf
+// Weiss 2.77:1. Seit hell die Vorgabe ist, war das die Normalansicht.
+describe('Das Farbsystem bleibt ein System', () => {
+  const marken = roh => Object.fromEntries(
+    [...roh.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\b/g)].map(m => [m[1], m[2]]));
+
+  function block(start) {
+    const i = html.indexOf(start);
+    return html.slice(i, html.indexOf('\n}', i));
+  }
+
+  function kontrast(a, b) {
+    const leucht = h => {
+      const teile = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+        .map(c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+      return 0.2126 * teile[0] + 0.7152 * teile[1] + 0.0722 * teile[2];
+    };
+    const [hi, lo] = [leucht(a), leucht(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  for (const [thema, start] of [['hell', ':root{'], ['dunkel', '[data-theme="dark"]{']]) {
+    test(`jede Schriftfarbe ist im ${thema}en Thema lesbar`, () => {
+      const m = { ...marken(block(':root{')), ...marken(block(start)) };
+      const schlecht = [];
+      for (const t of ['text', 'text2', 'text3'])
+        for (const g of ['surface', 'surface2', 'surface3', 'bg']) {
+          const k = kontrast(m[t], m[g]);
+          if (k < 4.5) schlecht.push(`--${t} (${m[t]}) auf --${g} (${m[g]}): ${k.toFixed(2)}:1`);
+        }
+      assert.deepEqual(schlecht, [], 'unter 4.5:1');
+    });
+  }
+
+  test('keine Farbe außerhalb der Marken', () => {
+    // Der Druckblock und die beiden Markenblöcke dürfen Werte tragen; alles
+    // andere nimmt var(--…) oder color-mix(), damit es dem Thema folgt.
+    let rest = stilOhneDruck();
+    for (const start of [':root{', '[data-theme="dark"]{']) rest = rest.replace(block(start), '');
+    const roh = [
+      ...[...rest.matchAll(/#[0-9a-fA-F]{6}\b/g)].map(m => m[0]),
+      ...[...rest.matchAll(/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+/g)].map(m => m[0] + ',…)'),
+    ];
+    assert.deepEqual(roh, []);
+  });
+
+  test('es gibt keine Marke, die niemand benutzt', () => {
+    const alle = { ...marken(block(':root{')), ...marken(block('[data-theme="dark"]{')) };
+    // Normale Zeichenkette, kein Template - dort bliebe \( nur eine Klammer.
+    const tot = Object.keys(alle).filter(t => !new RegExp('var\\(--' + t + '\\b').test(html));
+    assert.deepEqual(tot, []);
+  });
+});
