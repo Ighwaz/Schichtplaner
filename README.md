@@ -71,7 +71,11 @@ Single-File-Weboberfläche – eine EXE, keine Runtime-Abhängigkeiten.
   Knopf im Menü ⋯ unerklärt durchgehen
 - **Druckansicht** im Querformat: nur die offene Ansicht, mit Kopfzeile,
   ausgeschriebenen Notizen und derselben Legende wie im Fenster – unabhängig
-  vom Theme immer auf Weiß
+  vom Theme immer auf Weiß, weil das dunkle Thema hinter `@media screen`
+  steht und das Papier gar nicht erreichen kann. Kein Knopf und kein
+  Eingabefeld wird mitgedruckt; was in einem davon stand und auf das Blatt
+  gehört – die gewählte Woche, der Template-Name –, steht in der Kopfzeile.
+  `tests/stilblatt.test.mjs` prüft beides
 - **Import/Export** als ICS (Kalender) und JSON (vollständiges Backup)
 - **Anzeigegröße** über A− / A+ im Menü ⋯ (90 % bis 160 %), die
   Mitarbeiterleiste lässt sich ausklappen – beides wird gemerkt

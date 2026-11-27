@@ -82,7 +82,18 @@
      dafuer frueher - das ist der Preis und er ist gewollt. */
   --mx-zelle:46px;--mx-ruf:18px;
 }
-[data-theme="dark"]{
+/* Das dunkle Thema gilt nur fuer den Bildschirm.
+   Papier ist immer hell: Drucker lassen Hintergruende weg, heller Text auf
+   weissem Papier kaeme dabei heraus. Dafuer stand im Druckblock eine zweite,
+   vollstaendige Palette, die jede Marke dieses Blocks nachsetzen musste -
+   achtzehn von achtunddreissig fehlten, und --normal-text war dort noch
+   tuerkis aus einer Zeit, in der der Normaldienst tuerkis war. Wer aus dem
+   dunklen Thema druckte, bekam darum einen hellgruenen Stundenbalken und
+   ein rosa Konfliktzeichen auf Weiss.
+   Hinter @media screen kann dieser Block das Papier nicht erreichen, und
+   der Druckblock setzt nur noch, was Papier wirklich anders braucht.
+   tests/stilblatt.test.mjs haelt beides fest. */
+@media screen{[data-theme="dark"]{
   --bg:#0f1117;--surface:#191d27;--surface2:#1e2330;--surface3:#262c3b;
   --border:#2a3140;--border2:#3a4256;
   --text:#e7eaf3;--text2:#a6aec2;--text3:#8a93a6;
@@ -98,7 +109,7 @@
   --blue:#3b82f6;--blue-soft:rgba(59,130,246,.14);
   --orange:#fb923c;
   --today:rgba(59,130,246,.13);--today-border:#3b82f6;
-}
+}}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'Inter',system-ui,'Segoe UI',sans-serif;font-size:var(--t4);background:var(--bg);color:var(--text);overflow:hidden}
 /* Kopf- und Fussleiste behalten ihre Hoehe, der Inhalt dazwischen nimmt sich
@@ -731,26 +742,42 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 @page{size:A4 landscape;margin:9mm}
 
 @media print{
-  /* Auf Papier immer helle, kontraststarke Farben - unabhaengig davon, ob im
-     Fenster gerade das dunkle Theme laeuft. Sonst kaeme heller Text auf weissem
-     Papier heraus, weil Drucker Hintergruende standardmaessig weglassen. */
-  :root,:root[data-theme=dark],:root[data-theme=light]{
+  /* Nur was Papier anders braucht als der Schirm. Alles andere - vor allem
+     die vier Schichtfarben - kommt aus dem hellen Thema, das hier ohnehin
+     gilt: weisser Grund statt des hellgrauen, dunklere Linien, weil die des
+     Bildschirms im Druck verschwinden, schwarze Schrift, kein Heute-Schimmer,
+     kein Schatten, und Fremdmonatstage in voller Deckkraft (sie werden
+     stattdessen weiter unten blass gesetzt). */
+  :root{
     --bg:#fff;--surface:#fff;--surface2:#fff;--surface3:#f2f2f2;
     --border:#9aa0ad;--border2:#6b7280;
     --text:#000;--text2:#26292f;--text3:#4b5060;
-    --frueh-text:#15803d;--normal-text:#0e6b82;--spaet-text:#a45309;--ruf-text:#6d28d9;
-    --urlaub-text:#a3164f;--krank-text:#b91c1c;--eltern-text:#0e7490;--sonder-text:#8a4308;
-    --frueh-bg:#eaf7ee;--normal-bg:#e4f5fa;--spaet-bg:#fdf1e0;--ruf-bg:#f1ebfd;
-    --urlaub-bg:#fdebf3;--krank-bg:#fdecec;--eltern-bg:#e6f6fa;--sonder-bg:#fbf0e3;
     --today:transparent;--shadow:transparent;--day-other:1;
+    /* Die geteilte Zelle dichter als im Fenster - auf Papier wird sie nur
+       gelesen, nicht geklickt, und ein Monat soll auf eine Seite passen.
+       Vorher standen diese beiden Hoehen als drei !important-Regeln da, von
+       denen zwei einander aufheben mussten. */
+    --mx-zelle:22px;--mx-ruf:8px;
   }
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact;
     box-shadow:none!important;animation:none!important;transition:none!important}
   html,body{height:auto!important;overflow:visible!important;background:#fff!important;font-size:11px;zoom:1!important}
 
-  /* Alles, was nur zum Bedienen da ist */
+  /* Alles, was nur zum Bedienen da ist. Diese Liste nannte drei Leisten,
+     die es nicht mehr gab, und keine der vier, die es gibt: vierzehn
+     Knoepfe, Felder und Auswahllisten wurden mitgedruckt - darunter die
+     fuenf Knoepfe der Rufbereitschaft und "Template anwenden".
+     tests/stilblatt.test.mjs laeuft jedes Bedienelement des Markups durch
+     und verlangt, dass es einen Vorfahren in dieser Liste hat. */
   header,.more-menu,.daymenu,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
-  .dab,.tmpl-footer,.hol-add-form,#hol-coverage-note{display:none!important}
+  .dab,.hol-add-form,#hol-coverage-note,
+  .ruf-col-hdr,.tmpl-header,.tmpl-name-row,.tmpl-saved,
+  .mx-kopf select{display:none!important}
+  /* Bedienanleitungen gehoeren an den Schirm. Auf Papier erklaeren sie
+     Klicks, die es dort nicht gibt. */
+  .mx-hinweis,.ruf-hint,.tmpl-hint{display:none!important}
+  /* .tmpl-footer stand hier und war das Einzige in dieser Ansicht, das aufs
+     Papier gehoert: der Monat, fuer den das Template gilt. */
 
   .main{display:block!important;height:auto!important;grid-template-columns:1fr!important}
   /* Nur die offene Ansicht drucken - sonst landen Rufbereitschaft,
@@ -764,10 +791,7 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   .mx-scroll{max-height:none!important;overflow:visible!important;border:none!important;flex:none!important}
   .mx-name,.mx-sum,.mx-table thead th,.mx-foot td{position:static!important}
   .mx-table{min-width:0!important}
-  .mx-split{height:22px!important;border:1px solid var(--border)!important}
-  .mx-band{height:8px!important}
-  .mx-band:first-child{height:auto!important}
-  .mx-hinweis{display:none!important}
+  .mx-split{border:1px solid var(--border)!important}
 
   /* Kopfzeile nur auf dem Papier; die Legende ist dieselbe Fussleiste wie
      im Fenster - eine Legende, zwei Ausgaben. */
@@ -3343,9 +3367,18 @@ function updatePrintHead(){
   }else if(activeView==='ruf'){
     text=`Rufbereitschaft ${dom.auswahl('rufkw-year')?.value||curYear}`;
   }else if(activeView==='matrix'){
-    text=`Monatsübersicht ${monat}`;
+    // Zeigt die Ansicht nur eine Woche, muss das auf dem Papier stehen:
+    // das Auswahlfeld, in dem es im Fenster steht, wird nicht mitgedruckt.
+    // Sonst traegt ein Blatt mit sieben Spalten die Aufschrift des ganzen
+    // Monats.
+    const zr=dom.auswahl('mx-zeitraum');
+    const woche=zr&&zr.value!==''?zr.options[zr.selectedIndex]?.textContent:'';
+    text=woche?`Monatsübersicht ${monat} · ${woche}`:`Monatsübersicht ${monat}`;
   }else if(activeView==='tmpl'){
-    text='Autoplan-Template';
+    // Ebenso der Name: er steht im Fenster in einem Eingabefeld, und das
+    // ist Bedienung und wird nicht gedruckt.
+    const name=dom.eingabe('tmpl-name-input')?.value.trim();
+    text=name?`Autoplan-Template „${name}“`:'Autoplan-Template';
   }else if(activeView==='hol'){
     text=`Eigene Feiertage ${curYear}`;
   }

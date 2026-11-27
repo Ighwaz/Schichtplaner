@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { starteOberflaeche } from './lade-oberflaeche.mjs';
+import { starteOberflaeche, klick } from './lade-oberflaeche.mjs';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(hier, '..', 'frontend', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -265,5 +265,119 @@ describe('Jede Klasse im Stilblatt wird auch vergeben', () => {
       assert.ok(html.includes(stamm + '${'),
         `${k} wird nirgends zusammengesetzt - raus aus der Liste`);
     }
+  });
+});
+
+// Was auf dem Papier steht.
+//
+// Der Druckstil hatte zwei Loecher, die beide niemandem auffielen, weil
+// niemand im dunklen Thema druckt und dann hinsieht:
+//
+// Erstens eine zweite, vollstaendige Palette, die jede Marke des dunklen
+// Themas nachsetzen musste, damit das Papier hell bleibt. Achtzehn von
+// achtunddreissig fehlten. Wer dunkel druckte, bekam einen hellgruenen
+// Stundenbalken und ein rosa Konfliktzeichen auf Weiss. Jetzt steht das
+// dunkle Thema in @media screen und kann das Papier nicht erreichen.
+//
+// Zweitens eine Ausblendliste, die drei Leisten nannte, die es nicht mehr
+// gab, und keine der vier, die es gibt. Vierzehn Bedienelemente wurden
+// mitgedruckt.
+describe('Der Druckstil zeigt Papier und nicht die Bedienung', () => {
+  // Der Druckblock als Text, ohne Kommentare.
+  function druckblock() {
+    const stil = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+    const di = stil.indexOf('@media print');
+    let tiefe = 0, ende = di;
+    for (let k = stil.indexOf('{', di); k < stil.length; k++) {
+      if (stil[k] === '{') tiefe++;
+      else if (stil[k] === '}' && --tiefe === 0) { ende = k + 1; break; }
+    }
+    return stil.slice(di, ende).replace(/\/\*[\s\S]*?\*\//g, '');
+  }
+
+  test('das dunkle Thema kann das Papier nicht erreichen', () => {
+    assert.match(html, /@media screen\{\s*\[data-theme="dark"\]\{/,
+      'der dunkle Block steht nicht hinter @media screen - dann muss der ' +
+      'Druckblock jede seiner Marken nachsetzen, und genau das ging schief');
+  });
+
+  test('es gilt weiter auf dem Schirm', async () => {
+    // Die Gegenprobe: @media screen darf das Thema nicht abschalten. Gelesen
+    // wird die Marke selbst, nicht die Farbe dahinter - jsdom setzt var()
+    // in getComputedStyle nicht ein.
+    const o = await starteOberflaeche();
+    const wurzel = o.dokument.documentElement;
+    const bg = () => o.fenster.getComputedStyle(wurzel).getPropertyValue('--bg').trim();
+    assert.equal(bg(), '#eef0f5', 'das helle Thema gilt nicht');
+    wurzel.dataset.theme = 'dark';
+    assert.equal(bg(), '#0f1117', 'das dunkle Thema wirkt nicht mehr');
+  });
+
+  test('der Druckblock setzt keine Marke, die es nicht gibt', () => {
+    // Acht Marken standen hier, die es nach dem Umbenennen der
+    // Bedeutungsfarben nicht mehr gab: --urlaub-*, --krank-*, --eltern-*,
+    // --sonder-*. Gesetzt wurden sie, gelesen nichts.
+    const da = new Set([
+      ...[...html.slice(html.indexOf(':root{'), html.indexOf('\n}', html.indexOf(':root{')))
+        .replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/--([a-z0-9-]+)\s*:/g)].map(m => m[1]),
+    ]);
+    assert.ok(da.size > 30, `nur ${da.size} Marken im hellen Thema gefunden`);
+    const erfunden = [...druckblock().matchAll(/--([a-z0-9-]+)\s*:/g)]
+      .map(m => m[1]).filter(t => !da.has(t));
+    assert.deepEqual([...new Set(erfunden)], []);
+  });
+
+  test('kein Knopf, kein Feld und keine Auswahlliste auf dem Papier', async () => {
+    // Jede Regel des Druckblocks, die display:none setzt, zaehlt. Ein
+    // Bedienelement darf nicht gedruckt werden - also muss es selbst oder
+    // einer seiner Vorfahren von einer dieser Regeln getroffen werden.
+    const block = druckblock();
+    const versteckt = [...block.matchAll(/([^{}]+)\{\s*display:\s*none\s*!important\s*\}/g)]
+      .flatMap(m => m[1].split(',').map(x => x.trim()));
+
+    // Eine Regel, die etwas wieder einschaltet, nimmt ihrer Grundregel die
+    // Beweiskraft: .view-panel steht hier auf display:none, aber
+    // .view-panel.active holt die offene Ansicht zurueck. Ohne diesen
+    // Schritt galt jeder Knopf als versteckt, weil er in irgendeiner
+    // Ansicht sitzt - der Test war gruen und prueffte nichts. Die vierzehn
+    // mitgedruckten Bedienelemente hat er so nicht gesehen.
+    const zurueck = [...block.matchAll(/([^{}]+)\{\s*display:\s*(?!none)[a-z-]+\s*!important\s*\}/g)]
+      .flatMap(m => m[1].split(',').map(x => x.trim()));
+    const weg = versteckt.filter(s => !zurueck.some(z => z.startsWith(s))).join(',');
+    assert.ok(weg.includes('.sidebar'), 'die Ausblendregeln wurden nicht gefunden');
+    assert.ok(!weg.includes('.view-panel,') && !weg.endsWith('.view-panel'),
+      '.view-panel zaehlt noch mit, obwohl .view-panel.active es zurueckholt');
+
+    const o = await starteOberflaeche();
+    const offen = [...o.dokument.querySelectorAll('button,select,input,textarea')]
+      .filter(e => !e.closest(weg))
+      .map(e => `${e.tagName} "${(e.textContent || e.id || '').trim().slice(0, 36)}"`);
+    assert.deepEqual(offen, []);
+  });
+
+  test('der Druckkopf traegt, was in den versteckten Feldern stand', async () => {
+    // Die Woche der Monatsuebersicht und der Template-Name stehen im
+    // Fenster in einem Auswahl- bzw. Eingabefeld. Beide werden nicht
+    // gedruckt, also muss die Kopfzeile sie nennen - sonst traegt ein Blatt
+    // mit sieben Spalten die Aufschrift des ganzen Monats.
+    const o = await starteOberflaeche({
+      mitarbeiter: [{ name: 'Bauer, Martin', team: 'DE', color: '#4a9eff', icon: '', prefs: {} }],
+    });
+    const titel = o.$('#print-title');
+
+    klick(o.$('.vtab[data-view="matrix"]'));
+    assert.match(titel.textContent, /Monatsübersicht/);
+
+    const zr = o.$('#mx-zeitraum');
+    assert.ok(zr.options.length > 1, 'die Wochenliste ist leer');
+    zr.value = '1';
+    zr.dispatchEvent(new o.fenster.Event('change'));
+    o.fenster.updatePrintHead();
+    assert.match(titel.textContent, /KW ?\d/, 'die gewählte Woche fehlt auf dem Papier');
+
+    klick(o.$('.vtab[data-view="tmpl"]'));
+    o.$('#tmpl-name-input').value = 'Sommer';
+    o.fenster.updatePrintHead();
+    assert.match(titel.textContent, /Sommer/, 'der Template-Name fehlt auf dem Papier');
   });
 });
