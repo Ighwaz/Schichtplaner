@@ -54,11 +54,11 @@
   --bg:#eef0f5;--surface:#ffffff;--surface2:#f5f6fa;--surface3:#e9ecf4;
   --border:#dde1ec;--border2:#c3cadc;
   --text:#15171f;--text2:#4c5468;--text3:#616879;
-  --shadow:rgba(40,50,90,.1);--chip-alpha:.1;--day-other:.3;
+  --shadow:rgba(40,50,90,.1);--day-other:.3;
   --blue:#2563eb;--blue-soft:rgba(37,99,235,.1);
   --orange:#ea580c;
   --today:rgba(37,99,235,.08);--today-border:#2563eb;
-  --radius-cell:11px;--radius-chip:5px;
+  --radius-cell:9px;--radius-chip:5px;
   /* SCHRIFTSKALA
      Vorher standen im Stilblatt achtzehn verschiedene Groessen, zwoelf davon
      zwischen 7.5 und 13 Pixeln. Hierarchie entsteht aus Verhaeltnissen, und
@@ -86,7 +86,7 @@
   --bg:#0f1117;--surface:#191d27;--surface2:#1e2330;--surface3:#262c3b;
   --border:#2a3140;--border2:#3a4256;
   --text:#e7eaf3;--text2:#a6aec2;--text3:#8a93a6;
-  --shadow:rgba(0,0,0,.6);--chip-alpha:.2;--day-other:.35;
+  --shadow:rgba(0,0,0,.6);--day-other:.35;
   --frueh:#22c55e;--frueh-bg:rgba(34,197,94,.15);--frueh-text:#7ee9ab;
   --normal:#3b82f6;--normal-bg:rgba(59,130,246,.16);--normal-text:#92b8fb;
   --spaet:#f97316;--spaet-bg:rgba(249,115,22,.15);--spaet-text:#fcbe7d;
@@ -148,7 +148,6 @@ h1{font-size:var(--t4);font-weight:800;letter-spacing:-.3px;white-space:nowrap;f
   border-radius:7px;cursor:pointer;font-size:var(--t3);font-weight:600;transition:all .15s}
 .ur-btn:hover:not(:disabled){background:var(--surface3);color:var(--text)}
 .ur-btn:disabled{opacity:.3;cursor:default}
-.ur-btn.on{border-color:var(--blue);color:var(--blue)}
 /* Mehr-Menue: Ordner, Sicherung, ICS, Drucken, Anzeigegroesse, Theme */
 .more-menu{position:fixed;top:52px;right:12px;z-index:300;background:var(--surface);
   border:1px solid var(--border2);border-radius:11px;padding:6px;min-width:232px;
@@ -186,11 +185,6 @@ h1{font-size:var(--t4);font-weight:800;letter-spacing:-.3px;white-space:nowrap;f
   white-space:nowrap;transition:background .12s,color .12s}
 .vtab:hover{color:var(--text);background:var(--surface3)}
 .vtab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px var(--shadow);font-weight:700}
-.sub-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px}
-.sub-tab{padding:4px 12px;border-radius:7px;cursor:pointer;font-size:var(--t3);font-weight:600;color:var(--text2);border:2px solid transparent;transition:all .15s}
-.sub-tab:hover{background:var(--surface2);color:var(--text)}
-.sub-tab.active{background:var(--surface2);border-color:var(--ruf);color:var(--ruf)}
-.sub-panel{display:none}.sub-panel.active{display:block}
 
 /* LAYOUT */
 .main{display:grid;grid-template-columns:274px 1fr;flex:1;min-height:0;overflow:hidden;transition:grid-template-columns .2s}
@@ -236,10 +230,6 @@ h1{font-size:var(--t4);font-weight:800;letter-spacing:-.3px;white-space:nowrap;f
 .soll-pill input:focus{outline:none}
 .soll-pill input::-webkit-inner-spin-button,.soll-pill input::-webkit-outer-spin-button{-webkit-appearance:none}
 
-.soll-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:var(--t3)}
-.soll-row label{color:var(--text2);width:85px;flex-shrink:0;font-weight:500}
-.soll-row input{width:42px;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:3px 5px;border-radius:6px;font-size:var(--t3);text-align:center}
-.soll-row input:focus{outline:none;border-color:var(--blue)}
 /* WERKZEUG
    Person(en) und Schicht stehen zusammen an einem Ort - vorher war die eine
    Haelfte oben in der Leiste und die andere hier unten. */
@@ -317,7 +307,7 @@ h1{font-size:var(--t4);font-weight:800;letter-spacing:-.3px;white-space:nowrap;f
 .cal-grid{display:grid;grid-template-columns:32px repeat(7,1fr);gap:5px}
 .day-hdr{text-align:center;font-family:'JetBrains Mono',monospace;font-size:var(--t1);font-weight:700;letter-spacing:.5px;color:var(--text3);padding:4px 0 6px;text-transform:uppercase}
 .day-hdr.we{opacity:.55}
-.day-cell{background:var(--surface);border:2px solid var(--border);border-radius:9px;padding:7px;min-height:118px;transition:border-color .12s,background .12s,transform .1s;display:flex;flex-direction:column;gap:2px;cursor:pointer;position:relative;overflow:hidden}
+.day-cell{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius-cell);padding:7px;min-height:118px;transition:border-color .12s,background .12s,transform .1s;display:flex;flex-direction:column;gap:2px;cursor:pointer;position:relative;overflow:hidden}
 .day-cell:hover{border-color:var(--border2);background:var(--surface2);box-shadow:0 2px 10px var(--shadow)}
 .day-cell.other{opacity:var(--day-other);pointer-events:none;background:var(--bg)!important;border-color:var(--border)!important}
 .day-cell.weekend{background:color-mix(in srgb,var(--surface) 88%,var(--bg))}
@@ -358,9 +348,6 @@ h1{font-size:var(--t4);font-weight:800;letter-spacing:-.3px;white-space:nowrap;f
 .hol-de-tag{color:var(--blue)}.hol-in-tag{color:var(--orange)}.hol-custom-tag{color:var(--hinweis)}
 .conflict-badge{position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--fehler);
   border:2px solid var(--surface);overflow:hidden;text-indent:-999px;white-space:nowrap}
-.soll-ist{display:flex;gap:2px;flex-shrink:0;margin-top:1px}
-.si-bar{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
-.si-fill{height:100%;border-radius:2px;transition:width .2s}
 .chips-area{display:flex;flex-direction:column;gap:2px;flex:1}
 /* DER STUNDENBALKEN
    Eine Schicht ist eine Tageszeit - das stand bisher nur in der Fussleiste
@@ -548,28 +535,12 @@ tr.zeile-abw td{background:color-mix(in srgb,var(--fehler) 7%,transparent)}
 tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 .ruf-col-hdr h3{font-family:'JetBrains Mono',monospace;font-size:var(--t3);font-weight:700;margin-right:auto;white-space:nowrap}
 .ruf-col-hdr select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:5px 8px;border-radius:7px;font-size:var(--t3)}
-.ruf-col-body{max-height:calc(100vh - 230px);overflow-y:auto}
 .ruf-hint{font-size:var(--t2);color:var(--text3);line-height:1.55;margin-bottom:9px}
-.ruf-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
-.ruf-toolbar select{background:var(--surface);border:2px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:var(--t3);font-family:inherit}
-.ruf-toolbar select:focus{outline:none;border-color:var(--blue)}
 .ruf-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .ruf-sum-card{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:150px}
-.ruf-sum-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--t3);font-weight:700;color:#fff;flex-shrink:0}
 .ruf-sum-name{font-weight:600;font-size:var(--t3)}
 .ruf-sum-sub{font-size:var(--t1);color:var(--text3);font-family:'JetBrains Mono',monospace}
 .ruf-sum-count{font-family:'JetBrains Mono',monospace;font-size:var(--t5);font-weight:700;color:var(--ruf);margin-left:auto}
-.ruf-sum-label{font-size:var(--t1);color:var(--text3)}
-.ruf-table{width:100%;border-collapse:collapse;font-size:var(--t3)}
-.ruf-table th{background:var(--surface2);padding:9px 14px;text-align:left;font-size:var(--t1);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);font-family:'JetBrains Mono',monospace;border-bottom:2px solid var(--border)}
-.ruf-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
-.ruf-table tr:last-child td{border-bottom:none}
-.ruf-table tr:hover td{background:var(--surface2)}
-.ruf-date-col{font-family:'JetBrains Mono',monospace;font-size:var(--t3);color:var(--text2);white-space:nowrap}
-.ruf-day-col{font-size:var(--t2);color:var(--text3)}
-.ruf-person-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:color-mix(in srgb,var(--ruf) 15%,transparent);color:var(--ruf);font-weight:600;font-size:var(--t3);margin:2px}
-.ruf-empty{text-align:center;padding:40px;color:var(--text3);font-size:var(--t4)}
-.ruf-export-row{display:flex;gap:8px;margin-top:12px}
 
 /* ── TEMPLATE EDITOR ── */
 .tmpl-wrap{overflow-y:auto;flex:1;padding:14px;background:var(--bg)}
@@ -669,12 +640,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 .pref-btn.sel-s{border-color:var(--spaet);background:color-mix(in srgb,var(--spaet) 12%,transparent);color:var(--spaet)}
 .pref-btn.sel-r{border-color:var(--ruf);background:color-mix(in srgb,var(--ruf) 12%,transparent);color:var(--ruf)}
 .pref-btn.sel-frei{border-color:var(--fehler);background:color-mix(in srgb,var(--fehler) 8%,transparent);color:var(--fehler)}
-.ap-check{display:flex;align-items:center;gap:4px;font-size:var(--t3);cursor:pointer;font-weight:500;margin-bottom:5px}
-.ap-check input{cursor:pointer;accent-color:var(--blue)}
-.ap-toggle{display:flex;align-items:center;gap:7px;font-size:var(--t3);font-weight:500}
-.ap-result{font-size:var(--t3);padding:8px 10px;border-radius:8px;margin-top:9px;display:none}
-.ap-result.ok{background:color-mix(in srgb,var(--frueh) 10%,transparent);color:var(--frueh);display:block}
-.ap-result.err{background:color-mix(in srgb,var(--fehler) 10%,transparent);color:var(--fehler-text);display:block}
 .ics-sec{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .ics-sec:last-child{border-bottom:none;margin-bottom:0}
 .ics-sec h3{font-size:var(--t1);letter-spacing:.8px;text-transform:uppercase;color:var(--text3);margin-bottom:7px;font-family:'JetBrains Mono',monospace}
@@ -785,8 +750,7 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 
   /* Alles, was nur zum Bedienen da ist */
   header,.more-menu,.daymenu,.view-tabs,.sidebar-toggle,.sidebar,.modal-bg,#toast,
-  .dab,.ruf-export-row,.tmpl-footer,.hol-add-form,#hol-coverage-note,
-  .ruf-toolbar,.tmpl-toolbar{display:none!important}
+  .dab,.tmpl-footer,.hol-add-form,#hol-coverage-note{display:none!important}
 
   .main{display:block!important;height:auto!important;grid-template-columns:1fr!important}
   /* Nur die offene Ansicht drucken - sonst landen Rufbereitschaft,
@@ -804,9 +768,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   .mx-band{height:8px!important}
   .mx-band:first-child{height:auto!important}
   .mx-hinweis{display:none!important}
-  .ruf-col-body{max-height:none!important;overflow:visible!important}
-  .ruf-split{display:block!important}
-  .ruf-col{border:none!important;padding:0!important;margin-bottom:14px}
 
   /* Kopfzeile nur auf dem Papier; die Legende ist dieselbe Fussleiste wie
      im Fenster - eine Legende, zwei Ausgaben. */
@@ -829,7 +790,6 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
   /* Tabellen der uebrigen Ansichten sauber ueber Seiten verteilen */
   tr{break-inside:avoid}
   thead{display:table-header-group}
-  .soll-ist{display:none}
   /* Im Fenster ein 7px-Punkt mit Tooltip - auf Papier gibt es keinen Tooltip,
      also als lesbare Zeile ausgeben statt als Punkt mit ueberlaufendem Text. */
   .conflict-badge{position:static!important;width:auto!important;height:auto!important;
@@ -850,18 +810,12 @@ tr.zeile-offen td{background:color-mix(in srgb,var(--spaet) 7%,transparent)}
 .member-item:nth-child(5){animation-delay:.1s}
 .member-item:nth-child(n+6){animation-delay:.12s}
 
-/* ── Design System Additions ── */
-.hol-label{font-size:var(--t1);font-weight:600;color:var(--fehler-text);display:flex;align-items:center;gap:2px;letter-spacing:.1px;opacity:.85;margin-top:1px}
 .day-cell.selected{border-color:var(--blue) !important;background:color-mix(in srgb,var(--blue) 7%,var(--surface));box-shadow:0 0 0 3px var(--blue-soft)}
 .range-start,.range-end{border-color:var(--blue) !important;background:color-mix(in srgb,var(--blue) 10%,var(--surface))}
 .in-range{background:color-mix(in srgb,var(--blue) 5%,var(--surface));border-color:color-mix(in srgb,var(--blue) 30%,var(--border))}
 /* pill active state */
 .pill:active{transform:scale(.94)}
 .pill.active{border-color:currentColor;font-weight:700}
-/* action buttons in day cells */
-.day-act-btn{background:var(--surface2);border:1.5px solid var(--border);color:var(--text2);border-radius:5px;cursor:pointer;font-size:var(--t2);padding:1px 5px;transition:background .1s,transform .1s}
-.day-act-btn:hover{background:var(--surface3);color:var(--text)}
-.day-act-btn:active{transform:scale(.92)}
 /* ANLEITUNG: der Hilfedialog aus dem Mehr-Menue. Links die Kapitel, rechts
    der Text - beide Spalten rollen fuer sich. */
 .hilfe-box{width:960px;max-width:96vw;height:82vh;padding:0;display:flex;flex-direction:column;overflow:hidden}

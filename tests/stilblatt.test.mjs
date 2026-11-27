@@ -167,6 +167,12 @@ describe('Das Farbsystem bleibt ein System', () => {
   const marken = roh => Object.fromEntries(
     [...roh.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\b/g)].map(m => [m[1], m[2]]));
 
+  // Jede Marke, die ein Block setzt - auch die ohne Hexwert. Die Kommentare
+  // muessen vorher raus: dort stehen Markennamen als Erklaerung, nicht als
+  // Deklaration.
+  const namen = roh => [...roh.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/--([a-z0-9-]+)\s*:/g)]
+    .map(m => m[1]);
+
   function block(start) {
     const i = html.indexOf(start);
     return html.slice(i, html.indexOf('\n}', i));
@@ -208,9 +214,56 @@ describe('Das Farbsystem bleibt ein System', () => {
   });
 
   test('es gibt keine Marke, die niemand benutzt', () => {
-    const alle = { ...marken(block(':root{')), ...marken(block('[data-theme="dark"]{')) };
-    // Normale Zeichenkette, kein Template - dort bliebe \( nur eine Klammer.
-    const tot = Object.keys(alle).filter(t => !new RegExp('var\\(--' + t + '\\b').test(html));
+    // Alle Marken, nicht nur die mit Hexwert: --chip-alpha und --radius-cell
+    // standen jahrelang ungelesen da, weil die Probe vorher nur nach #rrggbb
+    // suchte. --radius-cell hielt dabei 11px fest, waehrend die Zelle
+    // 9px benutzte - eine Marke, die niemand liest, driftet.
+    const alle = [...namen(block(':root{')), ...namen(block('[data-theme="dark"]{'))];
+    const tot = alle.filter(t => !html.includes('var(--' + t + ')')
+      && !html.includes('var(--' + t + ',') && !html.includes('var(--' + t + ' '));
+    assert.deepEqual([...new Set(tot)], []);
+  });
+});
+
+// Jede Regel braucht einen Nutzer.
+//
+// Sechsundzwanzig Klassennamen standen im Stilblatt, die das Markup nie
+// vergibt. Das ist nicht nur Gewicht: .ruf-person-chip sieht dem lebenden
+// .rufkw-person-chip zum Verwechseln aehnlich, .day-act-btn dem lebenden
+// .dab, und .ruf-table war die Tabelle einer Ansicht, die es nicht mehr
+// gibt. Wer dort etwas aendert, aendert nichts - und sucht den Fehler dann
+// an der falschen Stelle.
+describe('Jede Klasse im Stilblatt wird auch vergeben', () => {
+  // Namen, die nie als Ganzes im Quelltext stehen, weil sie aus Stuecken
+  // gebaut werden: badge-${team}, st-${stand}, s-${['f','n','s','r'][i]}.
+  const GEBAUT = ['badge-de', 'badge-in', 'st-ok', 'st-offen', 's-f', 's-n', 's-s', 's-r'];
+
+  test('kein Klassenname ohne Stelle, die ihn setzt', () => {
+    const a = html.indexOf('<style>'), e = html.indexOf('</style>');
+    const stil = html.slice(a, e).replace(/\/\*[\s\S]*?\*\//g, '');
+    const rest = html.slice(0, a) + html.slice(e);   // Markup und Skripte
+    const namen = new Set();
+    for (const r of stil.matchAll(/([^{}]*)\{[^{}]*\}/g))
+      for (const k of r[1].matchAll(/\.([A-Za-z][\w-]*)/g)) namen.add(k[1]);
+    assert.ok(namen.size > 300, `nur ${namen.size} Klassen gefunden - greift der Ausschnitt noch?`);
+
+    // Der Name muss als ganzes Wort dastehen - Klassennamen bestehen nur
+    // aus [A-Za-z0-9_-], also ist die Grenze genau dieser Satz. Ausgeschrieben
+    // statt als \w, weil ein Escape in einer Zeichenkette leicht verloren
+    // geht und die Probe dann stillschweigend etwas anderes prueft.
+    const RAND = '[^A-Za-z0-9_-]';
+    const tot = [...namen].filter(k =>
+      !GEBAUT.includes(k) && !new RegExp(RAND + k + RAND).test(rest)).sort();
     assert.deepEqual(tot, []);
+  });
+
+  test('die gebauten Namen werden wirklich gebaut - sonst prüft die Liste nichts', () => {
+    for (const k of GEBAUT) {
+      // Der Stamm vor dem letzten Bindestrich muss im Quelltext an einem
+      // Platzhalter kleben: class="… badge-${…}".
+      const stamm = k.slice(0, k.lastIndexOf('-') + 1);
+      assert.ok(html.includes(stamm + '${'),
+        `${k} wird nirgends zusammengesetzt - raus aus der Liste`);
+    }
   });
 });
