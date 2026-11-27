@@ -74,6 +74,13 @@
      Emoji in Avataren (21px, 26px) sind Grafik und stehen nicht auf der
      Skala. tests/stilblatt.test.mjs haelt die Regel fest. */
   --t1:10px;--t2:11.5px;--t3:13px;--t4:15px;--t5:19px;
+  /* Hoehen der geteilten Tageszelle in der Monatsuebersicht. Das untere
+     Band war 11px hoch - das ist die Trefferflaeche fuer einen Klick auf
+     die Rufbereitschaft, also fuer das Hauptmerkmal dieser Ansicht, und
+     darunter standen bei sechs Personen 358px ungenutzt. Jetzt 18px, und
+     die Zelle waechst entsprechend mit. Wer viele Leute plant, scrollt
+     dafuer frueher - das ist der Preis und er ist gewollt. */
+  --mx-zelle:46px;--mx-ruf:18px;
 }
 [data-theme="dark"]{
   --bg:#0f1117;--surface:#191d27;--surface2:#1e2330;--surface3:#262c3b;
@@ -456,11 +463,11 @@ h1{font-size:var(--t4);font-weight:800;letter-spacing:-.3px;white-space:nowrap;f
    jedes weitere ein Streifen darunter. Die Regeln haengen an der Stellung,
    nicht an einem Namen - ein drittes Band waere damit von selbst der
    naechste Streifen. */
-.mx-split{display:flex;flex-direction:column;height:34px;border-radius:5px;overflow:hidden;
+.mx-split{display:flex;flex-direction:column;height:var(--mx-zelle);border-radius:5px;overflow:hidden;
   background:var(--surface2);border:1px solid transparent}
 .mx-band{display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;
   font-weight:700;cursor:pointer;transition:filter .1s;color:transparent;
-  height:11px;flex:none;font-size:var(--t1);letter-spacing:.5px;border-top:1px solid var(--border)}
+  height:var(--mx-ruf);flex:none;font-size:var(--t1);letter-spacing:.5px;border-top:1px solid var(--border)}
 .mx-band:first-child{flex:1;height:auto;font-size:var(--t2);color:var(--text3);
   letter-spacing:0;border-top:none}
 .mx-band:hover{outline:2px solid var(--blue);outline-offset:-2px;border-radius:3px}
